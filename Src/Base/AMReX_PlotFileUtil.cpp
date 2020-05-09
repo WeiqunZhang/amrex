@@ -174,7 +174,8 @@ WriteMultiLevelPlotfile (const std::string& plotfilename, int nlevels,
                          const std::string &versionName,
                          const std::string &levelPrefix,
                          const std::string &mfPrefix,
-                         const Vector<std::string>& extra_dirs)
+                         const Vector<std::string>& extra_dirs,
+                         bool mf_movable)
 {
     BL_PROFILE("WriteMultiLevelPlotfile()");
 
@@ -225,6 +226,18 @@ WriteMultiLevelPlotfile (const std::string& plotfilename, int nlevels,
 
     for (int level = 0; level <= finest_level; ++level)
     {
+        const MultiFab* data;
+        std::unique_ptr<MultiFab> mf_tmp;
+        if (mf[level]->nGrow() > 0) {
+            MultiFab(mf[level]->boxArray(),
+                     mf[level]->DistributionMap(),
+                     mf[level]->nComp(), 0, MFInfo(),
+                     mf[level]->Factory());
+            MultiFab::Copy(*mf_tmp, *mf[level], 0, 0, mf[level]->nComp(), 0);
+            data = mf_tmp.get();
+        } else {
+            data = mf[level];
+        }
         if (AsyncOut::UseAsyncOut()) {
             VisMF::AsyncWrite(*mf[level],
                               MultiFabFileFullPrefix(level, plotfilename, levelPrefix, mfPrefix),
@@ -299,7 +312,8 @@ WriteMultiLevelPlotfileHeaders (const std::string & plotfilename, int nlevels,
                                 const std::string         & versionName,
                                 const std::string         & levelPrefix,
                                 const std::string         & mfPrefix,
-                                const Vector<std::string> & extra_dirs)
+                                const Vector<std::string> & extra_dirs,
+                                bool mf_movable)
 {
     BL_PROFILE("WriteMultiLevelPlotfile()");
 
@@ -357,11 +371,32 @@ WriteSingleLevelPlotfile (const std::string& plotfilename,
     Vector<Geometry> geomarr(1,geom);
     Vector<int> level_steps(1,level_step);
     Vector<IntVect> ref_ratio;
+    bool mf_movable = false;
 
     WriteMultiLevelPlotfile(plotfilename, 1, mfarr, varnames, geomarr, time,
-                            level_steps, ref_ratio, versionName, levelPrefix, mfPrefix, extra_dirs);
+                            level_steps, ref_ratio, versionName, levelPrefix, mfPrefix,
+                            extra_dirs, mf_movable);
 }
 
+void
+WriteSingleLevelPlotfile (const std::string& plotfilename,
+                          MultiFab&& mf, const Vector<std::string>& varnames,
+                          const Geometry& geom, Real time, int level_step,
+                          const std::string &versionName,
+                          const std::string &levelPrefix,
+                          const std::string &mfPrefix,
+                          const Vector<std::string>& extra_dirs)
+{
+    Vector<const MultiFab*> mfarr(1,&mf);
+    Vector<Geometry> geomarr(1,geom);
+    Vector<int> level_steps(1,level_step);
+    Vector<IntVect> ref_ratio;
+    bool mf_movable = true;
+
+    WriteMultiLevelPlotfile(plotfilename, 1, mfarr, varnames, geomarr, time,
+                            level_steps, ref_ratio, versionName, levelPrefix, mfPrefix,
+                            extra_dirs, mf_movable);
+}
 
 #ifdef AMREX_USE_EB
 void

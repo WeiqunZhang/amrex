@@ -70,11 +70,22 @@ namespace amrex
 				     const std::string &mfPrefix = "Cell");
 
     void WriteSingleLevelPlotfile (const std::string &plotfilename,
-				   const MultiFab &mf,
-				   const Vector<std::string> &varnames,
-				   const Geometry &geom,
-				   Real t,
-				   int level_step,
+                                   const MultiFab &mf,
+                                   const Vector<std::string> &varnames,
+                                   const Geometry &geom,
+                                   Real t,
+                                   int level_step,
+                                   const std::string &versionName = "HyperCLaw-V1.1",
+                                   const std::string &levelPrefix = "Level_",
+                                   const std::string &mfPrefix = "Cell",
+                                   const Vector<std::string>& extra_dirs = Vector<std::string>());
+
+    void WriteSingleLevelPlotfile (const std::string &plotfilename,
+                                   MultiFab &&mf,
+                                   const Vector<std::string> &varnames,
+                                   const Geometry &geom,
+                                   Real t,
+                                   int level_step,
                                    const std::string &versionName = "HyperCLaw-V1.1",
                                    const std::string &levelPrefix = "Level_",
                                    const std::string &mfPrefix = "Cell",
@@ -91,7 +102,8 @@ namespace amrex
                                   const std::string &versionName = "HyperCLaw-V1.1",
                                   const std::string &levelPrefix = "Level_",
                                   const std::string &mfPrefix = "Cell",
-                                  const Vector<std::string>& extra_dirs = Vector<std::string>());
+                                  const Vector<std::string>& extra_dirs = Vector<std::string>(),
+                                  bool mf_movable = false);
 
 #ifdef AMREX_USE_HDF5
     void WriteGenericPlotfileHeaderHDF5 (hid_t fid,
