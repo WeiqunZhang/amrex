@@ -11,86 +11,73 @@ void fab_filnd (Box const& bx, Array4<Real> const& qn, int ncomp,
     const auto domlo = amrex::lbound(domain);
     const auto domhi = amrex::ubound(domain);
 
-    const int ilo = domlo.x;
-    const int ihi = domhi.x;
-
-#if AMREX_SPACEDIM >= 2
-    const int jlo = domlo.y;
-    const int jhi = domhi.y;
-#endif
-
-#if AMREX_SPACEDIM == 3
-    const int klo = domlo.z;
-    const int khi = domhi.z;
-#endif
-
     for (int n = 0; n < ncomp; ++n)
     {
         Array4<Real> q(qn,n);
         BCRec const& bc = bcn[n];
 
-        if (lo.x < ilo && (bc.lo(0) != BCType::int_dir)) {
+        if (lo.x < domlo.x && (bc.lo(0) != BCType::int_dir)) {
            const int imin = lo.x;
-           const int imax = ilo-1;
+           const int imax = domlo.x-1;
            for (int k = lo.z; k <= hi.z; ++k) {
            for (int j = lo.y; j <= hi.y; ++j) {
            for (int i = imin; i <= imax; ++i) {
-               q(i,j,k) = q(ilo,j,k);
+               q(i,j,k) = q(domlo.x,j,k);
            }}}
         }
 
-        if (hi.x > ihi && (bc.hi(0) != BCType::int_dir)) {
-            const int imin = ihi+1;
+        if (hi.x > domhi.x && (bc.hi(0) != BCType::int_dir)) {
+            const int imin = domhi.x+1;
             const int imax = hi.x;
             for (int k = lo.z; k <= hi.z; ++k) {
             for (int j = lo.y; j <= hi.y; ++j) {
             for (int i = imin; i <= imax; ++i) {
-                q(i,j,k) = q(ihi,j,k);
+                q(i,j,k) = q(domhi.x,j,k);
             }}}
         }
 
 #if AMREX_SPACEDIM >= 2
 
-        if (lo.y < jlo && (bc.lo(1) != BCType::int_dir)) {
+        if (lo.y < domlo.y && (bc.lo(1) != BCType::int_dir)) {
             const int jmin = lo.y;
-            const int jmax = jlo-1;
+            const int jmax = domlo.y-1;
             for (int k = lo.z; k <= hi.z; ++k) {
             for (int j = jmin; j <= jmax; ++j) {
             for (int i = lo.x; i <= hi.x; ++i) {
-                q(i,j,k) = q(i,jlo,k);
+                q(i,j,k) = q(i,domlo.y,k);
             }}}
         }
 
-        if (hi.y > jhi && (bc.hi(1) != BCType::int_dir)) {
-            const int jmin = jhi+1;
+        if (hi.y > domhi.y && (bc.hi(1) != BCType::int_dir)) {
+            const int jmin = domhi.y+1;
             const int jmax = hi.y;
             for (int k = lo.z; k <= hi.z; ++k) {
             for (int j = jmin; j <= jmax; ++j) {
             for (int i = lo.x; i <= hi.x; ++i) {
-                q(i,j,k) = q(i,jhi,k);
+                q(i,j,k) = q(i,domhi.y,k);
             }}}
         }
 #endif
 
 #if AMREX_SPACEDIM == 3
 
-        if (lo.z < klo && (bc.lo(2) != BCType::int_dir)) {
+        if (lo.z < domlo.z && (bc.lo(2) != BCType::int_dir)) {
             const int kmin = lo.z;
-            const int kmax = klo-1;
+            const int kmax = domlo.z-1;
             for (int k = kmin; k <= kmax; ++k) {
             for (int j = lo.y; j <= hi.y; ++j) {
             for (int i = lo.x; i <= hi.x; ++i) {
-                q(i,j,k) = q(i,j,klo);
+                q(i,j,k) = q(i,j,domlo.z);
             }}}
         }
 
-        if (hi.z > khi && (bc.hi(2) != BCType::int_dir)) {
-            const int kmin = khi+1;
+        if (hi.z > domhi.z && (bc.hi(2) != BCType::int_dir)) {
+            const int kmin = domhi.z+1;
             const int kmax = hi.z;
             for (int k = kmin; k <= kmax; ++k) {
             for (int j = lo.y; j <= hi.y; ++j) {
             for (int i = lo.x; i <= hi.x; ++i) {
-                q(i,j,k) = q(i,j,khi);
+                q(i,j,k) = q(i,j,domhi.z);
             }}}
         }
 #endif

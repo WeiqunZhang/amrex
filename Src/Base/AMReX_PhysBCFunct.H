@@ -8,6 +8,7 @@
 #include <AMReX_ArrayLim.H>
 #include <AMReX_FilCC_C.H>
 #include <AMReX_FilND_C.H>
+#include <AMReX_FilFC_C.H>
 #include <AMReX_TypeTraits.H>
 
 namespace amrex {

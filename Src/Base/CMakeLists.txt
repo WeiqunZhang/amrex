@@ -166,6 +166,8 @@ target_sources( amrex
    AMReX_FilCC_C.cpp
    AMReX_FilND_C.H
    AMReX_FilND_C.cpp
+   AMReX_FilFC_C.H
+   AMReX_FilFC_C.cpp
    # Non-Local BC
    AMReX_NonLocalBC.H
    AMReX_NonLocalBCImpl.H
