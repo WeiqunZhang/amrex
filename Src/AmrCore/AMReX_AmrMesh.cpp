@@ -625,8 +625,7 @@ AmrMesh::MakeNewGrids (int lbase, Real time, int& new_finest, Vector<BoxArray>& 
             blFcomp.accrete(iv);
             BoxList blF;
             blF.complementIn(mboxF,blFcomp);
-            BoxArray baF(blF);
-            blF.clear();
+            BoxArray baF(std::move(blF));
             baF.grow(n_proper);
             //
             // We need to do this in case the error buffering at
