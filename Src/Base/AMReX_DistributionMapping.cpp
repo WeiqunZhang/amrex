@@ -884,6 +884,7 @@ namespace
         class Compare
         {
         public:
+            AMREX_FORCE_INLINE
             bool operator () (const SFCToken& lhs,
                               const SFCToken& rhs) const;
         };
@@ -902,6 +903,7 @@ namespace
 
 int SFCToken::MaxPower = 64;
 
+AMREX_FORCE_INLINE
 bool
 SFCToken::Compare::operator () (const SFCToken& lhs,
                                 const SFCToken& rhs) const

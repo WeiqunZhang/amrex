@@ -1114,24 +1114,45 @@ FabArrayBase::FPinfo::FPinfo (const FabArrayBase& srcfa,
     BL_ASSERT(dstng.allLE(dstfa.nGrowVect()));
 
     BoxList bl(boxtype);
-    Long ncells_total = 0L;
-    Long ncells_max = 0L;
-    for (int i = 0, N = dstba_simplified.size(); i < N; ++i) {
+    const int Ndst = dstba_simplified.size();
+    const int nprocs = ParallelContext::NProcsSub();
+    int iboxlo, iboxhi;
+    bool parallel_ci;
+    if (Ndst > 8) {
+        parallel_ci = true;
+        const int navg = Ndst / nprocs;
+        const int nextra = Ndst - navg*nprocs;
+        const int myproc = ParallelContext::MyProcSub();
+        iboxlo = (myproc < nextra) ? myproc*(navg+1) : myproc*navg+nextra;
+        iboxhi = (myproc < nextra) ? iboxlo+navg+1-1 : iboxlo+navg-1;
+    } else {
+        parallel_ci = false;
+        iboxlo = 0;
+        iboxhi = Ndst-1;
+    }
+    for (int i = iboxlo; i <= iboxhi; ++i) {
         Box bx = dstba_simplified[i];
         bx.grow(m_dstng);
         bx &= m_dstdomain;
         BoxList const& leftover = srcba_simplified.complementIn(bx);
         if (leftover.isNotEmpty()) {
-            for (Box const& b : leftover) {
-                auto n = b.numPts();
-                ncells_total += n;
-                ncells_max = std::max(ncells_max, n);
-            }
             bl.join(leftover);
         }
     }
 
+    if (parallel_ci) {
+        amrex::AllGatherBoxes(bl.data());
+    }
+
     if (bl.isEmpty()) return;
+
+    Long ncells_total = 0L;
+    Long ncells_max = 0L;
+    for (auto const& b : bl) {
+        auto n = b.numPts();
+        ncells_total += n;
+        ncells_max = std::max(ncells_max, n);
+    }
 
     Long ncells_avg = ncells_total / ParallelContext::NProcsSub();
     Long ncells_target = std::max(2L*ncells_avg, 8L*8L*8L);
