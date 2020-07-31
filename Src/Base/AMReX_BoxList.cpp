@@ -426,7 +426,7 @@ BoxList::parallelComplementIn (const Box& b, BoxList&& bl)
 BoxList&
 BoxList::parallelComplementIn (const Box& b, BoxArray const& ba)
 {
-    BL_PROFILE("BoxList::pci");
+    BL_PROFILE("BoxList::parallelComplementIn()");
 #ifndef AMREX_USE_MPI
     return complementIn(b,ba);
 #else
@@ -436,8 +436,7 @@ BoxList::parallelComplementIn (const Box& b, BoxArray const& ba)
     }
     else
     {
-        BL_PROFILE("BoxList::parallelComplementIn");
-        return complementIn(b,ba);
+        BL_PROFILE("BoxList::pci");
 
         Long npts_avgbox;
         Box mbox = ba.minimalBox(npts_avgbox);
@@ -509,8 +508,9 @@ BoxList::parallelComplementIn (const Box& b, BoxArray const& ba)
             }
         }
 
-        amrex::AllGatherBoxes(local_boxes);
-        m_lbox.insert(std::end(m_lbox), std::begin(local_boxes), std::end(local_boxes));
+        amrex::AllGatherBoxes(local_boxes, this->size());
+        local_boxes.insert(std::end(local_boxes), std::begin(m_lbox), std::end(m_lbox));
+        std::swap(m_lbox, local_boxes);
 
         return *this;
     }

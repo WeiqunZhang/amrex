@@ -104,7 +104,7 @@ BoxCommHelper::BoxCommHelper (const Box& bx, int* p_)
 }
 
 void
-AllGatherBoxes (Vector<Box>& bxs)
+AllGatherBoxes (Vector<Box>& bxs, int n_extra_reserve)
 {
 #ifdef BL_USE_MPI
 
@@ -129,12 +129,14 @@ AllGatherBoxes (Vector<Box>& bxs)
         amrex::Abort("AllGatherBoxes: not many boxes");
     }
 
-    Vector<Box> recv_buffer(count_tot);
+    Vector<Box> recv_buffer;
+    recv_buffer.reserve(count_tot+n_extra_reserve);
+    recv_buffer.resize(count_tot);
     MPI_Allgatherv(bxs.data(), count, ParallelDescriptor::Mpi_typemap<Box>::type(),
                    recv_buffer.data(), countvec.data(), offset.data(),
                    ParallelDescriptor::Mpi_typemap<Box>::type(), comm);
 
-    bxs = std::move(recv_buffer);
+    std::swap(bxs,recv_buffer);
 #else
     MPI_Comm comm = ParallelContext::CommunicatorSub();
     const int root = ParallelContext::IOProcessorNumberSub();
@@ -162,14 +164,16 @@ AllGatherBoxes (Vector<Box>& bxs)
         amrex::Abort("AllGatherBoxes: not many boxes");
     }
 
-    Vector<Box> recv_buffer(count_tot);
+    Vector<Box> recv_buffer;
+    recv_buffer.reserve(count_tot+n_extra_reserve);
+    recv_buffer.resize(count_tot);
     MPI_Gatherv(bxs.data(), count, ParallelDescriptor::Mpi_typemap<Box>::type(),
                 recv_buffer.data(), countvec.data(), offset.data(),
                 ParallelDescriptor::Mpi_typemap<Box>::type(), root, comm);
     MPI_Bcast(recv_buffer.data(), count_tot, ParallelDescriptor::Mpi_typemap<Box>::type(),
               root, comm);
 
-    bxs = std::move(recv_buffer);
+    std::swap(bxs,recv_buffer);
 #endif
 
 #else
