@@ -17,8 +17,8 @@ operator<< (std::ostream&  os,
             const IntVect& p)
 {
     os << AMREX_D_TERM( '(' << p[0] , <<
-                  ',' << p[1] , <<
-                  ',' << p[2])  << ')';
+                        ',' << p[1] , <<
+                        ',' << p[2])  << ')';
     if (os.fail())
         amrex::Error("operator<<(ostream&,IntVect&) failed");
     return os;
