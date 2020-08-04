@@ -1171,16 +1171,13 @@ DistributionMapping::SFCProcessorMapDoIt (const BoxArray&          boxes,
     tokens.reserve(N);
     for (int i = 0; i < N; ++i)
     {
-	const Box& bx = boxes[i];
+        const Box& bx = boxes[i];
         tokens.push_back(makeSFCToken(i, bx.smallEnd()));
     }
     //
     // Put'm in Morton space filling curve order.
     //
-    {
-        BL_PROFILE("sort");
-        std::sort(tokens.begin(), tokens.end(), SFCToken::Compare());
-    }
+    std::sort(tokens.begin(), tokens.end(), SFCToken::Compare());
     //
     // Split'm up as equitably as possible per team.
     //
@@ -1410,38 +1407,18 @@ DistributionMapping::RRSFCDoIt (const BoxArray&          boxes,
 {
     BL_PROFILE("DistributionMapping::RRSFCDoIt()");
 
-#if 0
 #if defined (BL_USE_TEAM)
     amrex::Abort("Team support is not implemented yet in RRSFC");
 #endif
 
-    std::vector<SFCToken> tokens;
-
     const int nboxes = boxes.size();
-
+    std::vector<SFCToken> tokens;
     tokens.reserve(nboxes);
-
-    int maxijk = 0;
-
     for (int i = 0; i < nboxes; ++i)
     {
-	const Box& bx = boxes[i];
-        tokens.push_back(SFCToken(i,bx.smallEnd(),0.0));
-
-        const SFCToken& token = tokens.back();
-
-        AMREX_D_TERM(maxijk = std::max(maxijk, token.m_idx[0]);,
-               maxijk = std::max(maxijk, token.m_idx[1]);,
-               maxijk = std::max(maxijk, token.m_idx[2]););
+        const Box& bx = boxes[i];
+        tokens.push_back(makeSFCToken(i, bx.smallEnd()));
     }
-    //
-    // Set SFCToken::MaxPower for BoxArray.
-    //
-    int m = 0;
-    for ( ; (1 << m) <= maxijk; ++m) {
-        ;  // do nothing
-    }
-    SFCToken::MaxPower = m;
     //
     // Put'm in Morton space filling curve order.
     //
@@ -1455,7 +1432,6 @@ DistributionMapping::RRSFCDoIt (const BoxArray&          boxes,
     for (int i = 0; i < nboxes; ++i) {
 	m_ref->m_pmap[i] = ParallelContext::local_to_global_rank(ord[i%nprocs]);
     }
-#endif
 }
 
 void
@@ -1832,37 +1808,20 @@ DistributionMapping::makeSFC (const BoxArray& ba, bool use_box_vol, const int np
 {
     BL_PROFILE("makeSFC");
 
-#if 0
-    std::vector<SFCToken> tokens;
-
     const int N = ba.size();
-
+    std::vector<SFCToken> tokens;
+    std::vector<Long> wgts;
     tokens.reserve(N);
-
-    int maxijk = 0;
-
-    Real vol_sum = 0;
+    wgts.reserve(N);
+    Long vol_sum = 0;
     for (int i = 0; i < N; ++i)
     {
-	const Box& bx = ba[i];
-        const auto & bx_vol = (use_box_vol ? bx.volume() : 1);
-        tokens.push_back(SFCToken(i,bx.smallEnd(),bx_vol));
-        vol_sum += bx_vol;
-
-        const SFCToken& token = tokens.back();
-
-        AMREX_D_TERM(maxijk = std::max(maxijk, token.m_idx[0]);,
-                     maxijk = std::max(maxijk, token.m_idx[1]);,
-                     maxijk = std::max(maxijk, token.m_idx[2]););
+        const Box& bx = ba[i];
+        tokens.push_back(makeSFCToken(i, bx.smallEnd()));
+        const Long v = use_box_vol ? bx.volume() : Long(1);
+        vol_sum += v;
+        wgts.push_back(v);
     }
-    //
-    // Set SFCToken::MaxPower for BoxArray.
-    //
-    int m = 0;
-    for ( ; (1 << m) <= maxijk; ++m) {
-        ;  // do nothing
-    }
-    SFCToken::MaxPower = m;
     //
     // Put'm in Morton space filling curve order.
     //
@@ -1872,12 +1831,9 @@ DistributionMapping::makeSFC (const BoxArray& ba, bool use_box_vol, const int np
     volper = vol_sum / nprocs;
 
     std::vector< std::vector<int> > r(nprocs);
-    Distribute(tokens, nprocs, volper, r);
 
-    return r;
-#endif
-    // xxxxx
-    std::vector< std::vector<int> > r;
+    Distribute(tokens, wgts, nprocs, volper, r);
+
     return r;
 }
 
