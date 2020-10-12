@@ -1069,4 +1069,40 @@ MLCellLinOp::update ()
 MLCellLinOp::Counters MLCellLinOp::perf_counters;
 #endif
 
+void
+MLCellLinOp::switchToOriginalMode ()
+{
+    if (!m_in_original_model) {
+        std::swap(m_bndry_sol, m_bndry_save);
+        std::swap(m_crse_sol_br, m_crse_save_br);
+        m_in_original_model = true;
+    }
+}
+
+void
+MLCellLinOp::switchToCorrectionMode ()
+{
+    if (m_in_original_model) {
+        if (m_bndry_save.empty()) {
+            m_bndry_save.resize(m_num_amr_levels);
+            for (int i = 0; i < m_num_amr_levels; ++i) {
+                if (m_bndry_sol[i]) {
+                    m_bndry_save[i].reset(new MLMGBndry(*m_bndry_sol[i], true));
+                }
+            }
+        }
+        if (m_crse_save_br.empty()) {
+            m_crse_save_br.resize(m_num_amr_levels);
+            for (int i = 0; i < m_num_amr_levels; ++i) {
+                if (m_crse_sol_br[i]) {
+                    m_crse_save_br[i].reset(new BndryRegister(*m_crse_sol_br[i], true));
+                }
+            }
+        }
+        std::swap(m_bndry_sol, m_bndry_save);
+        std::swap(m_crse_sol_br, m_crse_save_br);
+        m_in_original_model = false;
+    }
+}
+
 }

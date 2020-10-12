@@ -105,6 +105,14 @@ BndryData::init (const BndryData& src)
     }
 }
 
+BndryData::BndryData (const BndryData& src, bool initialize_to_zero)
+    :
+    BndryRegister(src,initialize_to_zero),
+    m_ncomp(src.m_ncomp)
+{
+    init(src);
+}
+
 BndryData::BndryData (const BndryData& src)
     :
     BndryRegister(src),

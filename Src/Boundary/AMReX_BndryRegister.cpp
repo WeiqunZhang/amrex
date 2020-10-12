@@ -57,7 +57,7 @@ BndryRegister::clear ()
 }
 
 void
-BndryRegister::init (const BndryRegister& src)
+BndryRegister::init (const BndryRegister& src, bool initialize_to_zero)
 {
     grids = src.grids;
 
@@ -66,18 +66,22 @@ BndryRegister::init (const BndryRegister& src)
         const int ncomp = src.bndry[idim].nComp();
         bndry[idim].define(src.bndry[idim].boxArray(), src.DistributionMap(), ncomp);
 
+        if (initialize_to_zero) {
+            bndry[idim].setVal(0.0);
+        } else {
 #ifdef _OPENMP
 #pragma omp parallel if (Gpu::notInLaunchRegion())
 #endif
-        for (FabSetIter mfi(src.bndry[idim]); mfi.isValid(); ++mfi)
-        {
-            const Box& bx = mfi.validbox();
-            auto const sfab = src.bndry[idim].array(mfi);
-            auto       dfab =     bndry[idim].array(mfi);
-            AMREX_HOST_DEVICE_PARALLEL_FOR_4D ( bx, ncomp, i, j, k, n,
+            for (FabSetIter mfi(src.bndry[idim]); mfi.isValid(); ++mfi)
             {
-                dfab(i,j,k,n) = sfab(i,j,k,n);
-            });
+                const Box& bx = mfi.validbox();
+                auto const sfab = src.bndry[idim].array(mfi);
+                auto       dfab =     bndry[idim].array(mfi);
+                AMREX_HOST_DEVICE_PARALLEL_FOR_4D ( bx, ncomp, i, j, k, n,
+                {
+                    dfab(i,j,k,n) = sfab(i,j,k,n);
+                });
+            }
         }
     }
 }
@@ -85,6 +89,11 @@ BndryRegister::init (const BndryRegister& src)
 BndryRegister::BndryRegister (const BndryRegister& src)
 {
     init(src);
+}
+
+BndryRegister::BndryRegister (const BndryRegister& src, bool initialize_to_zero)
+{
+    init(src, initialize_to_zero);
 }
 
 BndryRegister&

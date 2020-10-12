@@ -17,11 +17,14 @@ namespace amrex {
 class PETScABecLap;
 #endif
 
+class GMRES;
+
 class MLMG
 {
 public:
 
     friend class MLCGSolver;
+    friend class GMRES;
 
     using BCMode = MLLinOp::BCMode;
     using Location = MLLinOp::Location;
@@ -268,6 +271,8 @@ private:
     Real m_final_resnorm0 = -1.0;
     Vector<int> m_niters_cg;
     Vector<Real> m_iter_fine_resnorm0; // Residual for each iteration at the finest level
+
+    std::string print_identation;
 
     void checkPoint (const Vector<MultiFab*>& a_sol, const Vector<MultiFab const*>& a_rhs,
                      Real a_tol_rel, Real a_tol_abs, const char* a_file_name) const;

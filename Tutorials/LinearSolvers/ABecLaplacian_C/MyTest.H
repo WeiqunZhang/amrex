@@ -52,10 +52,16 @@ private:
     bool use_hypre = false;
     bool use_petsc = false;
 
+    amrex::Real reltol = 1.e-10;
+    amrex::Real abstol = 0.0;
+
 #ifdef AMREX_USE_HYPRE
     int hypre_interface_i = 1;  // 1. structed, 2. semi-structed, 3. ij
     amrex::Hypre::Interface hypre_interface = amrex::Hypre::Interface::structed;
 #endif
+
+    bool use_gmres = false;
+    int gmres_verbose = 2;
 
     amrex::Vector<amrex::Geometry> geom;
     amrex::Vector<amrex::BoxArray> grids;

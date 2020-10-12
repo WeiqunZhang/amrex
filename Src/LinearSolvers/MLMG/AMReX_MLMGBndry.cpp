@@ -12,6 +12,10 @@ MLMGBndry::MLMGBndry (const BoxArray& _grids,
 
 MLMGBndry::~MLMGBndry () {}
 
+MLMGBndry::MLMGBndry (MLMGBndry const& rhs, bool initialize_to_zero)
+    : InterpBndryData(rhs, initialize_to_zero)
+{}
+
 void
 MLMGBndry::setLOBndryConds (const Vector<Array<LinOpBCType,AMREX_SPACEDIM> >& lo,
                             const Vector<Array<LinOpBCType,AMREX_SPACEDIM> >& hi,

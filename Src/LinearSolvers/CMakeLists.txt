@@ -49,6 +49,8 @@ target_sources(amrex
    MLMG/AMReX_MLTensorOp.cpp
    MLMG/AMReX_MLTensor_K.H
    MLMG/AMReX_MLTensor_${AMReX_SPACEDIM}D_K.H
+   MLMG/AMReX_GMRES.H
+   MLMG/AMReX_GMRES.cpp
    Projections/AMReX_MacProjector.H
    Projections/AMReX_MacProjector.cpp
    Projections/AMReX_NodalProjector.H

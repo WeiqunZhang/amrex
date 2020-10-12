@@ -22,6 +22,8 @@ public:
 
     virtual ~MLMGBndry ()  override;
 
+    MLMGBndry (MLMGBndry const& rhs, bool initialize_to_zero);
+
     MLMGBndry (MLMGBndry&& rhs) = delete;
     MLMGBndry (const MLMGBndry& rhs) = delete;
     MLMGBndry& operator= (const MLMGBndry& rhs) = delete;

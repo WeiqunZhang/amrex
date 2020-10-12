@@ -71,6 +71,8 @@ public:
     //! copy constructor
     BndryData (const BndryData& src);
 
+    BndryData (const BndryData& src, bool initialize_to_zero);
+
     //! copy assignment operator
     BndryData& operator= (const BndryData& src);
 

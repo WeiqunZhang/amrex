@@ -69,6 +69,8 @@ public:
     */
     InterpBndryData (const InterpBndryData& rhs);
 
+    InterpBndryData (const InterpBndryData& rhs, bool initialize_to_zero);
+
     virtual ~InterpBndryData () override;
     //
     //! Copy assignment operator.

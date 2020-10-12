@@ -50,6 +50,8 @@ public:
     //! The copy constructor.
     BndryRegister (const BndryRegister& src);
 
+    BndryRegister (const BndryRegister& src, bool initialize_to_zero);
+
     //! The copy assignment operator.
     BndryRegister& operator= (const BndryRegister& src);
 
@@ -139,7 +141,7 @@ public:
     static void Copy (BndryRegister& dst, const BndryRegister& src);
 
     //! Used by the copy constructor and assignment operator.
-    void init (const BndryRegister& src);
+    void init (const BndryRegister& src, bool initialize_to_zero = false);
 
 protected:
 

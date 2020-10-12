@@ -1,5 +1,6 @@
 #include "MyTest.H"
 
+#include <AMReX_GMRES.H>
 #include <AMReX_MLABecLaplacian.H>
 #include <AMReX_MLPoisson.H>
 #include <AMReX_ParmParse.H>
@@ -35,14 +36,10 @@ MyTest::solvePoisson ()
     info.setConsolidation(consolidation);
     info.setMaxCoarseningLevel(max_coarsening_level);
 
-    const Real tol_rel = 1.e-10;
-    const Real tol_abs = 0.0;
-
     const int nlevels = geom.size();
 
     if (composite_solve)
     {
-
         MLPoisson mlpoisson(geom, grids, dmap, info);
 
         mlpoisson.setMaxOrder(linop_maxorder);
@@ -77,7 +74,13 @@ MyTest::solvePoisson ()
         }
 #endif
 
-        mlmg.solve(GetVecOfPtrs(solution), GetVecOfConstPtrs(rhs), tol_rel, tol_abs);
+        if (use_gmres) {
+            GMRES gmres(mlmg);
+            gmres.setVerbose(gmres_verbose);
+            gmres.solve(GetVecOfPtrs(solution), GetVecOfConstPtrs(rhs), reltol, abstol);
+        } else {
+            mlmg.solve(GetVecOfPtrs(solution), GetVecOfConstPtrs(rhs), reltol, abstol);
+        }
     }
     else
     {
@@ -118,7 +121,13 @@ MyTest::solvePoisson ()
             }
 #endif
             
-            mlmg.solve({&solution[ilev]}, {&rhs[ilev]}, tol_rel, tol_abs);            
+            if (use_gmres) {
+                GMRES gmres(mlmg);
+                gmres.setVerbose(gmres_verbose);
+                gmres.solve({&solution[ilev]}, {&rhs[ilev]}, reltol, abstol);
+            } else {
+                mlmg.solve({&solution[ilev]}, {&rhs[ilev]}, reltol, abstol);
+            }
         }
     }
 }
@@ -132,9 +141,6 @@ MyTest::solveABecLaplacian ()
     info.setSemicoarsening(semicoarsening);
     info.setMaxCoarseningLevel(max_coarsening_level);
     info.setMaxSemicoarseningLevel(max_semicoarsening_level);
-
-    const Real tol_rel = 1.e-10;
-    const Real tol_abs = 0.0;
 
     const int nlevels = geom.size();
 
@@ -194,7 +200,13 @@ MyTest::solveABecLaplacian ()
         }
 #endif
 
-        mlmg.solve(GetVecOfPtrs(solution), GetVecOfConstPtrs(rhs), tol_rel, tol_abs);
+        if (use_gmres) {
+            GMRES gmres(mlmg);
+            gmres.setVerbose(gmres_verbose);
+            gmres.solve(GetVecOfPtrs(solution), GetVecOfConstPtrs(rhs), reltol, abstol);
+        } else {
+            mlmg.solve(GetVecOfPtrs(solution), GetVecOfConstPtrs(rhs), reltol, abstol);
+        }
     }
     else
     {
@@ -251,7 +263,13 @@ MyTest::solveABecLaplacian ()
             }
 #endif
 
-            mlmg.solve({&solution[ilev]}, {&rhs[ilev]}, tol_rel, tol_abs);            
+            if (use_gmres) {
+                GMRES gmres(mlmg);
+                gmres.setVerbose(gmres_verbose);
+                gmres.solve({&solution[ilev]}, {&rhs[ilev]}, reltol, abstol);
+            } else {
+                mlmg.solve({&solution[ilev]}, {&rhs[ilev]}, reltol, abstol);
+            }
         }
     }
 
@@ -274,9 +292,6 @@ MyTest::solveABecLaplacianInhomNeumann ()
     info.setAgglomeration(agglomeration);
     info.setConsolidation(consolidation);
     info.setMaxCoarseningLevel(max_coarsening_level);
-
-    const Real tol_rel = 1.e-10;
-    const Real tol_abs = 0.0;
 
     const int nlevels = geom.size();
 
@@ -336,7 +351,13 @@ MyTest::solveABecLaplacianInhomNeumann ()
         }
 #endif
 
-        mlmg.solve(GetVecOfPtrs(solution), GetVecOfConstPtrs(rhs), tol_rel, tol_abs);
+        if (use_gmres) {
+            GMRES gmres(mlmg);
+            gmres.setVerbose(gmres_verbose);
+            gmres.solve(GetVecOfPtrs(solution), GetVecOfConstPtrs(rhs), reltol, abstol);
+        } else {
+            mlmg.solve(GetVecOfPtrs(solution), GetVecOfConstPtrs(rhs), reltol, abstol);
+        }
     }
     else
     {
@@ -393,7 +414,13 @@ MyTest::solveABecLaplacianInhomNeumann ()
             }
 #endif
 
-            mlmg.solve({&solution[ilev]}, {&rhs[ilev]}, tol_rel, tol_abs);            
+            if (use_gmres) {
+                GMRES gmres(mlmg);
+                gmres.setVerbose(gmres_verbose);
+                gmres.solve({&solution[ilev]}, {&rhs[ilev]}, reltol, abstol);
+            } else {
+                mlmg.solve({&solution[ilev]}, {&rhs[ilev]}, reltol, abstol);
+            }
         }
     }
 
@@ -449,6 +476,11 @@ MyTest::readParameters ()
 #endif
     AMREX_ALWAYS_ASSERT_WITH_MESSAGE(!(use_hypre && use_petsc),
                                      "use_hypre & use_petsc cannot be both true");
+
+    pp.query("reltol", reltol);
+
+    pp.query("use_gmres", use_gmres);
+    pp.query("gmres_verbose", gmres_verbose);
 }
 
 void

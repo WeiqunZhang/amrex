@@ -94,7 +94,9 @@ MLMG::solve (const Vector<MultiFab*>& a_sol, const Vector<MultiFab const*>& a_rh
 
         if (verbose >= 1)
         {
-            amrex::Print() << "MLMG: Initial rhs               = " << rhsnorm0 << "\n"
+            amrex::Print() << print_identation
+                           << "MLMG: Initial rhs               = " << rhsnorm0 << "\n"
+                           << print_identation
                            << "MLMG: Initial residual (resid0) = " << resnorm0 << "\n";
         }
     }
@@ -116,7 +118,7 @@ MLMG::solve (const Vector<MultiFab*>& a_sol, const Vector<MultiFab const*>& a_rh
     if (!is_nsolve && resnorm0 <= res_target) {
         composite_norminf = resnorm0;
         if (verbose >= 1) {
-            amrex::Print() << "MLMG: No iterations needed\n";
+            amrex::Print() << print_identation <<  "MLMG: No iterations needed\n";
         }
     } else {
         Real iter_start_time = amrex::second();
@@ -138,7 +140,8 @@ MLMG::solve (const Vector<MultiFab*>& a_sol, const Vector<MultiFab const*>& a_rh
             m_iter_fine_resnorm0.push_back(fine_norminf);
             composite_norminf = fine_norminf;
             if (verbose >= 2) {
-                amrex::Print() << "MLMG: Iteration " << std::setw(3) << iter+1 << " Fine resid/"
+                amrex::Print() << print_identation
+                               << "MLMG: Iteration " << std::setw(3) << iter+1 << " Fine resid/"
                                << norm_name << " = " << fine_norminf/max_norm << "\n";
             }
             bool fine_converged = (fine_norminf <= res_target);
@@ -150,7 +153,8 @@ MLMG::solve (const Vector<MultiFab*>& a_sol, const Vector<MultiFab const*>& a_rh
                 computeMLResidual(finest_amr_lev-1);
                 Real crse_norminf = MLResNormInf(finest_amr_lev-1);
                 if (verbose >= 2) {
-                    amrex::Print() << "MLMG: Iteration " << std::setw(3) << iter+1
+                    amrex::Print() << print_identation
+                                   << "MLMG: Iteration " << std::setw(3) << iter+1
                                    << " Crse resid/" << norm_name << " = "
                                    << crse_norminf/max_norm << "\n";
                 }
@@ -162,7 +166,8 @@ MLMG::solve (const Vector<MultiFab*>& a_sol, const Vector<MultiFab const*>& a_rh
 
             if (converged) {
                 if (verbose >= 1) {
-                    amrex::Print() << "MLMG: Final Iter. " << iter+1
+                    amrex::Print() << print_identation
+                                   << "MLMG: Final Iter. " << iter+1
                                    << " resid, resid/" << norm_name << " = "
                                    << composite_norminf << ", "
                                    << composite_norminf/max_norm << "\n";
@@ -172,7 +177,8 @@ MLMG::solve (const Vector<MultiFab*>& a_sol, const Vector<MultiFab const*>& a_rh
               if (composite_norminf > 1.e20*max_norm) 
               {
                   if (verbose > 0) {
-                      amrex::Print() << "MLMG: Failing to converge after " << iter+1 << " iterations."
+                      amrex::Print() << print_identation
+                                     << "MLMG: Failing to converge after " << iter+1 << " iterations."
                                      << " resid, resid/" << norm_name << " = "
                                      << composite_norminf << ", "
                                      << composite_norminf/max_norm << "\n";
@@ -184,7 +190,8 @@ MLMG::solve (const Vector<MultiFab*>& a_sol, const Vector<MultiFab const*>& a_rh
 
         if (!converged && do_fixed_number_of_iters == 0) {
             if (verbose > 0) {
-                amrex::Print() << "MLMG: Failed to converge after " << max_iters << " iterations."
+                amrex::Print() << print_identation
+                               << "MLMG: Failed to converge after " << max_iters << " iterations."
                                << " resid, resid/" << norm_name << " = "
                                << composite_norminf << ", "
                                << composite_norminf/max_norm << "\n";
@@ -209,7 +216,8 @@ MLMG::solve (const Vector<MultiFab*>& a_sol, const Vector<MultiFab const*>& a_rh
                                   ParallelContext::CommunicatorSub());
         if (ParallelContext::MyProcSub() == 0)
         {
-            amrex::AllPrint() << "MLMG: Timers: Solve = " << timer[solve_time]
+            amrex::AllPrint() << print_identation
+                              << "MLMG: Timers: Solve = " << timer[solve_time]
                               << " Iter = " << timer[iter_time]
                               << " Bottom = " << timer[bottom_time] << "\n";
         }
@@ -428,7 +436,8 @@ MLMG::mgVcycle (int amrlev, int mglev_top)
         if (verbose >= 4)
         {
             Real norm = res[amrlev][mglev].norm0();
-            amrex::Print() << "AT LEVEL "  << amrlev << " " << mglev
+            amrex::Print() << print_identation
+                           << "AT LEVEL "  << amrlev << " " << mglev
                            << "   DN: Norm before smooth " << norm << "\n";
         }
 
@@ -446,7 +455,8 @@ MLMG::mgVcycle (int amrlev, int mglev_top)
         if (verbose >= 4)
         {
             Real norm = rescor[amrlev][mglev].norm0();
-            amrex::Print() << "AT LEVEL "  << amrlev << " " << mglev
+            amrex::Print() << print_identation
+                           << "AT LEVEL "  << amrlev << " " << mglev
                            << "   DN: Norm after  smooth " << norm << "\n";
         }
 
@@ -461,7 +471,8 @@ MLMG::mgVcycle (int amrlev, int mglev_top)
         if (verbose >= 4)
         {
             Real norm = res[amrlev][mglev_bottom].norm0();
-            amrex::Print() << "AT LEVEL "  << amrlev << " " << mglev_bottom
+            amrex::Print() << print_identation
+                           << "AT LEVEL "  << amrlev << " " << mglev_bottom
                            << "   DN: Norm before bottom " << norm << "\n";
         }
         bottomSolve();
@@ -470,7 +481,8 @@ MLMG::mgVcycle (int amrlev, int mglev_top)
             computeResOfCorrection(amrlev, mglev_bottom);
             Real norm = rescor[amrlev][mglev_bottom].norm0();
             
-            amrex::Print() << "AT LEVEL "  << amrlev << " " << mglev_bottom
+            amrex::Print() << print_identation
+                           << "AT LEVEL "  << amrlev << " " << mglev_bottom
                            << "   UP: Norm after  bottom " << norm << "\n";
         }
     }
@@ -479,7 +491,8 @@ MLMG::mgVcycle (int amrlev, int mglev_top)
         if (verbose >= 4)
         {
             Real norm = res[amrlev][mglev_bottom].norm0();
-            amrex::Print() << "AT LEVEL "  << amrlev << " " << mglev_bottom 
+            amrex::Print() << print_identation
+                           << "AT LEVEL "  << amrlev << " " << mglev_bottom 
                            << "       Norm before smooth " << norm << "\n";
         }
         cor[amrlev][mglev_bottom]->setVal(0.0);
@@ -493,7 +506,8 @@ MLMG::mgVcycle (int amrlev, int mglev_top)
         {
 	    computeResOfCorrection(amrlev, mglev_bottom);
             Real norm = rescor[amrlev][mglev_bottom].norm0();
-            amrex::Print() << "AT LEVEL "  << amrlev  << " " << mglev_bottom 
+            amrex::Print() << print_identation
+                           << "AT LEVEL "  << amrlev  << " " << mglev_bottom 
                            << "       Norm after  smooth " << norm << "\n";
         }
     }
@@ -509,7 +523,8 @@ MLMG::mgVcycle (int amrlev, int mglev_top)
         {
 	    computeResOfCorrection(amrlev, mglev);
             Real norm = rescor[amrlev][mglev].norm0();
-            amrex::Print() << "AT LEVEL "  << amrlev << " " << mglev
+            amrex::Print() << print_identation
+                           << "AT LEVEL "  << amrlev << " " << mglev
                            << "   UP: Norm before smooth " << norm << "\n";
         }
         for (int i = 0; i < nu2; ++i) {
@@ -522,7 +537,8 @@ MLMG::mgVcycle (int amrlev, int mglev_top)
         {
 	    computeResOfCorrection(amrlev, mglev);
             Real norm = rescor[amrlev][mglev].norm0();
-            amrex::Print() << "AT LEVEL "  << amrlev << " " << mglev
+            amrex::Print() << print_identation
+                           << "AT LEVEL "  << amrlev << " " << mglev
                            << "   UP: Norm after  smooth " << norm << "\n";
         }
     }
@@ -1002,7 +1018,7 @@ MLMG::bottomSolveWithCG (MultiFab& x, const MultiFab& b, MLCGSolver::Type type)
 
     int ret = cg_solver.solve(x, b, bottom_reltol, bottom_abstol);
     if (ret != 0 && verbose > 1) {
-        amrex::Print() << "MLMG: Bottom solve failed.\n";
+        amrex::Print() << print_identation << "MLMG: Bottom solve failed.\n";
     }
     m_niters_cg.push_back(cg_solver.getNumIters());
     return ret;
@@ -1307,11 +1323,15 @@ MLMG::prepareForSolve (const Vector<MultiFab*>& a_sol, const Vector<MultiFab con
     }
 
     if (verbose >= 2) {
-        amrex::Print() << "MLMG: # of AMR levels: " << namrlevs << "\n"
+        amrex::Print() << print_identation
+                       << "MLMG: # of AMR levels: " << namrlevs << "\n"
+                       << print_identation
                        << "      # of MG levels on the coarsest AMR level: " << linop.NMGLevels(0)
                        << "\n";
         if (ns_linop) {
-            amrex::Print() << "      # of MG levels in N-Solve: " << ns_linop->NMGLevels(0) << "\n"
+            amrex::Print() << print_identation
+                           << "      # of MG levels in N-Solve: " << ns_linop->NMGLevels(0) << "\n"
+                           << print_identation
                            << "      # of grids in N-Solve: " << ns_linop->m_grids[0][0].size() << "\n";
         }
     }
@@ -1726,7 +1746,8 @@ MLMG::makeSolvable ()
         ParallelAllReduce::Sum(offset.data(), ncomp, ParallelContext::CommunicatorSub());
         if (verbose >= 4) {
             for (int c = 0; c < ncomp; ++c) {
-                amrex::Print() << "MLMG: Subtracting " << offset[c] 
+                amrex::Print() << print_identation
+                               << "MLMG: Subtracting " << offset[c] 
                                << " from rhs component " << c << "\n";
             }
         }
@@ -1747,7 +1768,7 @@ MLMG::makeSolvable ()
         AMREX_ASSERT_WITH_MESSAGE(ncomp==1, "ncomp > 1 not supported for singular nodal problem");
         Real offset = getNodalSum(0, 0, rhs[0]);
         if (verbose >= 4) {
-            amrex::Print() << "MLMG: Subtracting " << offset << " from rhs\n";
+            amrex::Print() << print_identation << "MLMG: Subtracting " << offset << " from rhs\n";
         }
         for (int alev = 0; alev < namrlevs; ++alev) {
             rhs[alev].plus(-offset, 0, 1);
@@ -1784,7 +1805,8 @@ MLMG::makeSolvable (int amrlev, int mglev, MultiFab& mf)
 
         if (verbose >= 4) {
             for (int c = 0; c < ncomp; ++c) {
-                amrex::Print() << "MLMG: Subtracting " << offset[c] 
+                amrex::Print() << print_identation
+                               << "MLMG: Subtracting " << offset[c] 
                                << " from mf component c = " << c << "\n";
             }
         }
@@ -1804,7 +1826,8 @@ MLMG::makeSolvable (int amrlev, int mglev, MultiFab& mf)
         AMREX_ASSERT_WITH_MESSAGE(ncomp==1, "ncomp > 1 not supported for singular nodal problem");
         Real offset = getNodalSum(amrlev, mglev, mf);
         if (verbose >= 4) {
-            amrex::Print() << "MLMG: Subtracting " << offset << " on level (" << amrlev << ", "
+            amrex::Print() << print_identation
+                           << "MLMG: Subtracting " << offset << " on level (" << amrlev << ", "
                            << mglev << ")\n";
         }
         mf.plus(-offset, 0, 1);

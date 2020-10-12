@@ -264,6 +264,9 @@ public:
     virtual std::unique_ptr<PETScABecLap> makePETSc () const;
 #endif
 
+    virtual void switchToOriginalMode () {}
+    virtual void switchToCorrectionMode () {}
+
 protected:
 
     static constexpr int mg_coarsen_ratio = 2;

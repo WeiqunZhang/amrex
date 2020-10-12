@@ -143,6 +143,9 @@ public:
                         const Array<FArrayBox*,AMREX_SPACEDIM>& flux,
                         const FArrayBox& sol, Location loc, const int face_only=0) const = 0;
 
+    virtual void switchToOriginalMode () override;
+    virtual void switchToCorrectionMode () override;
+
 protected:
 
     bool m_has_metric_term = false;
@@ -152,6 +155,10 @@ protected:
 
     Vector<std::unique_ptr<MLMGBndry> > m_bndry_cor;
     Vector<std::unique_ptr<BndryRegister> > m_crse_cor_br;
+
+    bool m_in_original_model = true;
+    Vector<std::unique_ptr<MLMGBndry> > m_bndry_save;
+    Vector<std::unique_ptr<BndryRegister> > m_crse_save_br;
 
     // In case of agglomeration, coarse MG grids on amr level 0 are
     // not simply coarsened from fine MG grids.  So we need to build

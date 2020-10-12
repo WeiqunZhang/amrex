@@ -20,6 +20,11 @@ InterpBndryData::InterpBndryData (const InterpBndryData& rhs)
     BndryData(rhs)
 {}
 
+InterpBndryData::InterpBndryData (const InterpBndryData& rhs, bool initialize_to_zero)
+    :
+    BndryData(rhs, initialize_to_zero)
+{}
+
 InterpBndryData&
 InterpBndryData::operator= (const InterpBndryData& rhs)
 {
