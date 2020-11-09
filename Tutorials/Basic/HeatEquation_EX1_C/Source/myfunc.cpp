@@ -42,25 +42,19 @@ void advance (MultiFab& phi_old,
 #endif
         auto const& phi = phi_old.const_array(mfi);
 
-        amrex::ParallelFor(xbx,
-        [=] AMREX_GPU_DEVICE (int i, int j, int k)
-        {
-            compute_flux_x(i,j,k,fluxx,phi,dxinv);
-        });
-
-        amrex::ParallelFor(ybx,
-        [=] AMREX_GPU_DEVICE (int i, int j, int k)
-        {
-            compute_flux_y(i,j,k,fluxy,phi,dyinv);
-        });
-
-#if (AMREX_SPACEDIM > 2)
-        amrex::ParallelFor(zbx,
-        [=] AMREX_GPU_DEVICE (int i, int j, int k)
-        {
-            compute_flux_z(i,j,k,fluxz,phi,dzinv);
-        });
-#endif
+        amrex::ParallelFor(AMREX_D_DECL(xbx, ybx, zbx),
+            AMREX_D_DECL([=] AMREX_GPU_DEVICE (int i, int j, int k)
+                         {
+                             compute_flux_x(i,j,k,fluxx,phi,dxinv);
+                         },
+                         [=] AMREX_GPU_DEVICE (int i, int j, int k)
+                         {
+                             compute_flux_y(i,j,k,fluxy,phi,dyinv);
+                         },
+                         [=] AMREX_GPU_DEVICE (int i, int j, int k)
+                         {
+                             compute_flux_z(i,j,k,fluxz,phi,dzinv);
+                         }));
     }
 
     // Advance the solution one grid at a time

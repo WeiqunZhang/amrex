@@ -9,7 +9,7 @@ void init_phi (int i, int j, int k,
                amrex::GpuArray<amrex::Real,AMREX_SPACEDIM> const& dx,
                amrex::GpuArray<amrex::Real,AMREX_SPACEDIM> const& prob_lo)
 {
-    using amrex::Real;;
+    using amrex::Real;
 
     Real x = prob_lo[0] + (i+Real(0.5)) * dx[0];
     Real y = prob_lo[1] + (j+Real(0.5)) * dx[1];
