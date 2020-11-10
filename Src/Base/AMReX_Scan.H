@@ -398,7 +398,10 @@ T PrefixSum (N n, FIN && fin, FOUT && fout, Type type)
     constexpr int nelms_per_block = nthreads * nchunks;
     AMREX_ALWAYS_ASSERT(static_cast<Long>(n) < static_cast<Long>(std::numeric_limits<int>::max())*nelms_per_block);
     int nblocks = (static_cast<Long>(n) + nelms_per_block - 1) / nelms_per_block;
-    std::size_t sm = sizeof(T) * (Gpu::Device::warp_size + nwarps_per_block) + sizeof(int);
+//    std::size_t sm = sizeof(T) * (Gpu::Device::warp_size + nwarps_per_block) + sizeof(int);
+//    std::size_t sm = sizeof(T) * (Gpu::Device::warp_size + nwarps_per_block);
+    std::size_t sm = sizeof(T) * nelms_per_block;
+//    std::size_t sm = 1024;
     auto stream = Gpu::gpuStream();
 
     typedef typename std::conditional<sizeof(detail::STVA<T>) <= 8,
@@ -423,14 +426,19 @@ T PrefixSum (N n, FIN && fin, FOUT && fout, Type type)
         }
     });
 
-    amrex::launch(nblocks, nthreads, sm, stream,
+    //amrex::launch(nblocks, nthreads, sm, stream,
+    amrex::launch(nblocks, nthreads, 0, stream,
     [=] AMREX_GPU_DEVICE () noexcept
     {
         int lane = threadIdx.x % Gpu::Device::warp_size;
         int warp = threadIdx.x / Gpu::Device::warp_size;
 
-        amrex::Gpu::SharedMemory<T> gsm;
-        T* shared = gsm.dataPtr();
+//        amrex::Gpu::SharedMemory<T> gsm;
+//        T* shared = gsm.dataPtr();
+//        T* shared2 = shared + Gpu::Device::warp_size;
+//        T* scratch = shared;
+//        __shared__ T shared[nelms_per_block];
+        __shared__ T shared[Gpu::Device::warp_size+nwarps_per_block];
         T* shared2 = shared + Gpu::Device::warp_size;
 
         // First of all, get block virtual id.  We must do this to
@@ -438,7 +446,8 @@ T PrefixSum (N n, FIN && fin, FOUT && fout, Type type)
         // Anywhere in this function, we should not use blockIdx.
         int virtual_block_id = 0;
         if (gridDim.x > 1) {
-            int& virtual_block_id_shared = *((int*)(shared2+nwarps_per_block));
+            int& virtual_block_id_shared = *((int*)shared);
+            // int& virtual_block_id_shared = *((int*)(scratch+nelms_per_block));
             if (threadIdx.x == 0) {
                 unsigned int bid = Gpu::Atomic::Inc(virtual_block_id_p, gridDim.x);
                 virtual_block_id_shared = bid;
