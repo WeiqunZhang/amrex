@@ -202,7 +202,6 @@ T PrefixSum (N n, FIN && fin, FOUT && fout, Type type)
         sycl::ONEAPI::sub_group const& sg = gh.item->get_sub_group();
         int lane = sg.get_local_id()[0];
         int warp = sg.get_group_id()[0];
-        int nwarps = sg.get_group_range()[0];
 
         int threadIdxx = gh.item->get_local_id(0);
         int blockDimx = gh.item->get_local_range(0);
@@ -216,7 +215,7 @@ T PrefixSum (N n, FIN && fin, FOUT && fout, Type type)
         // Anywhere in this function, we should not use blockIdx.
         int virtual_block_id = 0;
         if (gridDimx > 1) {
-            int& virtual_block_id_shared = *((int*)(shared2+nwarps));
+            int& virtual_block_id_shared = *((int*)(shared2+nwarps_per_block));
             if (threadIdxx == 0) {
                 unsigned int bid = Gpu::Atomic::Inc<sycl::access::address_space::global_space>
                     (virtual_block_id_p, gridDimx);
@@ -270,18 +269,18 @@ T PrefixSum (N n, FIN && fin, FOUT && fout, Type type)
             // The first warp will do scan on the warp sums for the
             // whole block.
             if (warp == 0) {
-                T y = (lane < nwarps) ? shared[lane] : 0;
+                T y = (lane < nwarps_per_block) ? shared[lane] : 0;
                 for (int i = 1; i <= Gpu::Device::warp_size; i *= 2) {
                     T s = sg.shuffle_up(y, i);
                     if (lane >= i) y += s;
                 }
 
-                if (lane < nwarps) shared2[lane] = y;
+                if (lane < nwarps_per_block) shared2[lane] = y;
             }
 
             gh.item->barrier(sycl::access::fence_space::local_space);
 
-            // shared[0:nwarps) holds the inclusive sum of warp sums.
+            // shared[0:nwarps_per_block) holds the inclusive sum of warp sums.
             
             // Also note x still holds the inclusive sum within the
             // warp.  Given these two, we can compute the inclusive
@@ -289,7 +288,7 @@ T PrefixSum (N n, FIN && fin, FOUT && fout, Type type)
             T sum_prev_warp = (warp == 0) ? 0 : shared2[warp-1];
             tmp_out[ichunk] = sum_prev_warp + sum_prev_chunk +
                 ((type == Type::inclusive) ? x : x-x0);
-            sum_prev_chunk += shared2[nwarps-1];
+            sum_prev_chunk += shared2[nwarps_per_block-1];
         }
 
         // sum_prev_chunk now holds the sum of the whole block.
@@ -429,7 +428,6 @@ T PrefixSum (N n, FIN && fin, FOUT && fout, Type type)
     {
         int lane = threadIdx.x % Gpu::Device::warp_size;
         int warp = threadIdx.x / Gpu::Device::warp_size;
-        int nwarps = blockDim.x / Gpu::Device::warp_size;
 
         amrex::Gpu::SharedMemory<T> gsm;
         T* shared = gsm.dataPtr();
@@ -440,7 +438,7 @@ T PrefixSum (N n, FIN && fin, FOUT && fout, Type type)
         // Anywhere in this function, we should not use blockIdx.
         int virtual_block_id = 0;
         if (gridDim.x > 1) {
-            int& virtual_block_id_shared = *((int*)(shared2+nwarps));
+            int& virtual_block_id_shared = *((int*)(shared2+nwarps_per_block));
             if (threadIdx.x == 0) {
                 unsigned int bid = Gpu::Atomic::Inc(virtual_block_id_p, gridDim.x);
                 virtual_block_id_shared = bid;
@@ -495,11 +493,11 @@ T PrefixSum (N n, FIN && fin, FOUT && fout, Type type)
             // whole block.  Not all threads in the warp need to
             // participate.
 #ifdef AMREX_USE_CUDA
-            if (warp == 0 && lane < nwarps) {
+            if (warp == 0 && lane < nwarps_per_block) {
                 T y = shared[lane];
-                int mask = (1 << nwarps) - 1;
-                for (int i = 1; i <= nwarps; i *= 2) {
-                    T s = __shfl_up_sync(mask, y, i, nwarps);
+                int mask = (1 << nwarps_per_block) - 1;
+                for (int i = 1; i <= nwarps_per_block; i *= 2) {
+                    T s = __shfl_up_sync(mask, y, i, nwarps_per_block);
                     if (lane >= i) y += s;
                 }
                 shared2[lane] = y;
@@ -507,14 +505,14 @@ T PrefixSum (N n, FIN && fin, FOUT && fout, Type type)
 #else
             if (warp == 0) {
                 T y = 0;
-                if (lane < nwarps) {
+                if (lane < nwarps_per_block) {
                     y = shared[lane];
                 }
-                for (int i = 1; i <= nwarps; i *= 2) {
-                    T s = __shfl_up(y, i, nwarps);
+                for (int i = 1; i <= nwarps_per_block; i *= 2) {
+                    T s = __shfl_up(y, i, nwarps_per_block);
                     if (lane >= i) y += s;
                 }
-                if (lane < nwarps) {
+                if (lane < nwarps_per_block) {
                     shared2[lane] = y;
                 }
             }
@@ -522,7 +520,7 @@ T PrefixSum (N n, FIN && fin, FOUT && fout, Type type)
 
             __syncthreads();
 
-            // shared[0:nwarps) holds the inclusive sum of warp sums.
+            // shared[0:nwarps_per_block) holds the inclusive sum of warp sums.
             
             // Also note x still holds the inclusive sum within the
             // warp.  Given these two, we can compute the inclusive
@@ -530,7 +528,7 @@ T PrefixSum (N n, FIN && fin, FOUT && fout, Type type)
             T sum_prev_warp = (warp == 0) ? 0 : shared2[warp-1];
             tmp_out[ichunk] = sum_prev_warp + sum_prev_chunk +
                 ((type == Type::inclusive) ? x : x-x0);
-            sum_prev_chunk += shared2[nwarps-1];
+            sum_prev_chunk += shared2[nwarps_per_block-1];
         }
 
         // sum_prev_chunk now holds the sum of the whole block.
