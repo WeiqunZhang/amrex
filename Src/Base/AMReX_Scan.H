@@ -144,13 +144,15 @@ struct BlockStatus<T, false>
 
 enum class Type { inclusive, exclusive };
 
-#if defined(AMREX_USE_DPCPP)
+#ifdef AMREX_USE_DPCPP
+struct Dim1 { int x; };
+#endif
 
 template <typename T, typename FIN, typename FOUT>
 T PrefixSum (int n, FIN && fin, FOUT && fout, Type type)
 {
     if (n <= 0) return 0;
-    constexpr int nwarps_per_block = 8;
+    constexpr int nwarps_per_block = AMREX_HIP_OR_CUDA_OR_DPCPP(4,4,8);
     constexpr int nthreads = nwarps_per_block*Gpu::Device::warp_size;
     constexpr int nchunks = 12;
     constexpr int nelms_per_block = nthreads * nchunks;
@@ -181,242 +183,38 @@ T PrefixSum (int n, FIN && fin, FOUT && fout, Type type)
     });
 
     amrex::launch(nblocks, nthreads, sm, stream,
+#ifdef AMREX_USE_DPCPP
     [=] AMREX_GPU_DEVICE (Gpu::Handler const& gh) noexcept
-    {
-#if (__SYCL_COMPILER_VERSION <= 20200827)
-        sycl::intel::sub_group const& sg = gh.item.get_sub_group();
 #else
-        sycl::ONEAPI::sub_group const& sg = gh.item.get_sub_group();
+    [=] AMREX_GPU_DEVICE () noexcept
 #endif
+    {
+#ifdef AMREX_USE_DPCPP
+        auto my_syncthreads = [&gh] () { gh.item.barrier(sycl::access::fence_space::local_space); };
+#else
+        auto my_syncthreads = [] () { __syncthreads(); };
+#endif
+
+#ifdef AMREX_USE_DPCPP
+        sycl::ONEAPI::sub_group const& sg = gh.item.get_sub_group();
         int lane = sg.get_local_id()[0];
         int warp = sg.get_group_id()[0];
 
-        int threadIdxx = gh.item.get_local_id(0);
-        int blockDimx = gh.item.get_local_range(0);
-        int gridDimx = gh.item.get_group_range(0);
-
-        T* shared = (T*)(gh.local);
-        T* shared2 = shared + Gpu::Device::warp_size;
-
-        // First of all, get block virtual id.  We must do this to
-        // avoid deadlock because blocks may be launched in any order.
-        // Anywhere in this function, we should not use blockIdx.
-        int virtual_block_id = 0;
-        if (gridDimx > 1) {
-            int& virtual_block_id_shared = *(reinterpret_cast<int*>(shared));
-            if (threadIdxx == 0) {
-                unsigned int bid = Gpu::Atomic::Inc<sycl::access::address_space::global_space>
-                    (virtual_block_id_p, gridDimx);
-                virtual_block_id_shared = bid;
-            }
-            gh.item.barrier(sycl::access::fence_space::local_space);
-            virtual_block_id = virtual_block_id_shared;
-        }
-
-        // Each block processes [ibegin,iend).
-        int ibegin = nelms_per_block * virtual_block_id;
-        int iend = amrex::min(ibegin+nelms_per_block, n);
-        BlockStatusT& block_status = block_status_p[virtual_block_id];
-
-        //
-        // The overall algorithm is based on "Single-pass Parallel
-        // Prefix Scan with Decoupled Look-back" by D. Merrill &
-        // M. Garland.
-        //
-
-        // Each block is responsible for nchunks chunks of data,
-        // where each chunk has blockDim.x elements, one for each
-        // thread in the block.
-        T sum_prev_chunk = 0; // inclusive sum from previous chunks.
-        T tmp_out[nchunks]; // block-wide inclusive sum for chunks
-        for (int ichunk = 0; ichunk < nchunks; ++ichunk) {
-            int offset = ibegin + ichunk*blockDimx;
-            if (offset >= iend) break;
-
-            offset += threadIdxx;
-            T x0 = (offset < iend) ? fin(offset) : 0;
-            if  (type == Type::exclusive && offset == n-1) {
-                *totalsum_p += x0;
-            }
-            T x = x0;
-            // Scan within a warp
-            for (int i = 1; i <= Gpu::Device::warp_size; i *= 2) {
-                T s = sg.shuffle_up(x, i);
-                if (lane >= i) x += s;
-            }
-
-            // x now holds the inclusive sum within the warp.  The
-            // last thread in each warp holds the inclusive sum of
-            // this warp.  We will store it in shared memory.
-            if (lane == Gpu::Device::warp_size - 1) {
-                shared[warp] = x;
-            }
-
-            gh.item.barrier(sycl::access::fence_space::local_space);
-
-            // The first warp will do scan on the warp sums for the
-            // whole block.
-            if (warp == 0) {
-                T y = (lane < nwarps_per_block) ? shared[lane] : 0;
-                for (int i = 1; i <= Gpu::Device::warp_size; i *= 2) {
-                    T s = sg.shuffle_up(y, i);
-                    if (lane >= i) y += s;
-                }
-
-                if (lane < nwarps_per_block) shared2[lane] = y;
-            }
-
-            gh.item.barrier(sycl::access::fence_space::local_space);
-
-            // shared[0:nwarps_per_block) holds the inclusive sum of warp sums.
-            
-            // Also note x still holds the inclusive sum within the
-            // warp.  Given these two, we can compute the inclusive
-            // sum within this chunk.
-            T sum_prev_warp = (warp == 0) ? 0 : shared2[warp-1];
-            tmp_out[ichunk] = sum_prev_warp + sum_prev_chunk +
-                ((type == Type::inclusive) ? x : x-x0);
-            sum_prev_chunk += shared2[nwarps_per_block-1];
-        }
-
-        // sum_prev_chunk now holds the sum of the whole block.
-        if (threadIdxx == 0 && gridDimx > 1) {
-            block_status.write((virtual_block_id == 0) ? 'p' : 'a',
-                               sum_prev_chunk);
-        }
-
-        if (virtual_block_id == 0) {
-            for (int ichunk = 0; ichunk < nchunks; ++ichunk) {
-                int offset = ibegin + ichunk*blockDimx + threadIdxx;
-                if (offset >= iend) break;
-                fout(offset, tmp_out[ichunk]);
-                if (offset == n-1) {
-                    *totalsum_p += tmp_out[ichunk];
-                }
-            }
-        } else if (virtual_block_id > 0) {
-
-            if (warp == 0) {
-                T exclusive_prefix = 0;
-                BlockStatusT volatile* pbs = block_status_p;
-                for (int iblock0 = virtual_block_id-1; iblock0 >= 0; iblock0 -= Gpu::Device::warp_size)
-                {
-                    int iblock = iblock0-lane;
-                    detail::STVA<T> stva{'p', 0};
-                    if (iblock >= 0) {
-                        stva = pbs[iblock].wait(gh.item);
-                    }
-
-                    T x = stva.value;
-
-                    // implement our own __ballot
-                    unsigned status_bf = (stva.status == 'p') ? (0x1u << lane) : 0;
-                    for (int i = 1; i < Gpu::Device::warp_size; i *= 2) {
-                        status_bf |= sg.shuffle_xor(status_bf, i);
-                    }
-
-                    bool stop_lookback = status_bf & 0x1u;
-                    if (stop_lookback == false) {
-                        if (status_bf != 0) {
-                            T y = x;
-                            if (lane > 0) x = 0;
-                            unsigned int bit_mask = 0x1u;
-                            for (int i = 1; i < Gpu::Device::warp_size; ++i) {
-                                bit_mask <<= 1;
-                                if (i == lane) x = y;
-                                if (status_bf & bit_mask) {
-                                    stop_lookback = true;
-                                    break;
-                                }
-                            }
-                        }
-
-                        for (int i = Gpu::Device::warp_size/2; i > 0; i /= 2) {
-                            x += sg.shuffle_down(x,i);
-                        }
-                    }
-
-                    if (lane == 0) { exclusive_prefix += x; }
-                    if (stop_lookback) break;
-                }
-
-                if (lane == 0) {
-                    block_status.write('p', block_status.get_aggregate() + exclusive_prefix);
-                    shared[0] = exclusive_prefix;
-                }
-            }
-
-            gh.item.barrier(sycl::access::fence_space::local_space);
-
-            T exclusive_prefix = shared[0];
-
-            for (int ichunk = 0; ichunk < nchunks; ++ichunk) {
-                int offset = ibegin + ichunk*blockDimx + threadIdxx;
-                if (offset >= iend) break;
-                T t = tmp_out[ichunk] + exclusive_prefix;
-                fout(offset, t);
-                if (offset == n-1) {
-                    *totalsum_p += t;
-                }
-            }
-        }
-    });
-
-    T totalsum;
-    Gpu::dtoh_memcpy_async(&totalsum, totalsum_p, sizeof(T));
-    Gpu::streamSynchronize();
-
-    The_Device_Arena()->free(dp);
-
-    AMREX_GPU_ERROR_CHECK();
-
-    return totalsum;
-}
-
+        Dim1 threadIdx, blockDim, gridDim;
+        threadIdx.x = gh.item.get_local_id(0);
+        blockDim.x = gh.item.get_local_range(0);
+        gridDim.x = gh.item.get_group_range(0);
 #else
-
-template <typename T, typename FIN, typename FOUT>
-T PrefixSum (int n, FIN && fin, FOUT && fout, Type type)
-{
-    if (n <= 0) return 0;
-    constexpr int nwarps_per_block = 4;
-    constexpr int nthreads = nwarps_per_block*Gpu::Device::warp_size;
-    constexpr int nchunks = 12;
-    constexpr int nelms_per_block = nthreads * nchunks;
-    int nblocks = (n + nelms_per_block - 1) / nelms_per_block;
-    std::size_t sm = sizeof(T) * (Gpu::Device::warp_size + nwarps_per_block) + sizeof(int);
-    auto stream = Gpu::gpuStream();
-
-    typedef typename std::conditional<sizeof(detail::STVA<T>) <= 8,
-        detail::BlockStatus<T,true>, detail::BlockStatus<T,false> >::type BlockStatusT;
-
-    std::size_t nbytes_blockstatus = Arena::align(sizeof(BlockStatusT)*nblocks);
-    std::size_t nbytes_blockid = Arena::align(sizeof(unsigned int));
-    std::size_t nbytes_totalsum = Arena::align(sizeof(T));
-    auto dp = (char*)(The_Device_Arena()->alloc(  nbytes_blockstatus
-                                                + nbytes_blockid
-                                                + nbytes_totalsum));
-    BlockStatusT* AMREX_RESTRICT block_status_p = (BlockStatusT*)dp;
-    unsigned int* AMREX_RESTRICT virtual_block_id_p = (unsigned int*)(dp + nbytes_blockstatus);
-    T* AMREX_RESTRICT totalsum_p = (T*)(dp + nbytes_blockstatus + nbytes_blockid);
-
-    amrex::ParallelFor(nblocks, [=] AMREX_GPU_DEVICE (int i) noexcept {
-        BlockStatusT& block_status = block_status_p[i];
-        block_status.set_status('x');
-        if (i == 0) {
-            *virtual_block_id_p = 0;
-            *totalsum_p = 0;
-        }
-    });
-
-    amrex::launch(nblocks, nthreads, sm, stream,
-    [=] AMREX_GPU_DEVICE () noexcept
-    {
         int lane = threadIdx.x % Gpu::Device::warp_size;
         int warp = threadIdx.x / Gpu::Device::warp_size;
+#endif
 
+#ifdef AMREX_USE_DPCPP
+        T* shared = (T*)(gh.local);
+#else
         amrex::Gpu::SharedMemory<T> gsm;
         T* shared = gsm.dataPtr();
+#endif
         T* shared2 = shared + Gpu::Device::warp_size;
 
         // First of all, get block virtual id.  We must do this to
@@ -426,10 +224,17 @@ T PrefixSum (int n, FIN && fin, FOUT && fout, Type type)
         if (gridDim.x > 1) {
             int& virtual_block_id_shared = *(reinterpret_cast<int*>(shared));
             if (threadIdx.x == 0) {
+#ifdef AMREX_USE_DPCPP
+                unsigned int bid = Gpu::Atomic::Inc<sycl::access::address_space::global_space>
+                    (virtual_block_id_p, gridDim.x);
+#else
                 unsigned int bid = Gpu::Atomic::Inc(virtual_block_id_p, gridDim.x);
+#endif
                 virtual_block_id_shared = bid;
             }
-            __syncthreads();
+
+            my_syncthreads();
+
             virtual_block_id = virtual_block_id_shared;
         }
 
@@ -461,8 +266,9 @@ T PrefixSum (int n, FIN && fin, FOUT && fout, Type type)
             T x = x0;
             // Scan within a warp
             for (int i = 1; i <= Gpu::Device::warp_size; i *= 2) {
-                AMREX_HIP_OR_CUDA( T s = __shfl_up(x,i);,
-                                   T s = __shfl_up_sync(0xffffffff, x, i); )
+                AMREX_HIP_OR_CUDA_OR_DPCPP( T s = __shfl_up(x,i);,
+                                            T s = __shfl_up_sync(0xffffffff, x, i);,
+                                            T s = sg.shuffle_up(x, i) );
                 if (lane >= i) x += s;
             }
 
@@ -473,19 +279,17 @@ T PrefixSum (int n, FIN && fin, FOUT && fout, Type type)
                 shared[warp] = x;
             }
 
-            __syncthreads();
+            my_syncthreads();
 
             // The first warp will do scan on the warp sums for the
-            // whole block.  Not all threads in the warp need to
-            // participate.
+            // whole block.
             if (warp == 0) {
-                T y = 0;
-                if (lane < nwarps_per_block) {
-                    y = shared[lane];
-                }
+                T y = (lane < nwarps_per_block) ? shared[lane] : 0;
                 for (int i = 1; i <= nwarps_per_block; i *= 2) {
-                    AMREX_HIP_OR_CUDA( T s = __shfl_up(y, i, nwarps_per_block);,
-                                       T s = __shfl_up_sync(0xffffffff, y, i, nwarps_per_block); )
+                    AMREX_HIP_OR_CUDA_OR_DPCPP(
+                        T s = __shfl_up(y, i, nwarps_per_block);,
+                        T s = __shfl_up_sync(0xffffffff, y, i, nwarps_per_block);,
+                        T s = sg.shuffle_up(y, i) );
                     if (lane >= i) y += s;
                 }
                 if (lane < nwarps_per_block) {
@@ -493,7 +297,7 @@ T PrefixSum (int n, FIN && fin, FOUT && fout, Type type)
                 }
             }
 
-            __syncthreads();
+            my_syncthreads();
 
             // shared[0:nwarps_per_block) holds the inclusive sum of warp sums.
             
@@ -531,20 +335,34 @@ T PrefixSum (int n, FIN && fin, FOUT && fout, Type type)
                     int iblock = iblock0-lane;
                     detail::STVA<T> stva{'p', 0};
                     if (iblock >= 0) {
+#ifdef AMREX_USE_DPCPP
+                        stva = pbs[iblock].wait(gh.item);
+#else
                         stva = pbs[iblock].wait();
+#endif
                     }
 
                     T x = stva.value;
 
+#ifdef AMREX_USE_DPCPP
+                    // implement our own __ballot
+                    unsigned status_bf = (stva.status == 'p') ? (0x1u << lane) : 0;
+                    for (int i = 1; i < Gpu::Device::warp_size; i *= 2) {
+                        status_bf |= sg.shuffle_xor(status_bf, i);
+                    }
+#else
                     AMREX_HIP_OR_CUDA( uint64_t const status_bf = __ballot(stva.status == 'p');,
                                        unsigned const status_bf = __ballot_sync(0xffffffff, stva.status == 'p'));
+#endif
+
                     bool stop_lookback = status_bf & 0x1u;
                     if (stop_lookback == false) {
                         if (status_bf != 0) {
                             T y = x;
                             if (lane > 0) x = 0;
-                            AMREX_HIP_OR_CUDA(uint64_t bit_mask = 0x1ull;,
-                                              unsigned bit_mask = 0x1u);
+                            AMREX_HIP_OR_CUDA_OR_DPCPP(uint64_t bit_mask = 0x1ull;,
+                                                       unsigned bit_mask = 0x1u;,
+                                                       unsigned bit_mask = 0x1u);
                             for (int i = 1; i < Gpu::Device::warp_size; ++i) {
                                 bit_mask <<= 1;
                                 if (i == lane) x = y;
@@ -556,8 +374,9 @@ T PrefixSum (int n, FIN && fin, FOUT && fout, Type type)
                         }
 
                         for (int i = Gpu::Device::warp_size/2; i > 0; i /= 2) {
-                            AMREX_HIP_OR_CUDA( x += __shfl_down(x,i);,
-                                               x += __shfl_down_sync(0xffffffff, x, i); )
+                            AMREX_HIP_OR_CUDA_OR_DPCPP( x += __shfl_down(x,i);,
+                                                        x += __shfl_down_sync(0xffffffff, x, i);,
+                                                        x += sg.shuffle_down(x,i) );
                         }
                     }
 
@@ -571,7 +390,7 @@ T PrefixSum (int n, FIN && fin, FOUT && fout, Type type)
                 }
             }
 
-            __syncthreads();
+            my_syncthreads();
 
             T exclusive_prefix = shared[0];
 
@@ -597,8 +416,6 @@ T PrefixSum (int n, FIN && fin, FOUT && fout, Type type)
 
     return totalsum;
 }
-
-#endif
 
 // The return value is the total sum.
 template <typename N, typename T, typename M=amrex::EnableIf_t<std::is_integral<N>::value> >
