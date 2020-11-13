@@ -36,19 +36,12 @@ struct BlockStatus<T, true>
 
     AMREX_GPU_DEVICE AMREX_FORCE_INLINE
     void write (char a_status, T a_value) {
-#if defined(AMREX_USE_CUDA)
-        volatile uint64_t tmp;
-        reinterpret_cast<STVA<T> volatile&>(tmp).status = a_status;
-        reinterpret_cast<STVA<T> volatile&>(tmp).value  = a_value;
-        reinterpret_cast<uint64_t&>(d.s) = tmp;
-#else
         Data<T> tmp;
         tmp.s = {a_status, a_value};
         static_assert(sizeof(unsigned long long) == sizeof(uint64_t),
                       "HIP/DPCPP: unsigned long long must be 64 bits");
         Gpu::Atomic::Exch(reinterpret_cast<unsigned long long*>(&d),
                           reinterpret_cast<unsigned long long&>(tmp));
-#endif
     }
 
     AMREX_GPU_DEVICE AMREX_FORCE_INLINE
