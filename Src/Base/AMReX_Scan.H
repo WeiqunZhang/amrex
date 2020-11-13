@@ -36,12 +36,19 @@ struct BlockStatus<T, true>
 
     AMREX_GPU_DEVICE AMREX_FORCE_INLINE
     void write (char a_status, T a_value) {
+#if defined(AMREX_USE_CUDA) && (__CUDA_ARCH__ < 700)
+        volatile uint64_t tmp;
+        reinterpret_cast<STVA<T> volatile&>(tmp).status = a_status;
+        reinterpret_cast<STVA<T> volatile&>(tmp).value  = a_value;
+        reinterpret_cast<uint64_t&>(d.s) = tmp;
+#else
         Data<T> tmp;
         tmp.s = {a_status, a_value};
         static_assert(sizeof(unsigned long long) == sizeof(uint64_t),
                       "HIP/DPCPP: unsigned long long must be 64 bits");
         Gpu::Atomic::Exch(reinterpret_cast<unsigned long long*>(&d),
                           reinterpret_cast<unsigned long long&>(tmp));
+#endif
     }
 
     AMREX_GPU_DEVICE AMREX_FORCE_INLINE
@@ -49,11 +56,17 @@ struct BlockStatus<T, true>
 
     AMREX_GPU_DEVICE AMREX_FORCE_INLINE
     STVA<T> read () volatile {
+#if defined(AMREX_USE_CUDA) && (__CUDA_ARCH__ < 700)
+        volatile uint64_t tmp = reinterpret_cast<uint64_t volatile&>(d);
+        return {reinterpret_cast<STVA<T> volatile&>(tmp).status,
+                reinterpret_cast<STVA<T> volatile&>(tmp).value };
+#else
         static_assert(sizeof(unsigned long long) == sizeof(uint64_t),
                       "HIP/DPCPP: unsigned long long must be 64 bits");
         unsigned long long tmp = Gpu::Atomic::Add
             (reinterpret_cast<unsigned long long*>(const_cast<Data<T>*>(&d)), 0ull);
         return (*reinterpret_cast<Data<T>*>(&tmp)).s;
+#endif
     }
 
     AMREX_GPU_DEVICE AMREX_FORCE_INLINE
