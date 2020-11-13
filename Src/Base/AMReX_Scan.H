@@ -197,12 +197,6 @@ T PrefixSum (int n, FIN && fin, FOUT && fout, Type type)
 #endif
     {
 #ifdef AMREX_USE_DPCPP
-        auto my_syncthreads = [&gh] () { gh.item.barrier(sycl::access::fence_space::local_space); };
-#else
-        auto my_syncthreads = [] () { __syncthreads(); };
-#endif
-
-#ifdef AMREX_USE_DPCPP
         sycl::ONEAPI::sub_group const& sg = gh.item.get_sub_group();
         int lane = sg.get_local_id()[0];
         int warp = sg.get_group_id()[0];
@@ -240,7 +234,8 @@ T PrefixSum (int n, FIN && fin, FOUT && fout, Type type)
                 virtual_block_id_shared = bid;
             }
 
-            my_syncthreads();
+            AMREX_DPCPP_OR_ELSE( gh.item.barrier(sycl::access::fence_space::local_space);,
+                                 __syncthreads());
 
             virtual_block_id = virtual_block_id_shared;
         }
@@ -286,7 +281,8 @@ T PrefixSum (int n, FIN && fin, FOUT && fout, Type type)
                 shared[warp] = x;
             }
 
-            my_syncthreads();
+            AMREX_DPCPP_OR_ELSE( gh.item.barrier(sycl::access::fence_space::local_space);,
+                                 __syncthreads());
 
             // The first warp will do scan on the warp sums for the
             // whole block.
@@ -304,7 +300,8 @@ T PrefixSum (int n, FIN && fin, FOUT && fout, Type type)
                 }
             }
 
-            my_syncthreads();
+            AMREX_DPCPP_OR_ELSE( gh.item.barrier(sycl::access::fence_space::local_space);,
+                                 __syncthreads());
 
             // shared[0:nwarps_per_block) holds the inclusive sum of warp sums.
             
@@ -397,7 +394,8 @@ T PrefixSum (int n, FIN && fin, FOUT && fout, Type type)
                 }
             }
 
-            my_syncthreads();
+            AMREX_DPCPP_OR_ELSE( gh.item.barrier(sycl::access::fence_space::local_space);,
+                                 __syncthreads());
 
             T exclusive_prefix = shared[0];
 

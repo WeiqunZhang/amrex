@@ -33,6 +33,12 @@
 #endif
 
 #ifdef AMREX_USE_DPCPP
+#define AMREX_DPCPP_OR_ELSE(a,b) a
+#else
+#define AMREX_DPCPP_OR_ELSE(a,b) b
+#endif
+
+#ifdef AMREX_USE_DPCPP
 #define AMREX_DPCPP_ONLY(a) a
 #else
 #define AMREX_DPCPP_ONLY(a) ((void)0)
