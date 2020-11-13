@@ -159,28 +159,32 @@ void main_main ()
     }
 
     for (int i = 0; i < N; ++i) {
-        if (h_inclusive_cpu[i] != h_inclusive_amrex[i]) {
-            amrex::Print() << "i = " << i << ", std = " << h_inclusive_cpu[i]
-                           << ", amrex = " << h_inclusive_amrex[i] << "\n";
-            amrex::Abort("amrex inclusive scan failed");
-        }
-        if (h_exclusive_cpu[i] != h_exclusive_amrex[i]) {
-            amrex::Print() << "i = " << i << ", std = " << h_exclusive_cpu[i]
-                           << ", amrex = " << h_exclusive_amrex[i] << "\n";
-            amrex::Abort("amrex exclusive scan failed");
-        }
 #ifdef AMREX_USE_CUDA
         if (h_inclusive_cpu[i] != h_inclusive_thrust[i]) {
             amrex::Print() << "i = " << i << ", std = " << h_inclusive_cpu[i]
                            << ", thrust = " << h_inclusive_thrust[i] << "\n";
-            amrex::Abort("thrust inclusive scan failed");
+            amrex::Print() << "thrust failed inclusive scan" << std::endl;
+            amrex::Abort();
         }
         if (h_exclusive_cpu[i] != h_exclusive_thrust[i]) {
             amrex::Print() << "i = " << i << ", std = " << h_exclusive_cpu[i]
                            << ", thrust = " << h_exclusive_thrust[i] << "\n";
-            amrex::Abort("thrust exclusive scan failed");
+            amrex::Print() << "thrust failed exclusive scan" << std::endl;
+            amrex::Abort();
         }
 #endif
+        if (h_inclusive_cpu[i] != h_inclusive_amrex[i]) {
+            amrex::Print() << "i = " << i << ", std = " << h_inclusive_cpu[i]
+                           << ", amrex = " << h_inclusive_amrex[i] << "\n";
+            amrex::Print() << "amrex failed inclusive scan" << std::endl;
+            amrex::Abort();
+        }
+        if (h_exclusive_cpu[i] != h_exclusive_amrex[i]) {
+            amrex::Print() << "i = " << i << ", std = " << h_exclusive_cpu[i]
+                           << ", amrex = " << h_exclusive_amrex[i] << "\n";
+            amrex::Print() << "amrex failed exclusive scan" << std::endl;
+            amrex::Abort();
+        }
     }
 
     The_Device_Arena()->free(d_in);
