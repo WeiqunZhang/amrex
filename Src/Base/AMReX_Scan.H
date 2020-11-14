@@ -170,7 +170,7 @@ T PrefixSum (int n, FIN && fin, FOUT && fout, Type type)
     constexpr int nchunks = 12;
     constexpr int nelms_per_block = nthreads * nchunks;
     int nblocks = (n + nelms_per_block - 1) / nelms_per_block;
-    std::size_t sm = sizeof(T) * (Gpu::Device::warp_size + nwarps_per_block);
+    std::size_t sm = sizeof(T) * (Gpu::Device::warp_size + nwarps_per_block) + sizeof(int);
     auto stream = Gpu::gpuStream();
 
     typedef typename std::conditional<sizeof(detail::STVA<T>) <= 8,
@@ -229,7 +229,7 @@ T PrefixSum (int n, FIN && fin, FOUT && fout, Type type)
         // Anywhere in this function, we should not use blockIdx.
         int virtual_block_id = 0;
         if (gridDim.x > 1) {
-            int& virtual_block_id_shared = *(reinterpret_cast<int*>(shared));
+            int& virtual_block_id_shared = *((int*)(shared2+nwarps_per_block));
             if (threadIdx.x == 0) {
 #ifdef AMREX_USE_DPCPP
                 unsigned int bid = Gpu::Atomic::Inc<sycl::access::address_space::global_space>
