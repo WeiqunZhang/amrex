@@ -51,6 +51,7 @@ MLNodeLinOp::define (const Vector<Geometry>& a_geom,
     m_cc_fine_mask.resize(m_num_amr_levels);
     m_nd_fine_mask.resize(m_num_amr_levels);
     m_has_fine_bndry.resize(m_num_amr_levels);
+    m_weight.resize(m_num_amr_levels);
     for (int amrlev = 0; amrlev < m_num_amr_levels; ++amrlev)
     {
         if (amrlev < m_num_amr_levels-1)
@@ -58,6 +59,8 @@ MLNodeLinOp::define (const Vector<Geometry>& a_geom,
             m_nd_fine_mask[amrlev].reset(new iMultiFab(amrex::convert(m_grids[amrlev][0],IntVect::TheNodeVector()),
                                                        m_dmap[amrlev][0], 1, 0));
             m_cc_fine_mask[amrlev].reset(new iMultiFab(m_grids[amrlev][0], m_dmap[amrlev][0], 1, 1));
+            m_weight[amrlev].reset(new MultiFab(amrex::convert(m_grids[amrlev][0],IntVect::TheNodeVector()),
+                                                m_dmap[amrlev][0], 1, 0));
         } else {
             m_cc_fine_mask[amrlev].reset(new iMultiFab(m_grids[amrlev][0], m_dmap[amrlev][0], 1, 1,
                                                        MFInfo().SetAlloc(false)));
@@ -269,9 +272,12 @@ MLNodeLinOp::buildMasks ()
         iMultiFab& cc_mask = *m_cc_fine_mask[amrlev];
         iMultiFab& nd_mask = *m_nd_fine_mask[amrlev];
         LayoutData<int>& has_cf = *m_has_fine_bndry[amrlev];
+        MultiFab& weight = *m_weight[amrlev];
         const Box& ccdom = m_geom[amrlev][0].Domain();
+        const int rr = AMRRefRatio(amrlev);
 
-        AMREX_ALWAYS_ASSERT_WITH_MESSAGE(AMRRefRatio(amrlev) == 2, "ref_ratio != 0 not supported");
+        AMREX_ALWAYS_ASSERT_WITH_MESSAGE(AMRRefRatio(amrlev) == 2 || AMRRefRatio(amrlev) == 4,
+                                         "ref_ratio != 2 and 4 not supported");
 
         cc_mask = amrex::makeFineMask(cc_mask, *m_cc_fine_mask[amrlev+1], cc_mask.nGrowVect(),
                                       IntVect(AMRRefRatio(amrlev)), m_geom[amrlev][0].periodicity(),
@@ -295,11 +301,14 @@ MLNodeLinOp::buildMasks ()
             const Box& bx = mfi.tilebox();
             Array4<int> const& nmsk = nd_mask.array(mfi);
             Array4<int const> const& cmsk = cc_mask.const_array(mfi);
+            Array4<Real> const& w = weight.array(mfi);
             AMREX_HOST_DEVICE_PARALLEL_FOR_3D (bx, i, j, k,
             {
-                mlndlap_set_nodal_mask(i,j,k,nmsk,cmsk);
+                mlndlap_set_nodal_mask(i,j,k,nmsk,w,cmsk,rr);
             });
         }
+
+        amrex::VisMF::Write(weight, "w-"+std::to_string(amrlev));
     }
 
     auto& has_cf = *m_has_fine_bndry[m_num_amr_levels-1];

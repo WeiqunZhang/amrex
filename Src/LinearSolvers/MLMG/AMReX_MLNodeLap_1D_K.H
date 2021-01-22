@@ -6,7 +6,8 @@ namespace amrex {
 
 AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
 void mlndlap_set_nodal_mask (int /*i*/, int /*j*/, int /*k*/, Array4<int> const& /*nmsk*/,
-                             Array4<int const> const& /*cmsk*/) noexcept
+                             Array4<Real> const& /*w*/, Array4<int const> const& /*cmsk*/,
+                             int /*rr*/) noexcept
 {}
 
 AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
@@ -139,6 +140,14 @@ void mlndlap_restriction (int /*i*/, int /*j*/, int /*k*/, Array4<Real> const&,
 {}
 
 AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+void mlndlap_restriction_r4 (int /*i*/, int /*j*/, int /*k*/, Array4<Real> const&,
+                             Array4<Real const> const&, Array4<int const> const&,
+                             Box const&,
+                             GpuArray<LinOpBCType, AMREX_SPACEDIM> const&,
+                             GpuArray<LinOpBCType, AMREX_SPACEDIM> const&) noexcept
+{}
+
+AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
 void mlndlap_semi_restriction (int /*i*/, int /*j*/, int /*k*/, Array4<Real> const&,
                           Array4<Real const> const&, Array4<int const> const&, int) noexcept
 {}
@@ -191,19 +200,12 @@ void mlndlap_mknewu_c (int /*i*/, int /*j*/, int /*k*/, Array4<Real> const&, Arr
                      Real, GpuArray<Real,AMREX_SPACEDIM> const&) noexcept
 {}
 
+template <int rr>
 AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
-void mlndlap_divu_compute_fine_contrib (int /*i*/, int /*j*/, int /*k*/, Box const&,
-                                        Array4<Real> const&, Array4<Real const> const&,
-                                        GpuArray<Real,AMREX_SPACEDIM> const&,
-                                        Box const&,
-                                        GpuArray<LinOpBCType, AMREX_SPACEDIM> const&,
-                                        GpuArray<LinOpBCType, AMREX_SPACEDIM> const&) noexcept
-{}
-
-AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
-void mlndlap_divu_add_fine_contrib (int /*i*/, int /*j*/, int /*k*/, Box const&,
-                                    Array4<Real> const&, Array4<Real const> const&,
-                                    Array4<int const> const&) noexcept
+void mlndlap_divu_fine_contrib (int /*i*/, int /*j*/, int /*k*/, Box const&, Box const&,
+                                Array4<Real> const&, Array4<Real const> const&,
+                                Array4<int const> const&,
+                                GpuArray<Real,AMREX_SPACEDIM> const&) noexcept
 {}
 
 AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
@@ -217,10 +219,11 @@ void mlndlap_divu_cf_contrib (int, int, int, Array4<Real> const&,
                               Array4<Real const> const&, Array4<Real const> const&,
                               Array4<Real const> const&, Array4<int const> const&,
                               Array4<int const> const&, Array4<int const> const&,
+                              Array4<Real const> const&,
                               GpuArray<Real,AMREX_SPACEDIM> const&,
-                              Box const&, GpuArray<LinOpBCType,AMREX_SPACEDIM> const&,
+                              Box const&, Box const&,
                               GpuArray<LinOpBCType,AMREX_SPACEDIM> const&,
-                              bool) noexcept
+                              GpuArray<LinOpBCType,AMREX_SPACEDIM> const&) noexcept
 {}
 
 AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
