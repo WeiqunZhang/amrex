@@ -41,6 +41,8 @@ MLCellABecLap::define (const Vector<Geometry>& a_geom,
 {
     BL_PROFILE("MLCellABecLap::define(overset)");
 
+    MLCellLinOp::defineGrids(a_geom, a_grids, a_dmap, a_info, a_factory, true);
+
     int namrlevs = a_geom.size();
     m_overset_mask.resize(namrlevs);
     for (int amrlev = 0; amrlev < namrlevs; ++amrlev)
@@ -53,65 +55,89 @@ MLCellABecLap::define (const Vector<Geometry>& a_geom,
         }
     }
 
-    int amrlev = 0;
+    bool aggressive_coarsening = a_info.aggressive_coarsening;
+
     Box dom = a_geom[0].Domain();
-    for (int mglev = 1; mglev <= a_info.max_coarsening_level; ++mglev)
+    int first_mixed_coarsening_level = 1000000;
+    Vector<unsigned long long> nvalidcells;
+    for (int mglev = 1; mglev < m_num_mg_levels[0]; ++mglev)
     {
         AMREX_ALWAYS_ASSERT(mg_coarsen_ratio == 2);
-        iMultiFab const& fine = *m_overset_mask[amrlev][mglev-1];
-        if (dom.coarsenable(2) && fine.boxArray().coarsenable(2)) {
-            dom.coarsen(2);
-            std::unique_ptr<iMultiFab> crse(new iMultiFab(amrex::coarsen(fine.boxArray(),2),
-                                                          fine.DistributionMap(), 1, 1));
-            ReduceOps<ReduceOpSum> reduce_op;
-            ReduceData<int> reduce_data(reduce_op);
-            using ReduceTuple = typename decltype(reduce_data)::Type;
+        iMultiFab const& fine = *m_overset_mask[0][mglev-1];
+
+        std::unique_ptr<iMultiFab> crse(new iMultiFab(amrex::coarsen(fine.boxArray(),2),
+                                                      fine.DistributionMap(), 1, 1));
+        ReduceOps<ReduceOpSum,ReduceOpSum> reduce_op;
+        ReduceData<unsigned long long, unsigned long long> reduce_data(reduce_op);
+        using ReduceTuple = typename decltype(reduce_data)::Type;
 #ifdef AMREX_USE_OMP
 #pragma omp parallel if (Gpu::notInLaunchRegion())
 #endif
-            for (MFIter mfi(*crse, TilingIfNotGPU()); mfi.isValid(); ++mfi)
+        for (MFIter mfi(*crse, TilingIfNotGPU()); mfi.isValid(); ++mfi)
+        {
+            const Box& bx = mfi.tilebox();
+            Array4<int const> const& fmsk = fine.const_array(mfi);
+            Array4<int> const& cmsk = crse->array(mfi);
+            reduce_op.eval(bx, reduce_data,
+            [=] AMREX_GPU_HOST_DEVICE (Box const& b) -> ReduceTuple
             {
-                const Box& bx = mfi.tilebox();
-                Array4<int const> const& fmsk = fine.const_array(mfi);
-                Array4<int> const& cmsk = crse->array(mfi);
-                reduce_op.eval(bx, reduce_data,
-                [=] AMREX_GPU_HOST_DEVICE (Box const& b) -> ReduceTuple
-                {
-                    return { coarsen_overset_mask(b, cmsk, fmsk) };
-                });
-            }
-            ReduceTuple hv = reduce_data.value();
-            if (amrex::get<0>(hv) == 0) {
-                m_overset_mask[amrlev].push_back(std::move(crse));
-            } else {
-                break;
-            }
+                return coarsen_overset_mask(b, cmsk, fmsk);
+            });
+        }
+        ReduceTuple hv = reduce_data.value();
+        auto nmixed = amrex::get<0>(hv);
+        auto nvalid = amrex::get<1>(hv);
+        if (nmixed > 0) {
+            first_mixed_coarsening_level = std::min(first_mixed_coarsening_level, mglev);
+        }
+        nvalidcells.push_back(nvalid);
+        if (aggressive_coarsening || nmixed == 0) {
+            m_overset_mask[0].push_back(std::move(crse));
         } else {
             break;
         }
     }
-    int max_overset_mask_coarsening_level = m_overset_mask[amrlev].size()-1;
-    ParallelAllReduce::Min(max_overset_mask_coarsening_level, ParallelContext::CommunicatorSub());
-    m_overset_mask[amrlev].resize(max_overset_mask_coarsening_level+1);
 
-    LPInfo linfo = a_info;
-    linfo.max_coarsening_level = std::min(a_info.max_coarsening_level,
-                                          max_overset_mask_coarsening_level);
-
-    MLCellLinOp::define(a_geom, a_grids, a_dmap, linfo, a_factory);
-
-    amrlev = 0;
-    for (int mglev = 1; mglev < m_num_mg_levels[amrlev]; ++mglev) {
-        MultiFab foo(m_grids[amrlev][mglev], m_dmap[amrlev][mglev], 1, 0, MFInfo().SetAlloc(false));
-        if (! isMFIterSafe(*m_overset_mask[amrlev][mglev], foo)) {
-            std::unique_ptr<iMultiFab> osm(new iMultiFab(m_grids[amrlev][mglev],
-                                                         m_dmap[amrlev][mglev], 1, 1));
-            osm->ParallelCopy(*m_overset_mask[amrlev][mglev]);
-            std::swap(osm, m_overset_mask[amrlev][mglev]);
+    ParallelAllReduce::Min(first_mixed_coarsening_level, ParallelContext::CommunicatorSub());
+    if (first_mixed_coarsening_level < m_num_mg_levels[0]) {
+        if (aggressive_coarsening) {
+            ParallelAllReduce::Sum(nvalidcells.data(), nvalidcells.size(),
+                                   ParallelContext::CommunicatorSub());
+            auto it = std::find_if(nvalidcells.begin(), nvalidcells.end(),
+                                   [] (ULong i) -> bool { return i == 0; } );
+            m_overset_mask[0].resize
+                (std::distance(nvalidcells.begin(), it) + 1);
+        } else {
+            m_overset_mask[0].resize(first_mixed_coarsening_level);
         }
     }
 
-    for (amrlev = 0; amrlev < m_num_amr_levels; ++amrlev) {
+    m_first_mixed_coarsening_level = first_mixed_coarsening_level;
+
+    MLLinOp::resizeGrids(m_overset_mask[0].size());
+
+    // grids have been defined
+    MLCellLinOp::define(a_geom, a_grids, a_dmap, a_info, a_factory, true, true);
+
+    m_overset_mask[0][0]->setBndry(1);
+    m_overset_mask[0][0]->FillBoundary(m_geom[0][0].periodicity());
+
+    for (int mglev = 1; mglev < m_num_mg_levels[0]; ++mglev) {
+        MultiFab foo(m_grids[0][mglev], m_dmap[0][mglev], 1, 0, MFInfo().SetAlloc(false));
+        if (isMFIterSafe(*m_overset_mask[0][mglev], foo)) {
+            m_overset_mask[0][mglev]->setBndry(1);
+            m_overset_mask[0][mglev]->FillBoundary(m_geom[0][mglev].periodicity());
+        } else {
+            std::unique_ptr<iMultiFab> osm(new iMultiFab(m_grids[0][mglev],
+                                                         m_dmap[0][mglev], 1, 1));
+            osm->setBndry(1);
+            osm->ParallelCopy(*m_overset_mask[0][mglev], 0, 0, 1, 0, 1,
+                              m_geom[0][mglev].periodicity());
+            std::swap(osm, m_overset_mask[0][mglev]);
+        }
+    }
+
+    for (int amrlev = 1; amrlev < m_num_amr_levels; ++amrlev) {
         for (int mglev = 0; mglev < m_num_mg_levels[amrlev]; ++mglev) {
             m_overset_mask[amrlev][mglev]->setBndry(1);
             m_overset_mask[amrlev][mglev]->FillBoundary(m_geom[amrlev][mglev].periodicity());
@@ -129,6 +155,15 @@ void
 MLCellABecLap::update ()
 {
     if (MLCellLinOp::needsUpdate()) MLCellLinOp::update();
+}
+
+void
+MLCellABecLap::restriction (int amrlev, int cmglev, MultiFab& crse, MultiFab& fine) const
+{
+    MLCellLinOp::restriction(amrlev, cmglev, crse, fine);
+    if (amrlev == 0 && m_overset_mask[0][cmglev] && cmglev >= m_first_mixed_coarsening_level) {
+        applyOverset(0, cmglev, crse);
+    }
 }
 
 void
@@ -322,18 +357,18 @@ MLCellABecLap::applyInhomogNeumannTerm (int amrlev, MultiFab& rhs) const
 }
 
 void
-MLCellABecLap::applyOverset (int amrlev, MultiFab& rhs) const
+MLCellABecLap::applyOverset (int amrlev, int mglev, MultiFab& rhs) const
 {
-    if (m_overset_mask[amrlev][0]) {
+    if (m_overset_mask[amrlev][mglev]) {
         const int ncomp = getNComp();
 #ifdef AMREX_USE_OMP
 #pragma omp parallel if (Gpu::notInLaunchRegion())
 #endif
-        for (MFIter mfi(*m_overset_mask[amrlev][0],TilingIfNotGPU()); mfi.isValid(); ++mfi)
+        for (MFIter mfi(*m_overset_mask[amrlev][mglev],TilingIfNotGPU()); mfi.isValid(); ++mfi)
         {
             const Box& bx = mfi.tilebox();
             Array4<Real> const& rfab = rhs.array(mfi);
-            Array4<int const> const& osm = m_overset_mask[amrlev][0]->const_array(mfi);
+            Array4<int const> const& osm = m_overset_mask[amrlev][mglev]->const_array(mfi);
             AMREX_HOST_DEVICE_PARALLEL_FOR_4D(bx, ncomp, i, j, k, n,
             {
                 if (osm(i,j,k) == 0) rfab(i,j,k,n) = 0.0;

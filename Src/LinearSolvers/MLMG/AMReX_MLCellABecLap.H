@@ -46,6 +46,8 @@ public:
 
     virtual void prepareForSolve () override;
 
+    virtual void restriction (int, int, MultiFab& crse, MultiFab& fine) const override;
+
     virtual void getFluxes (const Vector<Array<MultiFab*,AMREX_SPACEDIM> >& a_flux,
                             const Vector<MultiFab*>& a_sol,
                             Location a_loc) const final override;
@@ -61,7 +63,7 @@ public:
 
     virtual void applyInhomogNeumannTerm (int amrlev, MultiFab& rhs) const final override;
 
-    virtual void applyOverset (int amlev, MultiFab& rhs) const override;
+    virtual void applyOverset (int amlev, int mglev, MultiFab& rhs) const override;
 
 #if defined(AMREX_USE_HYPRE) && (AMREX_SPACEDIM > 1)
     virtual std::unique_ptr<Hypre> makeHypre (Hypre::Interface hypre_interface) const override;
@@ -73,6 +75,7 @@ public:
 
 protected:
     Vector<Vector<std::unique_ptr<iMultiFab> > > m_overset_mask;
+    int m_first_mixed_coarsening_level = 1000000;
 };
 
 }

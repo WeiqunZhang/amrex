@@ -36,6 +36,7 @@ struct LPInfo
     bool do_agglomeration = true;
     bool do_consolidation = true;
     bool do_semicoarsening = false;
+    bool aggressive_coarsening = false;
     int agg_grid_size = -1;
     int con_grid_size = -1;
     bool has_metric_term = true;
@@ -45,6 +46,7 @@ struct LPInfo
     LPInfo& setAgglomeration (bool x) noexcept { do_agglomeration = x; return *this; }
     LPInfo& setConsolidation (bool x) noexcept { do_consolidation = x; return *this; }
     LPInfo& setSemicoarsening (bool x) noexcept { do_semicoarsening = x; return *this; }
+    LPInfo& setAggressiveCoarsening (bool x) noexcept { aggressive_coarsening = x; return *this; }
     LPInfo& setAgglomerationGridSize (int x) noexcept { agg_grid_size = x; return *this; }
     LPInfo& setConsolidationGridSize (int x) noexcept { con_grid_size = x; return *this; }
     LPInfo& setMetricTerm (bool x) noexcept { has_metric_term = x; return *this; }
@@ -100,7 +102,8 @@ public:
                  const Vector<DistributionMapping>& a_dmap,
                  const LPInfo& a_info,
                  const Vector<FabFactory<FArrayBox> const*>& a_factory,
-                 bool eb_limit_coarsening = true);
+                 bool eb_limit_coarsening = true,
+                 bool grids_defined = false);
 
     virtual std::string name () const { return std::string("Unspecified"); }
 
@@ -217,7 +220,7 @@ public:
 
     virtual void unimposeNeumannBC (int /*amrlev*/, MultiFab& /*rhs*/) const {} // only nodal solver might need it
     virtual void applyInhomogNeumannTerm (int /*amrlev*/, MultiFab& /*rhs*/) const {}
-    virtual void applyOverset (int /*amlev*/, MultiFab& /*rhs*/) const {}
+    virtual void applyOverset (int /*amlev*/, int /*mglev*/, MultiFab& /*rhs*/) const {}
 
     virtual void prepareForSolve () = 0;
     virtual bool isSingular (int amrlev) const = 0;
@@ -292,6 +295,9 @@ protected:
 
     bool m_do_agglomeration = false;
     bool m_do_consolidation = false;
+
+    int m_agg_lev = 1000000;
+    int m_con_lev = 1000000;
 
     bool m_do_semicoarsening = false;
     Vector<IntVect> mg_coarsen_ratio_vec;
@@ -380,12 +386,19 @@ protected:
         return std::unique_ptr<FabFactory<FArrayBox> >(new FArrayBoxFactory());
     }
 
-private:
+protected:
 
     void defineGrids (const Vector<Geometry>& a_geom,
                       const Vector<BoxArray>& a_grids,
                       const Vector<DistributionMapping>& a_dmap,
-                      const Vector<FabFactory<FArrayBox> const*>& a_factory);
+                      const LPInfo& a_info,
+                      const Vector<FabFactory<FArrayBox> const*>& a_factory,
+                      bool eb_limit_coarsening);
+
+    void resizeGrids (int a_num_mg_levels);
+
+private:
+
     void defineAuxData ();
     void defineBC ();
     static void makeAgglomeratedDMap (const Vector<BoxArray>& ba, Vector<DistributionMapping>& dm);

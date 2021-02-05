@@ -26,7 +26,9 @@ public:
                  const Vector<BoxArray>& a_grids,
                  const Vector<DistributionMapping>& a_dmap,
                  const LPInfo& a_info = LPInfo(),
-                 const Vector<FabFactory<FArrayBox> const*>& a_factory = {});
+                 const Vector<FabFactory<FArrayBox> const*>& a_factory = {},
+                 bool eb_limit_coarsening = true,
+                 bool grids_defined = false);
 
     virtual void setLevelBC (int amrlev, const MultiFab* levelbcdata) final override;
 

@@ -5,10 +5,12 @@
 namespace amrex {
 
 AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
-int coarsen_overset_mask (Box const& bx, Array4<int> const& cmsk, Array4<int const> const& fmsk)
+GpuTuple<unsigned long long, unsigned long long>
+coarsen_overset_mask (Box const& bx, Array4<int> const& cmsk, Array4<int const> const& fmsk)
     noexcept
 {
-    int nerrors = 0;
+    unsigned long long nmixed = 0;
+    unsigned long long nvalid = 0;
     const auto lo = amrex::lbound(bx);
     const auto hi = amrex::ubound(bx);
     for (int j = lo.y; j <= hi.y; ++j) {
@@ -18,11 +20,13 @@ int coarsen_overset_mask (Box const& bx, Array4<int> const& cmsk, Array4<int con
         cmsk(i,j,0) = fmsk(ii,jj,0) + fmsk(ii+1,jj,0) + fmsk(ii,jj+1,0) + fmsk(ii+1,jj+1,0);
         if (cmsk(i,j,0) == 4) {
             cmsk(i,j,0) = 1;
+            ++nvalid;
         } else if (cmsk(i,j,0) != 0) {
-            ++nerrors;
+            cmsk(i,j,0) = 0;
+            ++nmixed;
         }
     }}
-    return nerrors;
+    return GpuTuple<unsigned long long, unsigned long long>{nmixed,nvalid};
 }
 
 }

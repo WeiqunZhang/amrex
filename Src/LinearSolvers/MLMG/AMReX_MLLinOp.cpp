@@ -132,7 +132,7 @@ MLLinOp::define (const Vector<Geometry>& a_geom,
                  const Vector<DistributionMapping>& a_dmap,
                  const LPInfo& a_info,
                  const Vector<FabFactory<FArrayBox> const*>& a_factory,
-                 bool eb_limit_coarsening)
+                 bool eb_limit_coarsening, bool grids_defined)
 {
     amrex::ignore_unused(eb_limit_coarsening);
 
@@ -142,7 +142,30 @@ MLLinOp::define (const Vector<Geometry>& a_geom,
         Initialize();
     }
 
-    info = a_info;
+    if (!grids_defined) {
+        defineGrids(a_geom, a_grids, a_dmap, a_info, a_factory, eb_limit_coarsening);
+    }
+    defineAuxData();
+    defineBC();
+}
+
+void
+MLLinOp::defineGrids (const Vector<Geometry>& a_geom,
+                      const Vector<BoxArray>& a_grids,
+                      const Vector<DistributionMapping>& a_dmap,
+                      const LPInfo& a_info,
+                      const Vector<FabFactory<FArrayBox> const*>& a_factory,
+                      bool eb_limit_coarsening)
+{
+    amrex::ignore_unused(eb_limit_coarsening);
+
+    BL_PROFILE("MLLinOp::defineGrids()");
+
+    if (!initialized) {
+        Initialize();
+    }
+
+   info = a_info;
 #ifdef AMREX_USE_GPU
     if (Gpu::notInLaunchRegion())
     {
@@ -165,18 +188,6 @@ MLLinOp::define (const Vector<Geometry>& a_geom,
         }
     }
 #endif
-    defineGrids(a_geom, a_grids, a_dmap, a_factory);
-    defineAuxData();
-    defineBC();
-}
-
-void
-MLLinOp::defineGrids (const Vector<Geometry>& a_geom,
-                      const Vector<BoxArray>& a_grids,
-                      const Vector<DistributionMapping>& a_dmap,
-                      const Vector<FabFactory<FArrayBox> const*>& a_factory)
-{
-    BL_PROFILE("MLLinOp::defineGrids()");
 
     m_num_amr_levels = a_geom.size();
 
@@ -599,6 +610,9 @@ MLLinOp::defineGrids (const Vector<Geometry>& a_geom,
     m_do_agglomeration = agged;
     m_do_consolidation = coned;
 
+    if (agged) m_agg_lev = agg_lev;
+    if (coned) m_con_lev = con_lev;
+
     if (flag_verbose_linop) {
         if (agged) {
             Print() << "MLLinOp::defineGrids(): agglomerated AMR level 0 starting at MG level "
@@ -624,6 +638,37 @@ MLLinOp::defineGrids (const Vector<Geometry>& a_geom,
     {
         AMREX_ASSERT_WITH_MESSAGE(m_grids[amrlev][0].coarsenable(m_amr_ref_ratio[amrlev-1]),
                                   "MLLinOp: grids not coarsenable between AMR levels");
+    }
+}
+
+void
+MLLinOp::resizeGrids (int a_num_mg_levels)
+{
+    if (m_num_mg_levels[0] > a_num_mg_levels) {
+        if (flag_verbose_linop) {
+            Print() << "MLLinOp::resizeGrids(): Number of MG levels on AMR level 0 is resized"
+                    << " from " << m_num_mg_levels[0] << " to " << a_num_mg_levels << std::endl;
+        }
+
+        m_num_mg_levels[0] = a_num_mg_levels;
+
+        if (m_do_agglomeration && m_agg_lev > a_num_mg_levels) {
+            m_do_agglomeration = false;
+        }
+        if (m_do_consolidation && m_con_lev > a_num_mg_levels) {
+            m_do_consolidation = false;
+        }
+
+        if ((m_do_agglomeration || m_do_consolidation) &&
+            m_dmap[0][a_num_mg_levels] != m_dmap[0].back())
+        {
+            m_bottom_comm = makeSubCommunicator(m_dmap[0].back());
+        }
+
+        m_geom[0].resize(a_num_mg_levels);
+        m_grids[0].resize(a_num_mg_levels);
+        m_dmap[0].resize(a_num_mg_levels);
+        m_factory[0].resize(a_num_mg_levels);
     }
 }
 
