@@ -356,7 +356,7 @@ operator>> (std::istream  &is,
     } else {
         int ng;
         is >> ng;
-        hd.m_ngrow = IntVect(AMREX_D_DECL(ng,ng,ng));
+        hd.m_ngrow = IntVect(ng);
     }
     BL_ASSERT(hd.m_ngrow.min() >= 0);
 
@@ -1133,7 +1133,7 @@ VisMF::WriteOnlyHeader (const FabArray<FArrayBox> & mf,
 
     // We are saving NO data => nComp = 0, nGrow = {0, 0, 0}
     hdr.m_ncomp = 0;
-    hdr.m_ngrow = IntVect{AMREX_D_DECL(0, 0, 0)};
+    hdr.m_ngrow = IntVect{0};
 
     // FabOnDisk list is uninitialized => initialize it here
     for(VisMF::FabOnDisk & fod : hdr.m_fod){

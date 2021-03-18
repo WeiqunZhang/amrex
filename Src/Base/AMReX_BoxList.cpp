@@ -351,6 +351,8 @@ BoxList::complementIn (const Box& b, const BoxArray& ba)
         Real s_avgbox = static_cast<Real>(std::sqrt(npts_avgbox));
 #elif (AMREX_SPACEDIM == 3)
         Real s_avgbox = static_cast<Real>(std::cbrt(npts_avgbox));
+#else
+        Real s_avgbox = std::pow(npts_avgbox, 1./AMREX_SPACEDIM);
 #endif
 
         const int block_size = 4 * std::max(1,static_cast<int>(std::ceil(s_avgbox/4.))*4);
@@ -792,7 +794,28 @@ BoxList::maxSize (const IntVect& chunk)
         if (numblk == 1) {
             new_boxes.push_back(bx);
         } else {
-#if (AMREX_SPACEDIM == 3)
+#if (AMREX_SPACEDIM == 6)
+            for (int p = 0; p < numblk[5]; ++p) {
+                int plo = (p < extra[5]) ? p*(sz[5]+1)*ratio[5] : (p*sz[5]+extra[5])*ratio[5];
+                int phi = (p < extra[5]) ? plo+(sz[5]+1)*ratio[5]-1 : plo+sz[5]*ratio[5]-1;
+                plo += boxlo[5];
+                phi += boxlo[5];
+#endif
+#if (AMREX_SPACEDIM >= 5)
+            for (int n = 0; n < numblk[4]; ++n) {
+                int nlo = (n < extra[4]) ? n*(sz[4]+1)*ratio[4] : (n*sz[4]+extra[4])*ratio[4];
+                int nhi = (n < extra[4]) ? nlo+(sz[4]+1)*ratio[4]-1 : nlo+sz[4]*ratio[4]-1;
+                nlo += boxlo[4];
+                nhi += boxlo[4];
+#endif
+#if (AMREX_SPACEDIM >= 4)
+            for (int m = 0; m < numblk[3]; ++m) {
+                int mlo = (m < extra[3]) ? m*(sz[3]+1)*ratio[3] : (m*sz[3]+extra[3])*ratio[3];
+                int mhi = (m < extra[3]) ? mlo+(sz[3]+1)*ratio[3]-1 : mlo+sz[3]*ratio[3]-1;
+                mlo += boxlo[3];
+                mhi += boxlo[3];
+#endif
+#if (AMREX_SPACEDIM >= 3)
             for (int k = 0; k < numblk[2]; ++k) {
                 int klo = (k < extra[2]) ? k*(sz[2]+1)*ratio[2] : (k*sz[2]+extra[2])*ratio[2];
                 int khi = (k < extra[2]) ? klo+(sz[2]+1)*ratio[2]-1 : klo+sz[2]*ratio[2]-1;
@@ -811,10 +834,10 @@ BoxList::maxSize (const IntVect& chunk)
                         int ihi = (i < extra[0]) ? ilo+(sz[0]+1)*ratio[0]-1 : ilo+sz[0]*ratio[0]-1;
                         ilo += boxlo[0];
                         ihi += boxlo[0];
-                        new_boxes.push_back(Box(IntVect(AMREX_D_DECL(ilo,jlo,klo)),
-                                                IntVect(AMREX_D_DECL(ihi,jhi,khi))).
+                        new_boxes.push_back(Box(IntVect(AMREX_D6_DECL(ilo,jlo,klo,mlo,nlo,plo)),
+                                                IntVect(AMREX_D6_DECL(ihi,jhi,khi,mhi,nhi,phi))).
                                             convert(ixType()));
-            AMREX_D_TERM(},},})
+            AMREX_D6_TERM(},},},},},})
         }
     }
     std::swap(new_boxes, m_lbox);
@@ -825,7 +848,7 @@ BoxList::maxSize (const IntVect& chunk)
 BoxList&
 BoxList::maxSize (int chunk)
 {
-    return maxSize(IntVect(AMREX_D_DECL(chunk,chunk,chunk)));
+    return maxSize(IntVect{chunk});
 }
 
 BoxList&

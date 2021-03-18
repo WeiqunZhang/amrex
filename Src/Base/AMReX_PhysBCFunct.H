@@ -415,7 +415,7 @@ GpuBndryFuncFab<F>::ccdoit (Box const& bx, FArrayBox& dest,
             amrex::For(tmp, [=] (int i, int j, int k) noexcept
             {
                 amrex::ignore_unused(j,k);
-                IntVect const cell(AMREX_D_DECL(i,j,k));
+                IntVect const cell(AMREX_D6_DECL(i,j,k,0,0,0));
                 filcc_cell(cell, fab, dcomp, numcomp, geomdata, time,
                            bcr_p, 0, orig_comp);
                 f_user(cell, fab, dcomp, numcomp, geomdata, time,
@@ -456,7 +456,7 @@ GpuBndryFuncFab<F>::ccdoit (Box const& bx, FArrayBox& dest,
             amrex::For(tmp, [=] (int i, int j, int k) noexcept
             {
                 amrex::ignore_unused(j,k);
-                IntVect const cell(AMREX_D_DECL(i,j,k));
+                IntVect const cell(AMREX_D6_DECL(i,j,k,0,0,0));
                 filcc_cell(cell, fab, dcomp, numcomp, geomdata, time,
                            bcr_p, 0, orig_comp);
                 f_user(cell, fab, dcomp, numcomp, geomdata, time,
@@ -534,7 +534,7 @@ GpuBndryFuncFab<F>::nddoit (Box const& bx, FArrayBox& dest,
             for (int n = dcomp; n < dcomp+numcomp; ++n) {
                 fab(i,j,k,n) = fab(dxlo,j,k,n);
             }
-            f_user(IntVect(AMREX_D_DECL(i,j,k)), fab, dcomp, numcomp, geomdata, time,
+            f_user(IntVect(AMREX_D6_DECL(i,j,k,0,0,0)), fab, dcomp, numcomp, geomdata, time,
                    bcr_p, 0, orig_comp);
         });
     }
@@ -549,7 +549,7 @@ GpuBndryFuncFab<F>::nddoit (Box const& bx, FArrayBox& dest,
             for (int n = dcomp; n < dcomp+numcomp; ++n) {
                 fab(i,j,k,n) = fab(dxhi,j,k,n);
             }
-            f_user(IntVect(AMREX_D_DECL(i,j,k)), fab, dcomp, numcomp, geomdata, time,
+            f_user(IntVect(AMREX_D6_DECL(i,j,k,0,0,0)), fab, dcomp, numcomp, geomdata, time,
                    bcr_p, 0, orig_comp);
         });
     }
@@ -565,7 +565,7 @@ GpuBndryFuncFab<F>::nddoit (Box const& bx, FArrayBox& dest,
             for (int n = dcomp; n < dcomp+numcomp; ++n) {
                 fab(i,j,k,n) = fab(i,dylo,k,n);
             }
-            f_user(IntVect(AMREX_D_DECL(i,j,k)), fab, dcomp, numcomp, geomdata, time,
+            f_user(IntVect(AMREX_D6_DECL(i,j,k,0,0,0)), fab, dcomp, numcomp, geomdata, time,
                    bcr_p, 0, orig_comp);
         });
     }
@@ -580,7 +580,7 @@ GpuBndryFuncFab<F>::nddoit (Box const& bx, FArrayBox& dest,
             for (int n = dcomp; n < dcomp+numcomp; ++n) {
                 fab(i,j,k,n) = fab(i,dyhi,k,n);
             }
-            f_user(IntVect(AMREX_D_DECL(i,j,k)), fab, dcomp, numcomp, geomdata, time,
+            f_user(IntVect(AMREX_D6_DECL(i,j,k,0,0,0)), fab, dcomp, numcomp, geomdata, time,
                    bcr_p, 0, orig_comp);
         });
     }

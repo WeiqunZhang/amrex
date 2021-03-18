@@ -11,7 +11,7 @@ namespace amrex { namespace NonLocalBC {
 struct Rotate90ClockWise {
     AMREX_GPU_HOST_DEVICE
     IntVect operator() (IntVect const& iv) const noexcept {
-        return IntVect{AMREX_D_DECL(iv[1], -1-iv[0], iv[2])};
+        return IntVect{AMREX_D6_DECL(iv[1], -1-iv[0], iv[2], 0,0,0)};
     }
 
     AMREX_GPU_HOST_DEVICE
@@ -20,19 +20,19 @@ struct Rotate90ClockWise {
     }
 
     Box operator() (Box const& box) const noexcept {
-        return Box(operator()(IntVect{AMREX_D_DECL(box.bigEnd  (0),
-                                                   box.smallEnd(1),
-                                                   box.smallEnd(2))}),
-                   operator()(IntVect{AMREX_D_DECL(box.smallEnd(0),
-                                                   box.bigEnd  (1),
-                                                   box.bigEnd  (2))}));
+        return Box(operator()(IntVect{AMREX_D6_DECL(box.bigEnd  (0),
+                                                    box.smallEnd(1),
+                                                    box.smallEnd(2), 0,0,0)}),
+                   operator()(IntVect{AMREX_D6_DECL(box.smallEnd(0),
+                                                    box.bigEnd  (1),
+                                                    box.bigEnd  (2), 0,0,0)}));
     }
 };
 
 struct Rotate90CounterClockWise {
     AMREX_GPU_HOST_DEVICE
     IntVect operator() (IntVect const& iv) const noexcept {
-        return IntVect{AMREX_D_DECL(-1-iv[1], iv[0], iv[2])};
+        return IntVect{AMREX_D6_DECL(-1-iv[1], iv[0], iv[2], 0,0,0)};
     }
 
     AMREX_GPU_HOST_DEVICE
@@ -41,12 +41,12 @@ struct Rotate90CounterClockWise {
     }
 
     Box operator() (Box const& box) const noexcept {
-        return Box(operator()(IntVect{AMREX_D_DECL(box.smallEnd(0),
-                                                   box.bigEnd  (1),
-                                                   box.smallEnd(2))}),
-                   operator()(IntVect{AMREX_D_DECL(box.bigEnd  (0),
-                                                   box.smallEnd(1),
-                                                   box.bigEnd  (2))}));
+        return Box(operator()(IntVect{AMREX_D6_DECL(box.smallEnd(0),
+                                                    box.bigEnd  (1),
+                                                    box.smallEnd(2), 0,0,0)}),
+                   operator()(IntVect{AMREX_D6_DECL(box.bigEnd  (0),
+                                                    box.smallEnd(1),
+                                                    box.bigEnd  (2), 0,0,0)}));
     }
 };
 
@@ -67,7 +67,7 @@ struct Rotate180Fn {
 
     AMREX_GPU_HOST_DEVICE
     IntVect operator() (IntVect const& iv) const noexcept {
-        return IntVect{AMREX_D_DECL(-1-iv[0], Ly-1-iv[1], iv[2])};
+        return IntVect{AMREX_D6_DECL(-1-iv[0], Ly-1-iv[1], iv[2], 0,0,0)};
     }
 
     AMREX_GPU_HOST_DEVICE
@@ -76,12 +76,12 @@ struct Rotate180Fn {
     }
 
     Box operator() (Box const& box) const noexcept {
-        return Box(operator()(IntVect{AMREX_D_DECL(box.bigEnd  (0),
-                                                   box.bigEnd  (1),
-                                                   box.smallEnd(2))}),
-                   operator()(IntVect{AMREX_D_DECL(box.smallEnd(0),
-                                                   box.smallEnd(1),
-                                                   box.bigEnd  (2))}));
+        return Box(operator()(IntVect{AMREX_D6_DECL(box.bigEnd  (0),
+                                                    box.bigEnd  (1),
+                                                    box.smallEnd(2), 0,0,0)}),
+                   operator()(IntVect{AMREX_D6_DECL(box.smallEnd(0),
+                                                    box.smallEnd(1),
+                                                    box.bigEnd  (2), 0,0,0)}));
     }
 };
 
@@ -100,7 +100,7 @@ struct PolarFn {
 
     AMREX_GPU_HOST_DEVICE
     IntVect operator() (IntVect const& iv) const noexcept {
-        return IntVect{AMREX_D_DECL(i_index(iv[0]), j_index(iv[1]), iv[2])};
+        return IntVect{AMREX_D6_DECL(i_index(iv[0]), j_index(iv[1]), iv[2], 0,0,0)};
     }
 
     AMREX_GPU_HOST_DEVICE
@@ -109,12 +109,12 @@ struct PolarFn {
     }
 
     Box operator() (Box const& box) const noexcept {
-        return Box(operator()(IntVect{AMREX_D_DECL(box.bigEnd  (0),
-                                                   box.smallEnd(1),
-                                                   box.smallEnd(2))}),
-                   operator()(IntVect{AMREX_D_DECL(box.smallEnd(0),
-                                                   box.bigEnd  (1),
-                                                   box.bigEnd  (2))}));
+        return Box(operator()(IntVect{AMREX_D6_DECL(box.bigEnd  (0),
+                                                    box.smallEnd(1),
+                                                    box.smallEnd(2), 0,0,0)}),
+                   operator()(IntVect{AMREX_D6_DECL(box.smallEnd(0),
+                                                    box.bigEnd  (1),
+                                                    box.bigEnd  (2), 0,0,0)}));
     }
 };
 
@@ -141,7 +141,7 @@ struct PolarFn2 { // for the x-y corners
 
     AMREX_GPU_HOST_DEVICE
     IntVect operator() (IntVect const& iv) const noexcept {
-        return IntVect{AMREX_D_DECL(i_index(iv[0]), j_index(iv[1]), iv[2])};
+        return IntVect{AMREX_D6_DECL(i_index(iv[0]), j_index(iv[1]), iv[2], 0,0,0)};
     }
 
     AMREX_GPU_HOST_DEVICE
@@ -150,12 +150,12 @@ struct PolarFn2 { // for the x-y corners
     }
 
     Box operator() (Box const& box) const noexcept {
-        return Box(operator()(IntVect{AMREX_D_DECL(box.bigEnd  (0),
-                                                   box.smallEnd(1),
-                                                   box.smallEnd(2))}),
-                   operator()(IntVect{AMREX_D_DECL(box.smallEnd(0),
-                                                   box.bigEnd  (1),
-                                                   box.bigEnd  (2))}));
+        return Box(operator()(IntVect{AMREX_D6_DECL(box.bigEnd  (0),
+                                                    box.smallEnd(1),
+                                                    box.smallEnd(2), 0,0,0)}),
+                   operator()(IntVect{AMREX_D6_DECL(box.smallEnd(0),
+                                                    box.bigEnd  (1),
+                                                    box.bigEnd  (2), 0,0,0)}));
     }
 };
 
@@ -543,7 +543,7 @@ Rotate90 (FabArray<FAB>& mf, int scomp, int ncomp, IntVect const& nghost, Box co
 
     auto handler = Comm_nowait(mf, scomp, ncomp, TheRB90,Rotate90DstToSrc{});
 
-    Box corner(-nghost, IntVect{AMREX_D_DECL(-1,-1,domain.bigEnd(2)+nghost[2])});
+    Box corner(-nghost, IntVect{AMREX_D6_DECL(-1,-1,domain.bigEnd(2)+nghost[2], 0,0,0)});
 #ifdef AMREX_USE_OMP
 #pragma omp parallel if (Gpu::notInLaunchRegion())
 #endif

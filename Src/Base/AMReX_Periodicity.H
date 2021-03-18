@@ -16,13 +16,15 @@ namespace amrex {
 class Periodicity
 {
 public:
-    Periodicity () noexcept : period(AMREX_D_DECL(0,0,0)) {}
+    Periodicity () noexcept : period(0) {}
     explicit Periodicity (const IntVect& v) noexcept : period(v) {}
 
     bool isAnyPeriodic () const noexcept
-        { return AMREX_D_TERM(period[0]>0, || period[1]>0, || period[2]>0); }
+	{ return AMREX_D6_TERM(period[0]>0, || period[1]>0, || period[2]>0,
+                            || period[3]>0, || period[4]>0, || period[5]>0); }
     bool isAllPeriodic () const noexcept
-        { return AMREX_D_TERM(period[0]>0, && period[1]>0, && period[2]>0); }
+	{ return AMREX_D6_TERM(period[0]>0, && period[1]>0, && period[2]>0,
+                            && period[3]>0, && period[4]>0, && period[5]>0); }
     bool isPeriodic (int dir) const noexcept
         { return period[dir]>0; }
 

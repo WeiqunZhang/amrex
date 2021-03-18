@@ -39,6 +39,8 @@ target_sources( amrex
    AMReX_REAL.H
    AMReX_INT.H
    AMReX_CONSTANTS.H
+   AMReX_Dimension.H
+   AMReX_Dimension.cpp
    AMReX_SPACE.H
    AMReX_DistributionMapping.H
    AMReX_DistributionMapping.cpp

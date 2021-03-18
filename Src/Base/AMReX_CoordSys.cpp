@@ -205,6 +205,11 @@ CoordSys::SetVolume (FArrayBox& a_volfab,
     AMREX_ASSERT(ok);
     AMREX_ASSERT(region.cellCentered());
 
+#if (AMREX_SPACEDIM >= 4)
+    amrex::ignore_unused(a_volfab,region);
+    amrex::Abort("CoordSys::SetVolume: xxxxx HD todo");
+#else
+
     auto vol = a_volfab.array();
     GpuArray<Real,AMREX_SPACEDIM> a_dx{{AMREX_D_DECL(dx[0], dx[1], dx[2])}};
 
@@ -222,6 +227,8 @@ CoordSys::SetVolume (FArrayBox& a_volfab,
     {
         amrex_setvol(tbx, vol, a_offset, a_dx, coord);
     });
+#endif
+
 #endif
 }
 
@@ -246,7 +253,10 @@ CoordSys::SetDLogA (FArrayBox& a_dlogafab,
 
     auto dloga = a_dlogafab.array();
 
-#if (AMREX_SPACEDIM == 3)
+#if (AMREX_SPACEDIM >= 4)
+    amrex::ignore_unused(a_dlogafab,region,dir,dloga);
+    amrex::Abort("CoordSys::SetDLogA: xxxxx HD todo");
+#elif (AMREX_SPACEDIM == 3)
     AMREX_ASSERT(IsCartesian());
     AMREX_HOST_DEVICE_PARALLEL_FOR_3D ( region, i, j, k,
     {
@@ -283,7 +293,10 @@ CoordSys::SetFaceArea (FArrayBox& a_areafab,
 
     auto area = a_areafab.array();
 
-#if (AMREX_SPACEDIM == 3)
+#if (AMREX_SPACEDIM >= 4)
+    amrex::ignore_unused(a_areafab,region,dir,area);
+    amrex::Abort("CoordSys::SetFaceArea: xxxxx HD todo");
+#elif (AMREX_SPACEDIM == 3)
     AMREX_ASSERT(IsCartesian());
     const Real da = (dir == 0) ? dx[1]*dx[2] : ((dir == 1) ? dx[0]*dx[2] : dx[0]*dx[1]);
     AMREX_HOST_DEVICE_PARALLEL_FOR_3D ( region, i, j, k,
@@ -417,12 +430,18 @@ operator<< (std::ostream&   os,
             const CoordSys& c)
 {
     os << '(' << (int) c.Coord() << ' ';
-    os << AMREX_D_TERM( '(' << c.Offset(0) , <<
-                  ',' << c.Offset(1) , <<
-                  ',' << c.Offset(2))  << ')';
-    os << AMREX_D_TERM( '(' << c.CellSize(0) , <<
-                  ',' << c.CellSize(1) , <<
-                  ',' << c.CellSize(2))  << ')';
+    os << AMREX_D6_TERM( '(' << c.Offset(0) , <<
+                         ',' << c.Offset(1) , <<
+                         ',' << c.Offset(2) , <<
+                         ',' << c.Offset(3) , <<
+                         ',' << c.Offset(4) , <<
+                         ',' << c.Offset(5))  << ')';
+    os << AMREX_D6_TERM( '(' << c.CellSize(0) , <<
+                         ',' << c.CellSize(1) , <<
+                         ',' << c.CellSize(2) , <<
+                         ',' << c.CellSize(3) , <<
+                         ',' << c.CellSize(4) , <<
+                         ',' << c.CellSize(5))  << ')';
     os << ' ' << int(c.ok) << ")\n";
     return os;
 }
@@ -439,14 +458,20 @@ operator>> (std::istream& is,
     int coord;
     is.ignore(BL_IGNORE_MAX, '(') >> coord;
     c.c_sys = (CoordSys::CoordType) coord;
-    AMREX_D_EXPR(is.ignore(BL_IGNORE_MAX, '(') >> c.offset[0],
-                 is.ignore(BL_IGNORE_MAX, ',') >> c.offset[1],
-                 is.ignore(BL_IGNORE_MAX, ',') >> c.offset[2]);
+    AMREX_D6_EXPR(is.ignore(BL_IGNORE_MAX, '(') >> c.offset[0],
+                  is.ignore(BL_IGNORE_MAX, ',') >> c.offset[1],
+                  is.ignore(BL_IGNORE_MAX, ',') >> c.offset[2],
+                  is.ignore(BL_IGNORE_MAX, ',') >> c.offset[3],
+                  is.ignore(BL_IGNORE_MAX, ',') >> c.offset[4],
+                  is.ignore(BL_IGNORE_MAX, ',') >> c.offset[5]);
     is.ignore(BL_IGNORE_MAX, ')');
-    Real cellsize[3];
-    AMREX_D_EXPR(is.ignore(BL_IGNORE_MAX, '(') >> cellsize[0],
-                 is.ignore(BL_IGNORE_MAX, ',') >> cellsize[1],
-                 is.ignore(BL_IGNORE_MAX, ',') >> cellsize[2]);
+    Real cellsize[AMREX_SPACEDIM];
+    AMREX_D6_EXPR(is.ignore(BL_IGNORE_MAX, '(') >> cellsize[0],
+                  is.ignore(BL_IGNORE_MAX, ',') >> cellsize[1],
+                  is.ignore(BL_IGNORE_MAX, ',') >> cellsize[2],
+                  is.ignore(BL_IGNORE_MAX, ',') >> cellsize[3],
+                  is.ignore(BL_IGNORE_MAX, ',') >> cellsize[4],
+                  is.ignore(BL_IGNORE_MAX, ',') >> cellsize[5]);
     is.ignore(BL_IGNORE_MAX, ')');
     int tmp;
     is >> tmp;
@@ -477,9 +502,12 @@ CoordSys::Volume (const Real xlo[AMREX_SPACEDIM],
     switch (c_sys)
     {
     case cartesian:
-        return AMREX_D_TERM((xhi[0]-xlo[0]),
+        return AMREX_D6_TERM((xhi[0]-xlo[0]),
                             *(xhi[1]-xlo[1]),
-                            *(xhi[2]-xlo[2]));
+                            *(xhi[2]-xlo[2]),
+                            *(xhi[3]-xlo[3]),
+                            *(xhi[4]-xlo[4]),
+                            *(xhi[5]-xlo[5]));
 #if (AMREX_SPACEDIM==2)
     case RZ:
         return static_cast<Real>(0.5*TWOPI)*(xhi[1]-xlo[1])*(xhi[0]*xhi[0]-xlo[0]*xlo[0]);

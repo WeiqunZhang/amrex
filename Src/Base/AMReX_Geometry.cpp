@@ -6,7 +6,6 @@
 #include <AMReX_MultiFab.H>
 #include <AMReX_Utility.H>
 #include <AMReX_SPACE.H>
-
 #include <AMReX_OpenMP.H>
 
 #include <iostream>
@@ -14,16 +13,14 @@
 namespace amrex {
 
 std::ostream&
-operator<< (std::ostream&   os,
-            const Geometry& g)
+operator<< (std::ostream& os, const Geometry& g)
 {
     os << (CoordSys&) g << g.ProbDomain() << g.Domain() << 'P' << IntVect(g.isPeriodic());
     return os;
 }
 
 std::istream&
-operator>> (std::istream& is,
-            Geometry&     g)
+operator>> (std::istream& is, Geometry& g)
 {
     Box     bx;
     RealBox rb;
@@ -273,8 +270,8 @@ Geometry::GetFaceArea (FArrayBox&      area,
 }
 
 void
-Geometry::periodicShift (const Box&      target,
-                         const Box&      src,
+Geometry::periodicShift (const Box&       target,
+                         const Box&       src,
                          Vector<IntVect>& out) const noexcept
 {
     out.resize(0);
@@ -334,16 +331,18 @@ Geometry::periodicShift (const Box&      target,
                     locsrc.shift(2,rk*domain.length(2));
                 }
 
-                if (ri == 0 && rj == 0 && rk == 0)
+                if (ri == 0 && rj == 0 && rk == 0) {
                     continue;
+                }
                 //
                 // If losrc intersects target, then add to "out".
                 //
                 if (target.intersects(locsrc))
                 {
-                    out.push_back(IntVect(AMREX_D_DECL(ri*domain.length(0),
-                                                 rj*domain.length(1),
-                                                 rk*domain.length(2))));
+                    out.push_back(IntVect(AMREX_D6_DECL(ri*domain.length(0),
+                                                        rj*domain.length(1),
+                                                        rk*domain.length(2),
+                                                        0,0,0)));
                 }
                 if (rk != 0
 #if (AMREX_SPACEDIM == 3)

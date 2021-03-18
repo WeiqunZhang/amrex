@@ -35,11 +35,11 @@ struct IsIndexMapping
 //! (x,y,z) coordinates, an offset and a change in orientation.
 struct MultiBlockIndexMapping {
     //! \brief This vector needs to be a valid permutation
-    IntVect permutation{AMREX_D_DECL(0, 1, 2)};
+    IntVect permutation{AMREX_D6_DECL(0, 1, 2, 0,0,0)};
     //! \brief The offset in the source index space.
-    IntVect offset{AMREX_D_DECL(0, 0, 0)};
+    IntVect offset{0};
     //! \brief A vector of 1 and -1 describing the orientation in each component.
-    IntVect sign{AMREX_D_DECL(1, 1, 1)};
+    IntVect sign{1};
 
     //! \brief Applies this mapping on the index from destination space and returns an index in the
     //!        source space.
@@ -73,7 +73,7 @@ struct MultiBlockIndexMapping {
     }
 
     IndexType operator()(IndexType it) const noexcept {
-        return IndexType{IntVect{AMREX_D_DECL(it[permutation[0]], it[permutation[1]], it[permutation[2]])}};
+        return IndexType{IntVect{AMREX_D6_DECL(it[permutation[0]], it[permutation[1]], it[permutation[2]], 0,0,0)}};
     }
 
     IndexType Inverse(IndexType it) const noexcept {
@@ -81,7 +81,7 @@ struct MultiBlockIndexMapping {
         for (int i = 0; i < AMREX_SPACEDIM; ++i) {
             inverse_permutation[permutation[i]] = i;
         }
-        return IndexType{IntVect{AMREX_D_DECL(it[inverse_permutation[0]], it[inverse_permutation[1]], it[inverse_permutation[2]])}};
+        return IndexType{IntVect{AMREX_D6_DECL(it[inverse_permutation[0]], it[inverse_permutation[1]], it[inverse_permutation[2]], 0,0,0)}};
     }
 };
 
@@ -101,7 +101,7 @@ std::enable_if_t<IsCallableR<Dim3, DTOS, Dim3>::value, IntVect>
 Apply(DTOS dtos, const IntVect& iv)
 {
     Dim3 i = dtos(iv.dim3());
-    return IntVect{AMREX_D_DECL(i.x, i.y, i.z)};
+    return IntVect{AMREX_D6_DECL(i.x, i.y, i.z, 0,0,0)};
 }
 
 //! \brief Applies the Dim3 to Dim3 mapping onto Boxes but does not change the index type.

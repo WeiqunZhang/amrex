@@ -703,9 +703,10 @@ inline
 IntVect
 RealVect::floor () const noexcept
 {
-  return IntVect(AMREX_D_DECL(static_cast<int>(amrex::Math::floor(vect[0])),
-                              static_cast<int>(amrex::Math::floor(vect[1])),
-                              static_cast<int>(amrex::Math::floor(vect[2]))));
+  return IntVect(AMREX_D6_DECL(static_cast<int>(amrex::Math::floor(vect[0])),
+                               static_cast<int>(amrex::Math::floor(vect[1])),
+                               static_cast<int>(amrex::Math::floor(vect[2])),
+                               0,0,0));
 }
 
 AMREX_GPU_HOST_DEVICE
@@ -713,9 +714,10 @@ inline
 IntVect
 RealVect::ceil () const noexcept
 {
-  return IntVect(AMREX_D_DECL(static_cast<int>(amrex::Math::ceil(vect[0])),
-                              static_cast<int>(amrex::Math::ceil(vect[1])),
-                              static_cast<int>(amrex::Math::ceil(vect[2]))));
+  return IntVect(AMREX_D6_DECL(static_cast<int>(amrex::Math::ceil(vect[0])),
+                               static_cast<int>(amrex::Math::ceil(vect[1])),
+                               static_cast<int>(amrex::Math::ceil(vect[2])),
+                               0,0,0));
 }
 
 AMREX_GPU_HOST_DEVICE
@@ -723,9 +725,10 @@ inline
 IntVect
 RealVect::round () const noexcept
 {
-  return IntVect(AMREX_D_DECL(static_cast<int>(amrex::Math::round(vect[0])),
-                              static_cast<int>(amrex::Math::round(vect[1])),
-                              static_cast<int>(amrex::Math::round(vect[2]))));
+  return IntVect(AMREX_D6_DECL(static_cast<int>(amrex::Math::round(vect[0])),
+                               static_cast<int>(amrex::Math::round(vect[1])),
+                               static_cast<int>(amrex::Math::round(vect[2])),
+                               0,0,0));
 }
 
 AMREX_GPU_HOST_DEVICE

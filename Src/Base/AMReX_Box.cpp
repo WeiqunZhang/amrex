@@ -15,17 +15,18 @@ namespace amrex {
 //
 
 std::ostream&
-operator<< (std::ostream& os,
-            const Box&    b)
+operator<< (std::ostream& os, const Box& b)
 {
+    auto d= b.dimension();
     os << '('
-       << b.smallEnd() << ' '
-       << b.bigEnd()   << ' '
-       << b.type()
+       << IntVectDim(b.smallEnd(),d) << ' '
+       << IntVectDim(b.bigEnd(),d)   << ' '
+       << IntVectDim(b.type(),d)
        << ')';
 
-    if (os.fail())
+    if (os.fail()) {
         amrex::Error("operator<<(ostream&,Box&) failed");
+    }
 
     return os;
 }
@@ -36,10 +37,9 @@ operator<< (std::ostream& os,
 #define BL_IGNORE_MAX 100000
 
 std::istream&
-operator>> (std::istream& is,
-            Box&          b)
+operator>> (std::istream& is, Box& b)
 {
-    IntVect lo, hi, typ;
+    IntVectDim lo, hi, typ;
 
     is >> std::ws;
     char c;
@@ -75,10 +75,13 @@ operator>> (std::istream& is,
         amrex::Error("operator>>(istream&,Box&): expected \'(\'");
     }
 
-    b = Box(lo,hi,typ);
+    AMREX_ASSERT(lo.dimension() == hi.dimension() && lo.dimension() == typ.dimension());
 
-    if (is.fail())
+    b = Box(lo.intVect(),hi.intVect(),typ.intVect(),lo.dimension());
+
+    if (is.fail()) {
         amrex::Error("operator>>(istream&,Box&) failed");
+    }
 
     return is;
 }
@@ -87,20 +90,30 @@ BoxCommHelper::BoxCommHelper (const Box& bx, int* p_)
     : p(p_)
 {
     if (p == 0) {
-        v.resize(3*AMREX_SPACEDIM);
+        v.resize(3*AMREX_SPACEDIM+1);
         p = &v[0];
     }
 
-    AMREX_D_EXPR(p[0]                = bx.smallend[0],
-                 p[1]                = bx.smallend[1],
-                 p[2]                = bx.smallend[2]);
-    AMREX_D_EXPR(p[0+AMREX_SPACEDIM] = bx.bigend[0],
-                 p[1+AMREX_SPACEDIM] = bx.bigend[1],
-                 p[2+AMREX_SPACEDIM] = bx.bigend[2]);
+    AMREX_D6_EXPR(p[0] = bx.smallend[0],
+                  p[1] = bx.smallend[1],
+                  p[2] = bx.smallend[2],
+                  p[3] = bx.smallend[3],
+                  p[4] = bx.smallend[4],
+                  p[5] = bx.smallend[5]);
+    AMREX_D6_EXPR(p[0+AMREX_SPACEDIM] = bx.bigend[0],
+                  p[1+AMREX_SPACEDIM] = bx.bigend[1],
+                  p[2+AMREX_SPACEDIM] = bx.bigend[2],
+                  p[3+AMREX_SPACEDIM] = bx.bigend[3],
+                  p[4+AMREX_SPACEDIM] = bx.bigend[4],
+                  p[5+AMREX_SPACEDIM] = bx.bigend[5]);
     const IntVect& typ = bx.btype.ixType();
-    AMREX_D_EXPR(p[0+AMREX_SPACEDIM*2] = typ[0],
-                 p[1+AMREX_SPACEDIM*2] = typ[1],
-                 p[2+AMREX_SPACEDIM*2] = typ[2]);
+    AMREX_D6_EXPR(p[0+AMREX_SPACEDIM*2] = typ[0],
+                  p[1+AMREX_SPACEDIM*2] = typ[1],
+                  p[2+AMREX_SPACEDIM*2] = typ[2],
+                  p[3+AMREX_SPACEDIM*2] = typ[3],
+                  p[4+AMREX_SPACEDIM*2] = typ[4],
+                  p[5+AMREX_SPACEDIM*2] = typ[5]);
+    p[AMREX_SPACEDIM*3] = static_cast<int>(bx.dimen);
 }
 
 void

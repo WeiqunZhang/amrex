@@ -84,7 +84,7 @@ public:
 
     GpuArray<Real,AMREX_SPACEDIM> CellSizeArray () const noexcept {
         BL_ASSERT(ok);
-        return {{ AMREX_D_DECL(dx[0],dx[1],dx[2]) }};
+        return {{ AMREX_D6_DECL(dx[0],dx[1],dx[2],dx[3],dx[4],dx[5]) }};
     }
 
     //! Returns the inverse cellsize for each coordinate direction.
@@ -95,7 +95,7 @@ public:
 
     GpuArray<Real,AMREX_SPACEDIM> InvCellSizeArray () const noexcept {
         BL_ASSERT(ok);
-        return {{ AMREX_D_DECL(inv_dx[0],inv_dx[1],inv_dx[2]) }};
+        return {{ AMREX_D6_DECL(inv_dx[0],inv_dx[1],inv_dx[2],inv_dx[3],inv_dx[4],inv_dx[5]) }};
     }
 
     //! Returns location of cell center in specified direction.
@@ -248,11 +248,14 @@ protected:
     CoordType c_sys = undef;
     Real      offset[AMREX_SPACEDIM];
 
-    Real dx[AMREX_SPACEDIM] = {AMREX_D_DECL(0.,0.,0.)};
+    Real dx[AMREX_SPACEDIM] = {AMREX_D6_DECL(0.,0.,0.,0.,0.,0.)};
     Real inv_dx[AMREX_SPACEDIM]
-        = {AMREX_D_DECL(std::numeric_limits<Real>::infinity(),
-                        std::numeric_limits<Real>::infinity(),
-                        std::numeric_limits<Real>::infinity())};
+        = {AMREX_D6_DECL(std::numeric_limits<Real>::infinity(),
+                         std::numeric_limits<Real>::infinity(),
+                         std::numeric_limits<Real>::infinity(),
+                         std::numeric_limits<Real>::infinity(),
+                         std::numeric_limits<Real>::infinity(),
+                         std::numeric_limits<Real>::infinity())};
     bool ok = false;
 };
 
@@ -264,7 +267,7 @@ CoordSys::IsSPHERICAL () const noexcept
 #if (AMREX_SPACEDIM <= 2)
     return (c_sys == SPHERICAL);
 #endif
-#if (AMREX_SPACEDIM == 3)
+#if (AMREX_SPACEDIM >= 3)
     return false;
 #endif
 }
@@ -277,7 +280,7 @@ CoordSys::IsRZ () const noexcept
 #if (AMREX_SPACEDIM <= 2)
     return (c_sys == RZ);
 #endif
-#if (AMREX_SPACEDIM == 3)
+#if (AMREX_SPACEDIM >= 3)
     return false;
 #endif
 }

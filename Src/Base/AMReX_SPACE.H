@@ -25,8 +25,8 @@
 #error AMREX_SPACEDIM must be defined
 #endif
 
-#if  (AMREX_SPACEDIM != 1 && AMREX_SPACEDIM !=2 && AMREX_SPACEDIM != 3)
-#error AMREX_SPACEDIM must be either 1, 2, or 3
+#if  (AMREX_SPACEDIM < 1 || AMREX_SPACEDIM > 6)
+#error AMREX_SPACEDIM must be between 1 and 6
 #endif
 
 /*
@@ -73,6 +73,7 @@ namespace amrex
   corresponding to AMREX_SPACEDIM values of 1, 2, or 3.
 */
 #  define AMREX_D_EXPR(a,b,c) ((void)((a),0))
+#  define AMREX_D6_EXPR(a,b,c,d,e,f) ((void)((a),0))
 
 /*
   The AMREX_D_DECL(a,b,c) macro expands to a comma-separated list of
@@ -96,6 +97,7 @@ namespace amrex
   corresponding to AMREX_SPACEDIM values of 1, 2, or 3.
 */
 #  define AMREX_D_DECL(a,b,c) a
+#  define AMREX_D6_DECL(a,b,c,d,e,f) a
 
 /*
   The AMREX_D_TERM(a,b,c) macro expands to a whitespace-separated list of
@@ -119,6 +121,7 @@ namespace amrex
   corresponding to AMREX_SPACEDIM values of 1, 2, or 3.
 */
 #  define AMREX_D_TERM(a,b,c) a
+#  define AMREX_D6_TERM(a,b,c,d,e,f) a
 
 /*
   The AMREX_D_PICK(a,b,c) macro expands to a single result equal to the
@@ -141,16 +144,52 @@ namespace amrex
   corresponding to AMREX_SPACEDIM values of 1, 2, or 3.
 */
 #  define AMREX_D_PICK(a,b,c) a
+#  define AMREX_D6_PICK(a,b,c,d,e,f) a
 #elif AMREX_SPACEDIM==2
 #  define AMREX_D_EXPR(a,b,c) ((void)((a),(b),0))
 #  define AMREX_D_DECL(a,b,c) a,b
 #  define AMREX_D_TERM(a,b,c) a b
 #  define AMREX_D_PICK(a,b,c) b
+#  define AMREX_D6_EXPR(a,b,c,d,e,f) ((void)((a),(b),0))
+#  define AMREX_D6_DECL(a,b,c,d,e,f) a,b
+#  define AMREX_D6_TERM(a,b,c,d,e,f) a b
+#  define AMREX_D6_PICK(a,b,c,d,e,f) b
 #elif AMREX_SPACEDIM==3
 #  define AMREX_D_EXPR(a,b,c) ((void)((a),(b),(c),0))
 #  define AMREX_D_DECL(a,b,c) a,b,c
 #  define AMREX_D_TERM(a,b,c) a b c
 #  define AMREX_D_PICK(a,b,c) c
+#  define AMREX_D6_EXPR(a,b,c,d,e,f) ((void)((a),(b),(c),0))
+#  define AMREX_D6_DECL(a,b,c,d,e,f) a,b,c
+#  define AMREX_D6_TERM(a,b,c,d,e,f) a b c
+#  define AMREX_D6_PICK(a,b,c,d,e,f) c
+#elif AMREX_SPACEDIM==4
+#  define AMREX_D_EXPR(a,b,c) ((void)((a),(b),(c),0))
+#  define AMREX_D_DECL(a,b,c) a,b,c
+#  define AMREX_D_TERM(a,b,c) a b c
+#  define AMREX_D_PICK(a,b,c) c
+#  define AMREX_D6_EXPR(a,b,c,d,e,f) ((void)((a),(b),(c),(d),0))
+#  define AMREX_D6_DECL(a,b,c,d,e,f) a,b,c,d
+#  define AMREX_D6_TERM(a,b,c,d,e,f) a b c d
+#  define AMREX_D6_PICK(a,b,c,d,e,f) d
+#elif AMREX_SPACEDIM==5
+#  define AMREX_D_EXPR(a,b,c) ((void)((a),(b),(c),0))
+#  define AMREX_D_DECL(a,b,c) a,b,c
+#  define AMREX_D_TERM(a,b,c) a b c
+#  define AMREX_D_PICK(a,b,c) c
+#  define AMREX_D6_EXPR(a,b,c,d,e,f) ((void)((a),(b),(c),(d),(e),0))
+#  define AMREX_D6_DECL(a,b,c,d,e,f) a,b,c,d,e
+#  define AMREX_D6_TERM(a,b,c,d,e,f) a b c d e
+#  define AMREX_D6_PICK(a,b,c,d,e,f) e
+#elif AMREX_SPACEDIM==6
+#  define AMREX_D_EXPR(a,b,c) ((void)((a),(b),(c),0))
+#  define AMREX_D_DECL(a,b,c) a,b,c
+#  define AMREX_D_TERM(a,b,c) a b c
+#  define AMREX_D_PICK(a,b,c) c
+#  define AMREX_D6_EXPR(a,b,c,d,e,f) ((void)((a),(b),(c),(d),(e),(f),0))
+#  define AMREX_D6_DECL(a,b,c,d,e,f) a,b,c,d,e,f
+#  define AMREX_D6_TERM(a,b,c,d,e,f) a b c d e f
+#  define AMREX_D6_PICK(a,b,c,d,e,f) f
 #endif
 
 #ifndef AMREX_XSDK
@@ -180,14 +219,44 @@ namespace amrex
 #  define AMREX_1D_ONLY(a) a
 #  define AMREX_2D_ONLY(a) ((void)0)
 #  define AMREX_3D_ONLY(a) ((void)0)
+#  define AMREX_4D_ONLY(a) ((void)0)
+#  define AMREX_5D_ONLY(a) ((void)0)
+#  define AMREX_6D_ONLY(a) ((void)0)
 #elif (AMREX_SPACEDIM == 2)
 #  define AMREX_1D_ONLY(a) ((void)0)
 #  define AMREX_2D_ONLY(a) a
 #  define AMREX_3D_ONLY(a) ((void)0)
+#  define AMREX_4D_ONLY(a) ((void)0)
+#  define AMREX_5D_ONLY(a) ((void)0)
+#  define AMREX_6D_ONLY(a) ((void)0)
 #elif (AMREX_SPACEDIM == 3)
 #  define AMREX_1D_ONLY(a) ((void)0)
 #  define AMREX_2D_ONLY(a) ((void)0)
 #  define AMREX_3D_ONLY(a) a
+#  define AMREX_4D_ONLY(a) ((void)0)
+#  define AMREX_5D_ONLY(a) ((void)0)
+#  define AMREX_6D_ONLY(a) ((void)0)
+#elif (AMREX_SPACEDIM == 4)
+#  define AMREX_1D_ONLY(a) ((void)0)
+#  define AMREX_2D_ONLY(a) ((void)0)
+#  define AMREX_3D_ONLY(a) ((void)0)
+#  define AMREX_4D_ONLY(a) a
+#  define AMREX_5D_ONLY(a) ((void)0)
+#  define AMREX_6D_ONLY(a) ((void)0)
+#elif (AMREX_SPACEDIM == 5)
+#  define AMREX_1D_ONLY(a) ((void)0)
+#  define AMREX_2D_ONLY(a) ((void)0)
+#  define AMREX_3D_ONLY(a) ((void)0)
+#  define AMREX_4D_ONLY(a) ((void)0)
+#  define AMREX_5D_ONLY(a) a
+#  define AMREX_6D_ONLY(a) ((void)0)
+#elif (AMREX_SPACEDIM == 6)
+#  define AMREX_1D_ONLY(a) ((void)0)
+#  define AMREX_2D_ONLY(a) ((void)0)
+#  define AMREX_3D_ONLY(a) ((void)0)
+#  define AMREX_4D_ONLY(a) ((void)0)
+#  define AMREX_5D_ONLY(a) ((void)0)
+#  define AMREX_6D_ONLY(a) a
 #endif
 
 #endif /*AMREX_SPACE_H*/

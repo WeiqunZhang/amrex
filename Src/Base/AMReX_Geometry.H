@@ -30,31 +30,31 @@ class BoxArray;
 
 struct GeometryData
 {
- //! Returns the cellsize for each coordinate direction.
+    //! Returns the cellsize for each coordinate direction.
     AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
     const Real* CellSize () const noexcept { return dx; }
     //
     AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
     Real CellSize (int dir) const noexcept { return dx[dir]; }
- //! Returns the lo end of the problem domain in each dimension.
+    //! Returns the lo end of the problem domain in each dimension.
     AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
     const Real* ProbLo () const noexcept { return prob_domain.lo(); }
     //
     AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
     Real ProbLo (int dir) const noexcept { return prob_domain.lo(dir); }
- //! Returns the hi end of the problem domain in each dimension.
+    //! Returns the hi end of the problem domain in each dimension.
     AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
     const Real* ProbHi () const noexcept { return prob_domain.hi(); }
     //
     AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
     Real ProbHi (int dir) const noexcept { return prob_domain.hi(dir); }
- //! Returns our rectangular domain.
+    //! Returns our rectangular domain.
     AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
     const Box& Domain () const noexcept { return domain; }
-//! Returns whether the domain is periodic in the given direction.
+    //! Returns whether the domain is periodic in the given direction.
     AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
     int isPeriodic (const int i) const noexcept { return is_periodic[i]; }
- //! Coordinates type
+    //! Coordinates type
     AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
     int Coord () const noexcept { return coord; }
 
@@ -89,8 +89,10 @@ public:
 
     //! Returns non-static copy of geometry's stored data.
     GeometryData data() const noexcept {
-        return { prob_domain, domain, {AMREX_D_DECL(dx[0],dx[1],dx[2])},
-            {AMREX_D_DECL(is_periodic[0], is_periodic[1], is_periodic[2])},
+        return {prob_domain, domain,
+                {AMREX_D6_DECL(dx[0],dx[1],dx[2],dx[3],dx[4],dx[5])},
+                {AMREX_D6_DECL(is_periodic[0], is_periodic[1], is_periodic[2],
+                               is_periodic[3], is_periodic[4], is_periodic[5])},
                 static_cast<int>(c_sys) };
     }
 
@@ -123,17 +125,21 @@ public:
     Real ProbHi (int dir) const noexcept { return prob_domain.hi(dir); }
 
     GpuArray<Real,AMREX_SPACEDIM> ProbLoArray () const noexcept {
-        return {{AMREX_D_DECL(prob_domain.lo(0),prob_domain.lo(1),prob_domain.lo(2))}};
+        return {AMREX_D6_DECL(prob_domain.lo(0),prob_domain.lo(1),prob_domain.lo(2),
+                              prob_domain.lo(3),prob_domain.lo(4),prob_domain.lo(5))};
     }
 
     GpuArray<Real,AMREX_SPACEDIM> ProbHiArray () const noexcept {
-        return {{AMREX_D_DECL(prob_domain.hi(0),prob_domain.hi(1),prob_domain.hi(2))}};
+        return {AMREX_D6_DECL(prob_domain.hi(0),prob_domain.hi(1),prob_domain.hi(2),
+                              prob_domain.hi(3),prob_domain.hi(4),prob_domain.hi(5))};
     }
 
     //! Returns the overall size of the domain by multiplying the ProbLength's together
     Real ProbSize () const noexcept
     {
-        return AMREX_D_TERM(prob_domain.length(0),*prob_domain.length(1),*prob_domain.length(2));
+        return AMREX_D6_TERM(prob_domain.length(0),*prob_domain.length(1),
+                            *prob_domain.length(2),*prob_domain.length(3),
+                            *prob_domain.length(4),*prob_domain.length(5));
     }
     //! Returns length of problem domain in specified dimension.
     Real ProbLength (int dir) const noexcept { return prob_domain.length(dir); }
@@ -189,37 +195,51 @@ public:
     //! Is domain periodic in any direction?
     bool isAnyPeriodic () const noexcept
     {
-        return AMREX_D_TERM(isPeriodic(0),||isPeriodic(1),||isPeriodic(2));
+        return AMREX_D6_TERM(isPeriodic(0),||isPeriodic(1),||isPeriodic(2),
+                           ||isPeriodic(3),||isPeriodic(4),||isPeriodic(5));
     }
     //! Is domain periodic in all directions?
     bool isAllPeriodic ()  const noexcept
     {
-        return AMREX_D_TERM(isPeriodic(0),&&isPeriodic(1),&&isPeriodic(2));
+        return AMREX_D6_TERM(isPeriodic(0),&&isPeriodic(1),&&isPeriodic(2),
+                           &&isPeriodic(3),&&isPeriodic(4),&&isPeriodic(5));
     }
     Array<int,AMREX_SPACEDIM> isPeriodic () const noexcept {
-        return {{AMREX_D_DECL(static_cast<int>(is_periodic[0]),
+        return {AMREX_D6_DECL(static_cast<int>(is_periodic[0]),
                               static_cast<int>(is_periodic[1]),
-                              static_cast<int>(is_periodic[2]))}};
+                              static_cast<int>(is_periodic[2]),
+                              static_cast<int>(is_periodic[3]),
+                              static_cast<int>(is_periodic[4]),
+                              static_cast<int>(is_periodic[5]))};
     }
     GpuArray<int,AMREX_SPACEDIM> isPeriodicArray () const noexcept {
-        return {{AMREX_D_DECL(static_cast<int>(is_periodic[0]),
+        return {AMREX_D6_DECL(static_cast<int>(is_periodic[0]),
                               static_cast<int>(is_periodic[1]),
-                              static_cast<int>(is_periodic[2]))}};
+                              static_cast<int>(is_periodic[2]),
+                              static_cast<int>(is_periodic[3]),
+                              static_cast<int>(is_periodic[4]),
+                              static_cast<int>(is_periodic[5]))};
     }
     //! What's period in specified direction?
     int period (int dir) const noexcept { BL_ASSERT(is_periodic[dir]); return domain.length(dir); }
 
     Periodicity periodicity () const noexcept {
-        return Periodicity(IntVect(AMREX_D_DECL(domain.length(0) * is_periodic[0],
-                                          domain.length(1) * is_periodic[1],
-                                          domain.length(2) * is_periodic[2])));
+        return Periodicity(IntVect(AMREX_D6_DECL(domain.length(0) * is_periodic[0],
+                                                 domain.length(1) * is_periodic[1],
+                                                 domain.length(2) * is_periodic[2],
+                                                 domain.length(3) * is_periodic[3],
+                                                 domain.length(4) * is_periodic[4],
+                                                 domain.length(5) * is_periodic[5])));
     }
 
     Periodicity periodicity (const Box& b) const noexcept {
         AMREX_ASSERT(b.cellCentered());
-        return Periodicity(IntVect(AMREX_D_DECL(b.length(0) * is_periodic[0],
-                                                b.length(1) * is_periodic[1],
-                                                b.length(2) * is_periodic[2])));
+        return Periodicity(IntVect(AMREX_D6_DECL(b.length(0) * is_periodic[0],
+                                                 b.length(1) * is_periodic[1],
+                                                 b.length(2) * is_periodic[2],
+                                                 b.length(3) * is_periodic[3],
+                                                 b.length(4) * is_periodic[4],
+                                                 b.length(5) * is_periodic[5])));
     }
 
     /**
@@ -230,8 +250,8 @@ public:
     * intersect without shifting.  The logic is that you will only do
     * this as a special case if there is some periodicity.
     */
-    void periodicShift (const Box&      target,
-                        const Box&      src,
+    void periodicShift (const Box&       target,
+                        const Box&       src,
                         Vector<IntVect>& out) const noexcept;
 
     //! Return domain box with non-periodic directions grown by ngrow.
@@ -244,12 +264,18 @@ public:
     //!
     Array<int,AMREX_SPACEDIM>
     setPeriodicity (Array<int,AMREX_SPACEDIM> const& period) noexcept {
-        Array<int,AMREX_SPACEDIM> r{{AMREX_D_DECL(is_periodic[0],
+        Array<int,AMREX_SPACEDIM> r{AMREX_D6_DECL(is_periodic[0],
                                                   is_periodic[1],
-                                                  is_periodic[2])}};
-        AMREX_D_TERM(is_periodic[0] = period[0];,
-                     is_periodic[1] = period[1];,
-                     is_periodic[2] = period[2];);
+                                                  is_periodic[2],
+                                                  is_periodic[3],
+                                                  is_periodic[4],
+                                                  is_periodic[5])};
+        AMREX_D6_TERM(is_periodic[0] = period[0];,
+                      is_periodic[1] = period[1];,
+                      is_periodic[2] = period[2];,
+                      is_periodic[3] = period[3];,
+                      is_periodic[4] = period[4];,
+                      is_periodic[5] = period[5];);
         return r;
     }
 
@@ -295,7 +321,8 @@ private:
     void read_params ();
 
     // is_periodic and RealBox used to be static
-    bool    is_periodic[AMREX_SPACEDIM] = {AMREX_D_DECL(false,false,false)};
+    bool    is_periodic[AMREX_SPACEDIM] = {AMREX_D6_DECL(false,false,false,
+                                                         false,false,false)};
     RealBox prob_domain;
 
     // Due to round-off errors, not all floating point numbers for which plo >= x < phi

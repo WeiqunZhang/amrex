@@ -66,6 +66,33 @@
 #define AMREX_BCREC_3D(x) x
 #define AMREX_BCREC_ANYD(x) x
 #define AMREX_ARLIM_ARG(x) AMREX_ARLIM_3D(x)
+#elif   AMREX_SPACEDIM==4
+#define AMREX_ARLIM_P(x)  const int&,const int&,const int&,const int&
+#define AMREX_ARLIM(x)  (x)[0],(x)[1],(x)[2],(x)[3]
+#define AMREX_ARLIM_3D(x) x
+#define AMREX_ARLIM_ANYD(x) x
+#define AMREX_ZFILL(x) x
+#define AMREX_BCREC_3D(x) x
+#define AMREX_BCREC_ANYD(x) x
+#define AMREX_ARLIM_ARG(x) AMREX_ARLIM_3D(x)
+#elif   AMREX_SPACEDIM==5
+#define AMREX_ARLIM_P(x)  const int&,const int&,const int&,const int&,const int&
+#define AMREX_ARLIM(x)  (x)[0],(x)[1],(x)[2],(x)[3],(x)[4]
+#define AMREX_ARLIM_3D(x) x
+#define AMREX_ARLIM_ANYD(x) x
+#define AMREX_ZFILL(x) x
+#define AMREX_BCREC_3D(x) x
+#define AMREX_BCREC_ANYD(x) x
+#define AMREX_ARLIM_ARG(x) AMREX_ARLIM_3D(x)
+#elif   AMREX_SPACEDIM==6
+#define AMREX_ARLIM_P(x)  const int&,const int&,const int&,const int&,const int&,const int&
+#define AMREX_ARLIM(x)  (x)[0],(x)[1],(x)[2],(x)[3],(x)[4],(x)[5]
+#define AMREX_ARLIM_3D(x) x
+#define AMREX_ARLIM_ANYD(x) x
+#define AMREX_ZFILL(x) x
+#define AMREX_BCREC_3D(x) x
+#define AMREX_BCREC_ANYD(x) x
+#define AMREX_ARLIM_ARG(x) AMREX_ARLIM_3D(x)
 #endif
 
 #define AMREX_INT_ANYD(x) AMREX_ARLIM_ANYD(x)

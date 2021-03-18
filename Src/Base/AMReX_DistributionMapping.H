@@ -13,7 +13,7 @@
 #include <limits>
 #include <memory>
 #include <cstddef>
-#include <iosfwd>
+#include <iostream>
 
 namespace amrex {
 

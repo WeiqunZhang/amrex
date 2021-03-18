@@ -1983,32 +1983,32 @@ BaseFab<T>::BaseFab (const Box& bx, int ncomp, T const* p)
 template<class T>
 BaseFab<T>::BaseFab (Array4<T> const& a) noexcept
     : dptr(a.p),
-      domain(IntVect(AMREX_D_DECL(a.begin.x,a.begin.y,a.begin.z)),
-             IntVect(AMREX_D_DECL(a.end.x-1,a.end.y-1,a.end.z-1))),
+      domain(IntVect(AMREX_D6_DECL(a.begin.x,a.begin.y,a.begin.z,0,0,0)),
+             IntVect(AMREX_D6_DECL(a.end.x-1,a.end.y-1,a.end.z-1,0,0,0))),
       nvar(a.ncomp), truesize(a.ncomp*a.nstride)
 {}
 
 template<class T>
 BaseFab<T>::BaseFab (Array4<T> const& a, IndexType t) noexcept
     : dptr(a.p),
-      domain(IntVect(AMREX_D_DECL(a.begin.x,a.begin.y,a.begin.z)),
-             IntVect(AMREX_D_DECL(a.end.x-1,a.end.y-1,a.end.z-1)), t),
+      domain(IntVect(AMREX_D6_DECL(a.begin.x,a.begin.y,a.begin.z,0,0,0)),
+             IntVect(AMREX_D6_DECL(a.end.x-1,a.end.y-1,a.end.z-1,0,0,0)), t),
       nvar(a.ncomp), truesize(a.ncomp*a.nstride)
 {}
 
 template<class T>
 BaseFab<T>::BaseFab (Array4<T const> const& a) noexcept
     : dptr(const_cast<T*>(a.p)),
-      domain(IntVect(AMREX_D_DECL(a.begin.x,a.begin.y,a.begin.z)),
-             IntVect(AMREX_D_DECL(a.end.x-1,a.end.y-1,a.end.z-1))),
+      domain(IntVect(AMREX_D6_DECL(a.begin.x,a.begin.y,a.begin.z,0,0,0)),
+             IntVect(AMREX_D6_DECL(a.end.x-1,a.end.y-1,a.end.z-1,0,0,0))),
       nvar(a.ncomp), truesize(a.ncomp*a.nstride)
 {}
 
 template<class T>
 BaseFab<T>::BaseFab (Array4<T const> const& a, IndexType t) noexcept
     : dptr(const_cast<T*>(a.p)),
-      domain(IntVect(AMREX_D_DECL(a.begin.x,a.begin.y,a.begin.z)),
-             IntVect(AMREX_D_DECL(a.end.x-1,a.end.y-1,a.end.z-1)), t),
+      domain(IntVect(AMREX_D6_DECL(a.begin.x,a.begin.y,a.begin.z,0,0,0)),
+             IntVect(AMREX_D6_DECL(a.end.x-1,a.end.y-1,a.end.z-1,0,0,0)), t),
       nvar(a.ncomp), truesize(a.ncomp*a.nstride)
 {}
 

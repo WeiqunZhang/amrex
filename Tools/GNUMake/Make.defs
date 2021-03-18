@@ -22,6 +22,17 @@ endif
 
 include $(AMREX_HOME)/Tools/GNUMake/Make.machines
 
+ifdef DIM
+  DIM := $(strip $(DIM))
+else
+  DIM := 3
+endif
+
+# No Fortran support if DIM >= 4
+ifeq ($(firstword $(sort 4 $(DIM))), 4)
+   BL_NO_FORT := TRUE
+endif
+
 ifdef USE_GPU
   USE_GPU := $(strip $(USE_GPU))
 else
@@ -184,12 +195,6 @@ ifdef LAZY
   LAZY := $(strip $(LAZY))
 else
   LAZY := FALSE
-endif
-
-ifdef DIM
-  DIM := $(strip $(DIM))
-else
-  DIM := 3
 endif
 
 ifdef USE_MPI

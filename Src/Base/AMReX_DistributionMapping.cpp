@@ -930,7 +930,7 @@ SFCToken::Compare::operator () (const SFCToken& lhs,
 }
 
 namespace {
-#if (AMREX_SPACEDIM == 3)
+#if (AMREX_SPACEDIM >= 3)
     AMREX_FORCE_INLINE
     uint32_t make_space (uint32_t x)
     {
@@ -992,7 +992,7 @@ namespace {
         SFCToken token;
         token.m_box = box_index;
 
-#if (AMREX_SPACEDIM == 3)
+#if (AMREX_SPACEDIM >= 3)
 
         constexpr int imin = -(1 << 29);
         AMREX_ASSERT_WITH_MESSAGE(AMREX_D_TERM(iv[0] >= imin && iv[0] < -imin,
@@ -1043,8 +1043,6 @@ namespace {
         token.m_morton[0] = (iv[0] >= 0) ? static_cast<uint32_t>(iv[0]) + offset
             : static_cast<uint32_t>(iv[0]-std::numeric_limits<int>::lowest());
 
-#else
-        static_assert(false,"AMREX_SPACEDIM != 1, 2 or 3");
 #endif
 
         return token;

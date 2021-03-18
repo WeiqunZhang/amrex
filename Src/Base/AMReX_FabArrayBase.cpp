@@ -44,17 +44,17 @@ IntVect FabArrayBase::mfiter_tile_size(1024000);
 #elif AMREX_SPACEDIM == 2
 IntVect FabArrayBase::mfiter_tile_size(1024000,1024000);
 #else
-IntVect FabArrayBase::mfiter_tile_size(1024000,8,8);
+IntVect FabArrayBase::mfiter_tile_size(AMREX_D6_DECL(1024000,8,8,8,8,8));
 #endif
 
 #endif
 
 #if defined(AMREX_USE_GPU) || !defined(AMREX_USE_OMP)
-IntVect FabArrayBase::comm_tile_size(AMREX_D_DECL(1024000, 1024000, 1024000));
-IntVect FabArrayBase::mfghostiter_tile_size(AMREX_D_DECL(1024000, 1024000, 1024000));
+IntVect FabArrayBase::comm_tile_size{1024000};
+IntVect FabArrayBase::mfghostiter_tile_size{1024000};
 #else
-IntVect FabArrayBase::comm_tile_size(AMREX_D_DECL(1024000, 8, 8));
-IntVect FabArrayBase::mfghostiter_tile_size(AMREX_D_DECL(1024000, 8, 8));
+IntVect FabArrayBase::comm_tile_size(AMREX_D6_DECL(1024000, 8, 8, 8, 8, 8));
+IntVect FabArrayBase::mfghostiter_tile_size(AMREX_D6_DECL(1024000, 8, 8, 8, 8, 8));
 #endif
 
 FabArrayBase::TACache              FabArrayBase::m_TheTileArrayCache;
@@ -1498,8 +1498,8 @@ FabArrayBase::PolarB::define (const FabArrayBase& fa)
     lox_box.grow(2, m_ngrow[2]);
     hix_box.grow(2, m_ngrow[2]);
 #endif
-    Box loxy_corner(IntVect{AMREX_D_DECL(-m_ngrow[0],-m_ngrow[1],-m_ngrow[2])},
-                    IntVect{AMREX_D_DECL(-1,-1,m_domain.bigEnd(2)+m_ngrow[2])});
+    Box loxy_corner(IntVect{AMREX_D6_DECL(-m_ngrow[0],-m_ngrow[1],-m_ngrow[2],0,0,0)},
+                    IntVect{AMREX_D6_DECL(-1,-1,m_domain.bigEnd(2)+m_ngrow[2],0,0,0)});
     Array<Box,8> const domain_dst{Box(lox_box).setBig  (1,ymid-1),
                                   Box(lox_box).setSmall(1,ymid  ),
                                   Box(hix_box).setBig  (1,ymid-1),
@@ -1508,9 +1508,9 @@ FabArrayBase::PolarB::define (const FabArrayBase& fa)
                                   amrex::shift(loxy_corner,1,m_domain.length(1)+m_ngrow[1]),
                                   amrex::shift(loxy_corner,0,m_domain.length(0)+m_ngrow[0]),
                                   amrex::shift(loxy_corner,
-                                               IntVect{AMREX_D_DECL(m_domain.length(0)+m_ngrow[0],
-                                                                    m_domain.length(1)+m_ngrow[1],
-                                                                    0)})};
+                                               IntVect{AMREX_D6_DECL(m_domain.length(0)+m_ngrow[0],
+                                                                     m_domain.length(1)+m_ngrow[1],
+                                                                     0,0,0,0)})};
 
     auto const convert = NonLocalBC::PolarFn{m_domain.length(0), m_domain.length(1)};
     auto const convert_corner = NonLocalBC::PolarFn2{m_domain.length(0), m_domain.length(1)};
@@ -1734,7 +1734,7 @@ FabArrayBase::FPinfo::FPinfo (const FabArrayBase& srcfa,
                 IntVect const len = b.length();
                 IntVect numblk{1};
                 while (npts > (AMREX_D_TERM(numblk[0],*numblk[1],*numblk[2])) * ncells_target) {
-#if (AMREX_SPACEDIM == 3)
+#if (AMREX_SPACEDIM >= 3)
                     int longdir = (len[2] >= len[0] && len[2] >= len[1]) ? 2 :
                         (len[1] >= len[0]) ? 1 : 0;
 #elif (AMREX_SPACEDIM == 2)
@@ -1756,7 +1756,7 @@ FabArrayBase::FPinfo::FPinfo (const FabArrayBase& srcfa,
                     bltmp.push_back(b);
                 } else {
                     IntVect const& boxlo = b.smallEnd();
-#if (AMREX_SPACEDIM == 3)
+#if (AMREX_SPACEDIM >= 3)
                     for (int k = 0; k < numblk[2]; ++k) {
                         int klo = (k < extra[2]) ? k*(sz[2]+1) : (k*sz[2]+extra[2]);
                         int khi = (k < extra[2]) ? klo+(sz[2]+1)-1 : klo+sz[2]-1;
@@ -1775,8 +1775,8 @@ FabArrayBase::FPinfo::FPinfo (const FabArrayBase& srcfa,
                                 int ihi = (i < extra[0]) ? ilo+(sz[0]+1)-1 : ilo+sz[0]-1;
                                 ilo += boxlo[0];
                                 ihi += boxlo[0];
-                                bltmpvec.emplace_back(IntVect(AMREX_D_DECL(ilo,jlo,klo)),
-                                                      IntVect(AMREX_D_DECL(ihi,jhi,khi)),
+                                bltmpvec.emplace_back(IntVect(AMREX_D6_DECL(ilo,jlo,klo,0,0,0)),
+                                                      IntVect(AMREX_D6_DECL(ihi,jhi,khi,0,0,0)),
                                                       boxtype);
                     AMREX_D_TERM(},},})
                 }

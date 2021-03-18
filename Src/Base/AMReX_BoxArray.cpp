@@ -548,7 +548,7 @@ BoxArray::CellEqual (const BoxArray& rhs) const noexcept
 BoxArray&
 BoxArray::maxSize (int block_size)
 {
-    return maxSize(IntVect(AMREX_D_DECL(block_size,block_size,block_size)));
+    return maxSize(IntVect{block_size});
 }
 
 BoxArray&
@@ -573,7 +573,7 @@ BoxArray::maxSize (const IntVect& block_size)
 BoxArray&
 BoxArray::refine (int refinement_ratio)
 {
-    return refine(IntVect(AMREX_D_DECL(refinement_ratio,refinement_ratio,refinement_ratio)));
+    return refine(IntVect{refinement_ratio});
 }
 
 BoxArray&
@@ -652,7 +652,7 @@ BoxArray::coarsenable(const IntVect& refinement_ratio, const IntVect& min_width)
 BoxArray&
 BoxArray::coarsen (int refinement_ratio)
 {
-    return coarsen(IntVect(AMREX_D_DECL(refinement_ratio,refinement_ratio,refinement_ratio)));
+    return coarsen(IntVect{refinement_ratio});
 }
 
 BoxArray&
@@ -1314,7 +1314,7 @@ BoxArray::complementIn (BoxList& bl, const Box& bx) const
     if (m_bat.is_null()) {
         AMREX_LOOP_3D(cbx, i, j, k,
         {
-            auto it = BoxHashMap.find(IntVect(AMREX_D_DECL(i,j,k)));
+            auto it = BoxHashMap.find(IntVect(AMREX_D6_DECL(i,j,k,0,0,0)));
             if (it != TheEnd) {
                 for (const int index : it->second) {
                     const Box& ibox = abox[index];
@@ -1329,7 +1329,7 @@ BoxArray::complementIn (BoxList& bl, const Box& bx) const
         IntVect cr = crseRatio();
         AMREX_LOOP_3D(cbx, i, j, k,
         {
-            auto it = BoxHashMap.find(IntVect(AMREX_D_DECL(i,j,k)));
+            auto it = BoxHashMap.find(IntVect(AMREX_D6_DECL(i,j,k,0,0,0)));
             if (it != TheEnd) {
                 for (const int index : it->second) {
                     const Box& ibox = amrex::convert(amrex::coarsen(abox[index],cr),t);
@@ -1342,7 +1342,7 @@ BoxArray::complementIn (BoxList& bl, const Box& bx) const
     } else {
         AMREX_LOOP_3D(cbx, i, j, k,
         {
-            auto it = BoxHashMap.find(IntVect(AMREX_D_DECL(i,j,k)));
+            auto it = BoxHashMap.find(IntVect(AMREX_D6_DECL(i,j,k,0,0,0)));
             if (it != TheEnd) {
                 for (const int index : it->second) {
                     const Box& ibox = m_bat.m_op.m_bndryReg(abox[index]);

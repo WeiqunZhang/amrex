@@ -8,6 +8,7 @@
 #include <AMReX_SPACE.H>
 
 #include <iosfwd>
+#include <cstdint>
 
 namespace amrex {
 
@@ -32,17 +33,21 @@ public:
     constexpr IndexType () noexcept : itype(0) {}
     //! Construct an IndexType identical to an IntVect.
     AMREX_GPU_HOST_DEVICE
-    explicit IndexType (const IntVect& iv) noexcept
-        : itype(AMREX_D_TERM((iv[0]?1:0), | ((iv[1]?1:0)<<1), | ((iv[2]?1:0)<<2)))
+    explicit constexpr IndexType (const IntVect& iv) noexcept
+        : itype(AMREX_D6_TERM((iv.vect[0]?1:0), | ((iv.vect[1]?1:0)<<1), | ((iv.vect[2]?1:0)<<2),
+                       | ((iv.vect[3]?1:0)<<3), | ((iv.vect[4]?1:0)<<4), | ((iv.vect[5]?1:0)<<5)))
         {}
+    AMREX_GPU_HOST_DEVICE
+    explicit constexpr IndexType (int t) : itype(t) {}
     /**
     * \brief Construct an IndexType given an explicit CellIndex for
     * each direction.  AMREX_D_DECL is a macro that sets the constructor
     * to take AMREX_SPACEDIM arguments.
     */
     AMREX_GPU_HOST_DEVICE
-    constexpr IndexType (AMREX_D_DECL(CellIndex i, CellIndex j, CellIndex k)) noexcept
-        : itype(AMREX_D_TERM(i, | (j<<1), | (k<<2)))
+    constexpr IndexType (AMREX_D6_DECL(CellIndex i, CellIndex j, CellIndex k,
+                                       CellIndex m, CellIndex n, CellIndex p)) noexcept
+        : itype(AMREX_D6_TERM(i, | (j<<1), | (k<<2), | (m<<3), | (n<<2), | (p<<2)))
         {}
     // dtor, copy-ctor, copy-op=, move-ctor, and move-op= are compiler generated.
 
@@ -95,16 +100,22 @@ public:
     void setType (int dir, CellIndex t) noexcept { t == CELL ? unset(dir) : set(dir); }
     //! Returns  the CellIndex in direction dir.
     AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
-    CellIndex ixType (int dir) const noexcept { return (CellIndex) ((itype & (1<<dir)) >> dir); }
+    CellIndex ixType (int dir) const noexcept { return (CellIndex) ((itype & (1u<<dir)) >> dir); }
     //! Return an integer representing the IndexType in direction dir.
     AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
     int operator[] (int dir) const noexcept { return test(dir); }
     //! Fill an IntVect of size AMREX_SPACEDIM with IndexTypes.
     AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
-    IntVect ixType () const noexcept { return IntVect(AMREX_D_DECL(itype&1, (itype>>1)&1, (itype>>2)&1)); }
+    IntVect ixType () const noexcept {
+        return IntVect(AMREX_D6_DECL(itype&1, (itype>>1)&1, (itype>>2)&1,
+                                     (itype>>3)&1, (itype>>4)&1, (itype>>5)&1));
+    }
     //! Fill an IntVect of size AMREX_SPACEDIM with IndexTypes.
     AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
-    IntVect toIntVect () const noexcept { return IntVect(AMREX_D_DECL(itype&1, (itype>>1)&1, (itype>>2)&1)); }
+    IntVect toIntVect () const noexcept {
+        return IntVect(AMREX_D6_DECL(itype&1, (itype>>1)&1, (itype>>2)&1,
+                                     (itype>>3)&1, (itype>>4)&1, (itype>>5)&1));
+    }
     /**
     * \brief This static member function returns an IndexType object of value
     * IndexType::CELL.  It is provided as a convenience to our users
@@ -113,9 +124,8 @@ public:
     */
     AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
     static constexpr IndexType TheCellType () noexcept {
-        return IndexType(AMREX_D_DECL(IndexType::CELL,
-                                      IndexType::CELL,
-                                      IndexType::CELL));
+        return IndexType(AMREX_D6_DECL(IndexType::CELL, IndexType::CELL, IndexType::CELL,
+                                       IndexType::CELL, IndexType::CELL, IndexType::CELL));
     }
     /**
     * \brief This static member function returns an IndexType object of value
@@ -125,18 +135,27 @@ public:
     */
     AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
     static constexpr IndexType TheNodeType () noexcept {
-        return IndexType(AMREX_D_DECL(IndexType::NODE,
-                                      IndexType::NODE,
-                                      IndexType::NODE));
+        return IndexType(AMREX_D6_DECL(IndexType::NODE, IndexType::NODE, IndexType::NODE,
+                                       IndexType::NODE, IndexType::NODE, IndexType::NODE));
     }
+
+    friend AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+    constexpr IndexType convert (IndexType t, Dimension d);
 
 private:
     //! Returns 1<<k.
     AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
-    static int mask (int k) noexcept { return 1<<k; }
+    static uint16_t mask (int k) noexcept { return 1u<<k; }
     //! An integer holding the CellIndex in bits 0 - AMREX_SPACEDIM-1.
-    unsigned int itype;
+    uint16_t itype;
 };
+
+//! Keep the first d bits and clear all others
+AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+constexpr IndexType convert (IndexType t, Dimension d)
+{
+    return IndexType{t.itype & ((1<<static_cast<short>(d))-1)};
+}
 
 //! Write an IndexType to an ostream in ASCII.
 std::ostream& operator<< (std::ostream& os, const IndexType& itype);

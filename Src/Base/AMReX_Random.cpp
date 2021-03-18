@@ -296,8 +296,9 @@ void
 amrex::RestoreRandomState (std::istream& is, int nthreads_old, int nstep_old)
 {
     int N = std::min(nthreads, nthreads_old);
-    for (int i = 0; i < N; i++)
+    for (int i = 0; i < N; i++) {
         is >> generators[i];
+    }
     if (nthreads > nthreads_old) {
         const int NProcs = ParallelDescriptor::NProcs();
         const int MyProc = ParallelDescriptor::MyProc();

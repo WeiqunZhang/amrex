@@ -1800,7 +1800,7 @@ indexFromValue (FabArray<FAB> const& mf, int comp, IntVect const& nghost,
                 auto const& fab = mf.const_array(mfi);
                 AMREX_LOOP_3D(bx, i, j, k,
                 {
-                    if (fab(i,j,k,comp) == value) priv_loc = IntVect(AMREX_D_DECL(i,j,k));
+                    if (fab(i,j,k,comp) == value) priv_loc = IntVect(AMREX_D6_DECL(i,j,k,0,0,0));
                 });
             }
 
