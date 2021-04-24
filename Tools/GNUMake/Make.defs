@@ -362,9 +362,13 @@ else
   LOG_BUILD_TIME := FALSE
 endif
 
-ifeq ($(LOG_BUILD_TIME),TRUE)
-  build_time_begin := $(shell date +"%s")
+ifdef LOG_BUILD_MEMORY
+  LOG_BUILD_MEMORY := $(strip $(LOG_BUILD_MEMORY))
+else
+  LOG_BUILD_MEMORY := FALSE
 endif
+
+build_time_begin := $(shell date +"%s")
 
 ALLOW_DIFFERENT_COMP ?= TRUE
 SKIP_LINKING ?= FALSE
@@ -385,6 +389,7 @@ CHECKFORT       = $(AMREX_HOME)/Tools/typechecker/typechecker.py
 MKCONFIG        = $(AMREX_HOME)/Tools/libamrex/mkconfig.py
 MKPKGCONFIG     = $(AMREX_HOME)/Tools/libamrex/mkpkgconfig.py
 GATHERBUILDTIME = $(AMREX_HOME)/Tools/C_scripts/gatherbuildtime.py
+GATHERBUILDMEM  = $(AMREX_HOME)/Tools/C_scripts/gatherbuildmem.py
 
 DEPFLAGS        = -MM
 
