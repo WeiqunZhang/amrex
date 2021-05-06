@@ -6,10 +6,11 @@ DIM	= 3
 
 COMP    = gcc
 
-USE_MPI   = TRUE
+USE_MPI   = FALSE
 USE_OMP   = FALSE
 USE_CUDA  = FALSE
 
+USE_HIP = TRUE
 TINY_PROFILE = TRUE
 
 include $(AMREX_HOME)/Tools/GNUMake/Make.defs

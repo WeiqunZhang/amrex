@@ -299,6 +299,10 @@ MLEBABecLap::Fsmooth (int amrlev, int mglev, MultiFab& sol, const MultiFab& rhs,
             });
         }
     }
+
+    if (sol.contains_nan(0,1,0)) {
+        amrex::Abort("MLEBABecLap::Fsmooth: sol has NaNs");
+    }
 }
 
 void

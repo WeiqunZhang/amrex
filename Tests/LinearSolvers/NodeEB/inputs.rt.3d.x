@@ -1,4 +1,6 @@
 
+tiny_profiler.v = 1
+
 n_cell = 32
 n_cell = 64
 n_cell = 128
