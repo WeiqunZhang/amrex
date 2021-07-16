@@ -44,26 +44,6 @@ CellConservativeProtected protected_interp;
 CellConservativeQuartic   quartic_interp;
 #endif
 
-Interpolater::~Interpolater () {}
-
-InterpolaterBoxCoarsener
-Interpolater::BoxCoarsener (const IntVect& ratio)
-{
-    return InterpolaterBoxCoarsener(this, ratio);
-}
-
-Box
-InterpolaterBoxCoarsener::doit (const Box& fine) const
-{
-    return mapper->CoarseBox(fine, ratio);
-}
-
-BoxConverter*
-InterpolaterBoxCoarsener::clone () const
-{
-    return new InterpolaterBoxCoarsener(mapper, ratio);
-}
-
 NodeBilinear::~NodeBilinear () {}
 
 Box
@@ -363,24 +343,6 @@ CellBilinear::interp (const FArrayBox&  crse,
                    &actual_comp,&actual_state);
 }
 #endif
-
-Vector<int>
-Interpolater::GetBCArray (const Vector<BCRec>& bcr)
-{
-    Vector<int> bc(2*AMREX_SPACEDIM*bcr.size());
-
-    for (int n = 0; n < bcr.size(); n++)
-    {
-        const int* b_rec = bcr[n].vect();
-
-        for (int m = 0; m < 2*AMREX_SPACEDIM; m++)
-        {
-            bc[2*AMREX_SPACEDIM*n + m] = b_rec[m];
-        }
-    }
-
-    return bc;
-}
 
 CellConservativeLinear::CellConservativeLinear (bool do_linear_limiting_)
 {

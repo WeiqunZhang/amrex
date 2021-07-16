@@ -3,18 +3,15 @@
 #include <AMReX_Config.H>
 
 #include <AMReX_BoxArray.H>
-#include <AMReX_BCRec.H>
 #include <AMReX_Extension.H>
-#include <AMReX_REAL.H>
 #include <AMReX_GpuControl.H>
+#include <AMReX_InterpBase.H>
 
 namespace amrex {
 
 class Geometry;
 class FArrayBox;
 class IArrayBox;
-class InterpolaterBoxCoarsener;
-
 
 /**
 * \brief Virtual base class for interpolaters.
@@ -23,35 +20,11 @@ class InterpolaterBoxCoarsener;
 */
 
 class Interpolater
+    : public InterpBase
 {
 public:
 
-    /**
-    * \brief The destructor.
-    */
-    virtual ~Interpolater ();
-
-    /**
-    * \brief Returns coarsened box given fine box and refinement ratio.
-    * This is a pure virtual function and hence MUST
-    * be implemented by derived classes.
-    *
-    * \param fine
-    * \param ratio
-    */
-    virtual Box CoarseBox (const Box& fine,
-                           int        ratio) = 0;
-
-    /**
-    * \brief Returns coarsened box given fine box and refinement ratio.
-    * This is a pure virtual function and hence MUST
-    * be implemented by derived classes.
-    *
-    * \param fine
-    * \param ratio
-    */
-    virtual Box CoarseBox (const Box&     fine,
-                           const IntVect& ratio) = 0;
+    virtual ~Interpolater () = default;
 
     /**
     * \brief Coarse to fine interpolation in space.
@@ -150,10 +123,6 @@ public:
                           const Geometry&  /*fine_geom*/,
                           Vector<BCRec>&   /*bcr*/,
                           RunOn            /*gpu_or_cpu*/) {}
-
-    virtual InterpolaterBoxCoarsener BoxCoarsener (const IntVect& ratio);
-
-    static Vector<int> GetBCArray (const Vector<BCRec>& bcr);
 };
 
 
@@ -180,8 +149,7 @@ public:
     * \param fine
     * \param ratio
     */
-    virtual Box CoarseBox (const Box& fine,
-                           int        ratio) override;
+    virtual Box CoarseBox (const Box& fine, int ratio) override;
 
     /**
     * \brief Returns coarsened box given fine box and refinement ratio.
@@ -189,8 +157,7 @@ public:
     * \param fine
     * \param ratio
     */
-    virtual Box CoarseBox (const Box&     fine,
-                           const IntVect& ratio) override;
+    virtual Box CoarseBox (const Box& fine, const IntVect& ratio) override;
 
     /**
     * \brief Coarse to fine interpolation in space.
@@ -248,8 +215,7 @@ public:
     * \param fine
     * \param ratio
     */
-    virtual Box CoarseBox (const Box& fine,
-                           int        ratio) override;
+    virtual Box CoarseBox (const Box& fine, int ratio) override;
 
     /**
     * \brief Returns coarsened box given fine box and refinement ratio.
@@ -257,8 +223,7 @@ public:
     * \param fine
     * \param ratio
     */
-    virtual Box CoarseBox (const Box&     fine,
-                           const IntVect& ratio) override;
+    virtual Box CoarseBox (const Box& fine, const IntVect& ratio) override;
 
     /**
     * \brief Coarse to fine interpolation in space.
@@ -331,8 +296,7 @@ public:
     * \param fine
     * \param ratio
     */
-    virtual Box CoarseBox (const Box& fine,
-                           int        ratio) override;
+    virtual Box CoarseBox (const Box& fine, int ratio) override;
 
     /**
     * \brief Returns coarsened box given fine box and refinement ratio.
@@ -340,8 +304,7 @@ public:
     * \param fine
     * \param ratio
     */
-    virtual Box CoarseBox (const Box&     fine,
-                           const IntVect& ratio) override;
+    virtual Box CoarseBox (const Box& fine, const IntVect& ratio) override;
     /**
     * \brief Coarse to fine interpolation in space.
     */
@@ -395,8 +358,7 @@ public:
     * \param fine
     * \param ratio
     */
-    virtual Box CoarseBox (const Box& fine,
-                           int        ratio) override;
+    virtual Box CoarseBox (const Box& fine, int ratio) override;
 
     /**
     * \brief Returns coarsened box given fine box and refinement ratio.
@@ -404,8 +366,7 @@ public:
     * \param fine
     * \param ratio
     */
-    virtual Box CoarseBox (const Box&     fine,
-                           const IntVect& ratio) override;
+    virtual Box CoarseBox (const Box& fine, const IntVect& ratio) override;
 
     /**
     * \brief Coarse to fine interpolation in space.
@@ -502,8 +463,7 @@ public:
     * \param fine
     * \param ratio
     */
-    virtual Box CoarseBox (const Box& fine,
-                           int        ratio) override;
+    virtual Box CoarseBox (const Box& fine, int ratio) override;
 
     /**
     * \brief Returns coarsened box given fine box and refinement ratio.
@@ -511,8 +471,7 @@ public:
     * \param fine
     * \param ratio
     */
-    virtual Box CoarseBox (const Box&     fine,
-                           const IntVect& ratio) override;
+    virtual Box CoarseBox (const Box& fine, const IntVect& ratio) override;
 
     /**
     * \brief Coarse to fine interpolation in space.
@@ -571,8 +530,7 @@ public:
     * \param fine
     * \param ratio
     */
-    virtual Box CoarseBox (const Box& fine,
-                           int        ratio) override;
+    virtual Box CoarseBox (const Box& fine, int ratio) override;
 
     /**
     * \brief Returns coarsened box given fine box and refinement ratio.
@@ -580,8 +538,7 @@ public:
     * \param fine
     * \param ratio
     */
-    virtual Box CoarseBox (const Box&     fine,
-                           const IntVect& ratio) override;
+    virtual Box CoarseBox (const Box& fine, const IntVect& ratio) override;
 
     /**
     * \brief Coarse to fine interpolation in space.
@@ -641,8 +598,7 @@ public:
     * \param fine
     * \param ratio
     */
-    virtual Box CoarseBox (const Box& fine,
-                           int        ratio) override;
+    virtual Box CoarseBox (const Box& fine, int ratio) override;
 
     /**
     * \brief Returns coarsened box given fine box and refinement ratio.
@@ -650,8 +606,7 @@ public:
     * \param fine
     * \param ratio
     */
-    virtual Box CoarseBox (const Box&     fine,
-                           const IntVect& ratio) override;
+    virtual Box CoarseBox (const Box& fine, const IntVect& ratio) override;
 
     /**
     * \brief Coarse to fine interpolation in space.
@@ -708,8 +663,7 @@ public:
     * \param fine
     * \param ratio
     */
-    virtual Box CoarseBox (const Box& fine,
-                           int        ratio) override;
+    virtual Box CoarseBox (const Box& fine, int ratio) override;
 
     /**
     * \brief Returns coarsened box given fine box and refinement ratio.
@@ -717,8 +671,7 @@ public:
     * \param fine
     * \param ratio
     */
-    virtual Box CoarseBox (const Box&     fine,
-                           const IntVect& ratio) override;
+    virtual Box CoarseBox (const Box& fine, const IntVect& ratio) override;
 
     /**
     * \brief Coarse to fine interpolation in space.
@@ -809,8 +762,7 @@ public:
     * \param fine
     * \param ratio
     */
-    virtual Box CoarseBox (const Box& fine,
-                           int        ratio) override;
+    virtual Box CoarseBox (const Box& fine, int ratio) override;
 
     /**
     * \brief Returns coarsened box given fine box and refinement ratio.
@@ -818,8 +770,7 @@ public:
     * \param fine
     * \param ratio
     */
-    virtual Box CoarseBox (const Box&     fine,
-                           const IntVect& ratio) override;
+    virtual Box CoarseBox (const Box& fine, const IntVect& ratio) override;
 
     /**
     * \brief Coarse to fine interpolation in space.
@@ -902,24 +853,6 @@ extern AMREX_EXPORT CellQuadratic             quadratic_interp;
 extern AMREX_EXPORT CellConservativeProtected protected_interp;
 extern AMREX_EXPORT CellConservativeQuartic   quartic_interp;
 #endif
-
-class InterpolaterBoxCoarsener
-    : public BoxConverter
-{
-public:
-    InterpolaterBoxCoarsener (Interpolater* mapper_, const IntVect& ratio_)
-        : mapper (mapper_), ratio(ratio_) { ; }
-
-    /**
-    *
-    * \param fine
-    */
-    virtual Box doit (const Box& fine) const;
-    virtual BoxConverter* clone () const;
-private:
-    Interpolater* mapper;
-    IntVect ratio;
-};
 
 }
 

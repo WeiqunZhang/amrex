@@ -13,6 +13,10 @@ target_sources(amrex
    AMReX_FillPatchUtil.H
    AMReX_FillPatchUtil_I.H
    AMReX_FluxRegister.H
+   AMReX_InterpBase.H
+   AMReX_InterpBase.cpp
+   AMReX_MFInterpolater.H
+   AMReX_MFInterpolater.cpp
    AMReX_Interpolater.cpp
    AMReX_TagBox.cpp
    AMReX_AmrMesh.cpp
