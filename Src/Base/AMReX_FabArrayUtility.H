@@ -1328,6 +1328,107 @@ Abs (FabArray<FAB>& fa, int icomp, int numcomp, const IntVect& nghost)
     }
 }
 
+/**
+ * \brief Linear combination of two FabArrays
+ *
+ * This function performs the linear combination of two FabArrays and stores
+ * the result in a FabArray.
+ *
+ * \tparm FAB Fab type in FabArray
+ * \tparm T   Type of the constants in the linear combination
+ *
+ * \param dst the destination FabArray storing the result
+ * \param a the constant multiplier for the first FabArray
+ * \param x the first of the two FabArrays
+ * \param xcomp the starting component of the first FabArray
+ * \param b the constant multiplier for the second FabArray
+ * \param y the second of the two FabArrays
+ * \param ycomp the starting component of the second FabArray
+ * \param dstcomp the startign component of the destination FabArray
+ * \param numcomp the number of component in this operation
+ * \param nghost the number of ghost cells in this operation
+ */
+template <class FAB, typename T,
+          class bar = std::enable_if_t<IsBaseFab<FAB>::value> >
+void
+LinComb (FabArray<FAB>& dst,
+         T a, FabArray<FAB> const& x, int xcomp,
+         T b, FabArray<FAB> const& y, int ycomp,
+         int dstcomp, int numcomp, int nghost)
+{
+    LinComb(dst, a, x, xcomp, b, y, ycomp, dstcomp, numcomp, IntVect(nghost));
+}
+
+/**
+ * \brief Linear combination of two FabArrays
+ *
+ * This function performs the linear combination of two FabArrays and stores
+ * the result in a FabArray.
+ *
+ * \tparm FAB Fab type in FabArray
+ * \tparm T   Type of the constants in the linear combination
+ *
+ * \param dst the destination FabArray storing the result
+ * \param a the constant multiplier for the first FabArray
+ * \param x the first of the two FabArrays
+ * \param xcomp the starting component of the first FabArray
+ * \param b the constant multiplier for the second FabArray
+ * \param y the second of the two FabArrays
+ * \param ycomp the starting component of the second FabArray
+ * \param dstcomp the startign component of the destination FabArray
+ * \param numcomp the number of component in this operation
+ * \param nghost the number of ghost cells in this operation
+ */
+template <class FAB, typename T,
+          class bar = std::enable_if_t<IsBaseFab<FAB>::value> >
+void
+LinComb (FabArray<FAB>& dst,
+         T a, FabArray<FAB> const& x, int xcomp,
+         T b, FabArray<FAB> const& y, int ycomp,
+         int dstcomp, int numcomp, IntVect const& nghost)
+{
+    AMREX_ASSERT(dst.boxArray() == x.boxArray());
+    AMREX_ASSERT(dst.distributionMap == x.distributionMap);
+    AMREX_ASSERT(dst.boxArray() == y.boxArray());
+    AMREX_ASSERT(dst.distributionMap == y.distributionMap);
+    AMREX_ASSERT(dst.nGrowVect().allGE(nghost) && x.nGrowVect().allGE(nghost)
+                 && y.nGrowVect().allGE(nghost));
+
+#ifdef AMREX_USE_GPU
+    if (Gpu::inLaunchRegion() && dst.isFusingCandidate()) {
+        auto const& dstma = dst.arrays();
+        auto const& xma = x.const_arrays();
+        auto const& yma = y.const_arrays();
+        ParallelFor(dst, nghost, numcomp,
+        [=] AMREX_GPU_DEVICE (int box_no, int i, int j, int k, int n) noexcept
+        {
+            dstma[box_no](i,j,k,dstcomp+n) = a*xma[box_no](i,j,k,xcomp+n)
+                +                            b*yma[box_no](i,j,k,ycomp+n);
+        });
+        Gpu::streamSynchronize();
+    } else
+#endif
+    {
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (Gpu::notInLaunchRegion())
+#endif
+        for (MFIter mfi(dst,TilingIfNotGPU()); mfi.isValid(); ++mfi)
+        {
+            const Box& bx = mfi.growntilebox(nghost);
+
+            if (bx.ok()) {
+                auto const xfab =   x.array(mfi);
+                auto const yfab =   y.array(mfi);
+                auto       dfab = dst.array(mfi);
+                AMREX_HOST_DEVICE_PARALLEL_FOR_4D( bx, numcomp, i, j, k, n,
+                {
+                    dfab(i,j,k,dstcomp+n) = a*xfab(i,j,k,xcomp+n) + b*yfab(i,j,k,ycomp+n);
+                });
+            }
+        }
+    }
+}
+
 template <class FAB, class bar = std::enable_if_t<IsBaseFab<FAB>::value> >
 void
 prefetchToHost (FabArray<FAB> const& fa, const bool synchronous = true)

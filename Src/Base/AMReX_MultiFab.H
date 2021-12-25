@@ -584,9 +584,24 @@ public:
                       int             dstcomp,
                       int             numcomp,
                       const IntVect&  nghost);
+
     /**
-    * \brief dst = a*x + b*y
-    */
+     * \brief Linear combination of two MultiFabs
+     *
+     * This function performs the linear combination of two MultiFabs and
+     * stores the result in a MultiFab.
+     *
+     * \param dst the destination MultiFab storing the result
+     * \param a the constant multiplier for the first MultiFab
+     * \param x the first of the two MultiFabs
+     * \param xcomp the starting component of the first MultiFab
+     * \param b the constant multiplier for the second MultiFab
+     * \param y the second of the two MultiFabs
+     * \param ycomp the starting component of the second MultiFab
+     * \param dstcomp the startign component of the destination MultiFab
+     * \param numcomp the number of component in this operation
+     * \param nghost the number of ghost cells in this operation
+     */
     static void LinComb (MultiFab&       dst,
                          Real            a,
                          const MultiFab& x,
@@ -598,6 +613,23 @@ public:
                          int             numcomp,
                          int             nghost);
 
+    /**
+     * \brief Linear combination of two MultiFabs
+     *
+     * This function performs the linear combination of two MultiFabs and
+     * stores the result in a MultiFab.
+     *
+     * \param dst the destination MultiFab storing the result
+     * \param a the constant multiplier for the first MultiFab
+     * \param x the first of the two MultiFabs
+     * \param xcomp the starting component of the first MultiFab
+     * \param b the constant multiplier for the second MultiFab
+     * \param y the second of the two MultiFabs
+     * \param ycomp the starting component of the second MultiFab
+     * \param dstcomp the startign component of the destination MultiFab
+     * \param numcomp the number of component in this operation
+     * \param nghost the number of ghost cells in this operation
+     */
     static void LinComb (MultiFab&       dst,
                          Real            a,
                          const MultiFab& x,

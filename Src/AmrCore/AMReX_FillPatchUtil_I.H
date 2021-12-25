@@ -94,68 +94,13 @@ FillPatchSingleLevel (MF& mf, IntVect const& nghost, Real time,
             if (time == stime[0]) {
                 Copy(*dmf, *smf[0], scomp, destcomp, ncomp, 0);
             } else if (time == stime[1]) {
-
-            } else if () {
-    /**
-    * \brief dst = a*x + b*y
-    */
-    static void LinComb (MultiFab&       dst,
-                         Real            a,
-                         const MultiFab& x,
-                         int             xcomp,
-                         Real            b,
-                         const MultiFab& y,
-                         int             ycomp,
-                         int             dstcomp,
-                         int             numcomp,
-                         int             nghost);
-
+                Copy(*dmf, *smf[1], scomp, destcomp, ncomp, 0);
+            } else if (! amrex::almostEqual(stime[0], stime[1])) {
+                Real alpha = (stime[1]-time)/(stime[1]-stime[0]);
+                Real beta  = (time-stime[0])/(stime[1]-stime[0]);
+                LinComb(*dmf, alpha, *smf[0], scomp, beta, *smf[1], scomp, destcomp, ncomp, 0);
             } else {
-
-            }
-#ifdef AMREX_USE_OMP
-#pragma omp parallel if (Gpu::notInLaunchRegion())
-#endif
-                for (MFIter mfi(*dmf,TilingIfNotGPU()); mfi.isValid(); ++mfi)
-                {
-                    const Box& bx = mfi.tilebox();
-                    const Real t0 = stime[0];
-                    const Real t1 = stime[1];
-                    auto const sfab0 = smf[0]->array(mfi);
-                    auto const sfab1 = smf[1]->array(mfi);
-                    auto       dfab  = dmf->array(mfi);
-
-                    if (time == t0)
-                    {
-                        AMREX_HOST_DEVICE_PARALLEL_FOR_4D ( bx, ncomp, i, j, k, n,
-                        {
-                            dfab(i,j,k,n+destcomp) = sfab0(i,j,k,n+scomp);
-                        });
-                    }
-                    else if (time == t1)
-                    {
-                        AMREX_HOST_DEVICE_PARALLEL_FOR_4D ( bx, ncomp, i, j, k, n,
-                        {
-                            dfab(i,j,k,n+destcomp) = sfab1(i,j,k,n+scomp);
-                        });
-                    }
-                    else if (! amrex::almostEqual(t0,t1))
-                    {
-                        Real alpha = (t1-time)/(t1-t0);
-                        Real beta = (time-t0)/(t1-t0);
-                        AMREX_HOST_DEVICE_PARALLEL_FOR_4D ( bx, ncomp, i, j, k, n,
-                        {
-                            dfab(i,j,k,n+destcomp) = alpha*sfab0(i,j,k,n+scomp)
-                                +                     beta*sfab1(i,j,k,n+scomp);
-                        });
-                    }
-                    else
-                    {
-                        AMREX_HOST_DEVICE_PARALLEL_FOR_4D ( bx, ncomp, i, j, k, n,
-                        {
-                        dfab(i,j,k,n+destcomp) = sfab0(i,j,k,n+scomp);
-                    });
-                }
+                Copy(*dmf, *smf[0], scomp, destcomp, ncomp, 0);
             }
         }
 
