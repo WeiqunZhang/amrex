@@ -21,10 +21,5 @@ CEXE_headers += AMReX_InterpFaceReg_C.H AMReX_InterpFaceReg_$(DIM)D_C.H
 
 CEXE_headers += AMReX_AmrCoreFwd.H
 
-ifneq ($(BL_NO_FORT),TRUE)
-  FEXE_headers += AMReX_FillPatchUtil_F.H
-  F90EXE_sources += AMReX_FillPatchUtil_$(DIM)d.F90
-endif
-
 VPATH_LOCATIONS += $(AMREX_HOME)/Src/AmrCore
 INCLUDE_LOCATIONS += $(AMREX_HOME)/Src/AmrCore

@@ -36,14 +36,6 @@ target_sources(amrex
    AMReX_AmrCoreFwd.H
    )
 
-if (AMReX_FORTRAN)
-   target_sources(amrex
-      PRIVATE
-      AMReX_FillPatchUtil_F.H
-      AMReX_FillPatchUtil_${AMReX_SPACEDIM}d.F90
-      )
-endif ()
-
 # These files are needed only if Particles are enabled
 if ( AMReX_PARTICLES )
   target_sources( amrex PRIVATE AMReX_AmrParGDB.H AMReX_AmrParticles.H )
