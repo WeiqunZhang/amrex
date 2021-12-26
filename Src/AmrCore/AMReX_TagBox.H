@@ -72,7 +72,7 @@ public:
     /**
     * \brief Returns Vector\<int\> of size domain.numPts() suitable for calling
     * Fortran, with positions set to same value as in the TagBox
-    * dataPtr().
+    * dataPtr().  This function is deprecated.
     */
 //#if (__cplusplus >= 201402L)
 //    [[deprecated("No need to use this unless calling Fortran < 2003")]]
@@ -82,7 +82,7 @@ public:
     /**
     * \brief Since a TagBox is a BaseFab\<char\>, we can use this utility
     * function to allocate an integer array to have the same number
-    * of elements as cells in tilebx
+    * of elements as cells in tilebx.   This function is deprecated.
     *
     * \param ar
     * \param tilebx
@@ -94,7 +94,7 @@ public:
 
     /**
     * \brief Set values as specified by the array -- this only tags.
-    * It's an error if ar.length() != domain.numPts().
+    * It's an error if ar.length() != domain.numPts().  This function is deprecated.
     *
     * \param ar
     */
@@ -105,7 +105,7 @@ public:
 
     /**
     * \brief Set values as specified by the array -- this tags and untags.
-    * It's an error if ar.length() != domain.numPts().
+    * It's an error if ar.length() != domain.numPts().  This function is deprecated.
     *
     * \param ar
     */
@@ -116,7 +116,7 @@ public:
 
     /**
     * \brief Set values as specified by the array -- this only tags.
-    * only changes values in the tilebx region
+    * only changes values in the tilebx region.  This function is deprecated.
     *
     * \param ar
     * \param tilebx
@@ -128,7 +128,7 @@ public:
 
     /**
     * \brief Set values as specified by the array -- this tags and untags.
-    * only changes values in the tilebx region
+    * only changes values in the tilebx region.  This function is deprecated.
     *
     * \param ar
     * \param tilebx

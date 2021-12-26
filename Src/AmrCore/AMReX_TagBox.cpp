@@ -311,12 +311,45 @@ TagBoxArray::buffer (const IntVect& nbuf)
 
     if (nbuf.max() > 0)
     {
+#ifdef AMREX_USE_GPU
+        if (Gpu::inLaunchRegion() && this->isFusingCandidate()) {
+            auto const& ma = this->arrays();
+            Dim3 nbuf3 = nbuf.dim3();
+            Dim3 ng3 = n_grow.dim3();
+            ParallelFor(*this, nbuf, [=] AMREX_GPU_DEVICE (int box_no, int i, int j, int k) noexcept
+            {
+                auto const& a = ma[box_no];
+                if (a(i,j,k) == TagBox::CLEAR) {
+                    bool to_buf = false;
+                    Dim3 alo = amrex::lbound(a);
+                    Dim3 ahi = amrex::ubound(a);
+                    int imin = amrex::max(i-nbuf3.x, alo.x+ng3.x-nbuf3.x);
+                    int jmin = amrex::max(j-nbuf3.y, alo.y+ng3.y-nbuf3.y);
+                    int kmin = amrex::max(k-nbuf3.z, alo.z+ng3.z-nbuf3.z);
+                    int imax = amrex::min(i+nbuf3.x, ahi.x-ng3.x+nbuf3.x);
+                    int jmax = amrex::min(j+nbuf3.y, ahi.y-ng3.y+nbuf3.y);
+                    int kmax = amrex::min(k+nbuf3.z, ahi.z-ng3.z+nbuf3.z);
+                    // xxxxx TODO: If nbuf is large, this is not efficient.
+                    //             We need to find another better way.
+                    for (int kk = kmin; kk <= kmax && !to_buf; ++kk) {
+                    for (int jj = jmin; jj <= jmax && !to_buf; ++jj) {
+                    for (int ii = imin; ii <= imax && !to_buf; ++ii) {
+                        if (a(ii,jj,kk) == TagBox::SET) to_buf = true;
+                    }}}
+                    if (to_buf) a(i,j,k) = TagBox::BUF;
+                }
+            });
+            Gpu::streamSynchronize();
+        } else
+#endif
+        {
 #ifdef AMREX_USE_OMP
 #pragma omp parallel if (Gpu::notInLaunchRegion())
 #endif
-       for (MFIter mfi(*this); mfi.isValid(); ++mfi) {
-           get(mfi).buffer(nbuf, n_grow);
-       }
+            for (MFIter mfi(*this); mfi.isValid(); ++mfi) {
+                get(mfi).buffer(nbuf, n_grow);
+            }
+        }
     }
 }
 
@@ -335,21 +368,20 @@ TagBoxArray::mapPeriodicRemoveDuplicates (const Geometry& geom)
 
         // We need to keep tags in periodic boundary
         const auto owner_mask = amrex::OwnerMask(tmp, Periodicity::NonPeriodic(), nGrowVect());
-        for (MFIter mfi(tmp); mfi.isValid(); ++mfi) {
-            Box const& box = mfi.fabbox();
-            Array4<TagType> const& tag =this->array(mfi);
-            Array4<int const> const& tmptag = tmp.const_array(mfi);
-            Array4<int const> const& msk = owner_mask->const_array(mfi);
-            amrex::ParallelFor(box,
-            [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
-            {
-                if (msk(i,j,k)) {
-                    tag(i,j,k) = static_cast<char>(tmptag(i,j,k));
-                } else {
-                    tag(i,j,k) = TagBox::CLEAR;
-                }
-            });
-        }
+
+        auto const& tagma = this->arrays();
+        auto const& tmptagma = tmp.const_arrays();
+        auto const& mskma = owner_mask->const_arrays();
+        ParallelFor(tmp, tmp.nGrowVect(),
+        [=] AMREX_GPU_DEVICE (int box_no, int i, int j, int k) noexcept
+        {
+            if (mskma[box_no](i,j,k)) {
+                tagma[box_no](i,j,k) = static_cast<char>(tmptagma[box_no](i,j,k));
+            } else {
+                tagma[box_no](i,j,k) = TagBox::CLEAR;
+            }
+        });
+        Gpu::streamSynchronize();
     }
     else
     {
