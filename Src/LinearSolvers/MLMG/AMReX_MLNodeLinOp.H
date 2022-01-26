@@ -81,7 +81,7 @@ public:
                           bool skip_fillboundary=false) const;
 
     virtual void Fapply (int amrlev, int mglev, MultiFab& out, const MultiFab& in) const = 0;
-    virtual void Fsmooth (int amrlev, int mglev, MultiFab& sol, const MultiFab& rsh) const = 0;
+    virtual void Fsmooth (int amrlev, int mglev, MultiFab& sol, const MultiFab& rhs) const = 0;
 
     virtual void nodalSync (int amrlev, int mglev, MultiFab& mf) const final override;
 

@@ -42,6 +42,7 @@ struct LPInfo
     int max_coarsening_level = 30;
     int max_semicoarsening_level = 0;
     int hidden_direction = -1;
+    bool mixed_precision = false;
 
     LPInfo& setAgglomeration (bool x) noexcept { do_agglomeration = x; return *this; }
     LPInfo& setConsolidation (bool x) noexcept { do_consolidation = x; return *this; }
@@ -52,6 +53,7 @@ struct LPInfo
     LPInfo& setMaxCoarseningLevel (int n) noexcept { max_coarsening_level = n; return *this; }
     LPInfo& setMaxSemicoarseningLevel (int n) noexcept { max_semicoarsening_level = n; return *this; }
     LPInfo& setHiddenDirection (int n) noexcept { hidden_direction = n; return *this; }
+    LPInfo& setMixedPrecision (bool x) noexcept { mixed_precision = x; return *this; }
 
     bool hasHiddenDimension () const noexcept {
         return hidden_direction >=0 && hidden_direction < AMREX_SPACEDIM;
@@ -196,14 +198,27 @@ public:
     virtual void update () {}
 
     virtual void restriction (int amrlev, int cmglev, MultiFab& crse, MultiFab& fine) const = 0;
+    virtual void restriction_d2s (int /*amrlev*/, int /*cmglev*/, fMultiFab& /*crse*/, MultiFab& /*fine*/) const {}
+    virtual void restriction_s2d (int /*amrlev*/, int /*cmglev*/, MultiFab& /*crse*/, fMultiFab& /*fine*/) const {}
+    virtual void restriction_s2s (int /*amrlev*/, int /*cmglev*/, fMultiFab& /*crse*/, fMultiFab& /*fine*/) const {}
+
     virtual void interpolation (int amrlev, int fmglev, MultiFab& fine, const MultiFab& crse) const = 0;
+    virtual void interpolation_d2s (int /*amrlev*/, int /*fmglev*/, fMultiFab& /*fine*/, const MultiFab& /*crse*/) const {}
+    virtual void interpolation_s2d (int /*amrlev*/, int /*fmglev*/, MultiFab& /*fine*/, const fMultiFab& /*crse*/) const {}
+    virtual void interpolation_s2s (int /*amrlev*/, int /*fmglev*/, fMultiFab& /*fine*/, const fMultiFab& /*crse*/) const {}
+
     virtual void averageDownSolutionRHS (int camrlev, MultiFab& crse_sol, MultiFab& crse_rhs,
                                          const MultiFab& fine_sol, const MultiFab& fine_rhs) = 0;
 
     virtual void apply (int amrlev, int mglev, MultiFab& out, MultiFab& in, BCMode bc_mode,
                         StateMode s_mode, const MLMGBndry* bndry=nullptr) const = 0;
+    virtual void apply_s (int /*amrlev*/, int /*mglev*/, fMultiFab& /*out*/, fMultiFab& /*in*/, BCMode /*bc_mode*/,
+                          StateMode /*s_mode*/, const MLMGBndry* /*bndry*/=nullptr) const {}
+
     virtual void smooth (int amrlev, int mglev, MultiFab& sol, const MultiFab& rhs,
                          bool skip_fillboundary=false) const = 0;
+    virtual void smooth_s (int /*amrlev*/, int /*mglev*/, fMultiFab& /*sol*/, const fMultiFab& /*rhs*/,
+                           bool /*skip_fillboundary*/=false) const {}
 
     // Divide mf by the diagonal component of the operator. Used by bicgstab.
     virtual void normalize (int /*amrlev*/, int /*mglev*/, MultiFab& /*mf*/) const {}
@@ -212,6 +227,9 @@ public:
                                    const MultiFab* crse_bcdata=nullptr) = 0;
     virtual void correctionResidual (int amrlev, int mglev, MultiFab& resid, MultiFab& x, const MultiFab& b,
                                      BCMode bc_mode, const MultiFab* crse_bcdata=nullptr) = 0;
+    virtual void correctionResidual_s (int /*amrlev*/, int /*mglev*/, fMultiFab& /*resid*/,
+                                       fMultiFab& /*x*/, const fMultiFab& /*b*/) const
+        {}
 
     virtual void reflux (int crse_amrlev,
                          MultiFab& res, const MultiFab& crse_sol, const MultiFab& crse_rhs,
@@ -311,6 +329,8 @@ protected:
     bool m_do_semicoarsening = false;
     Vector<IntVect> mg_coarsen_ratio_vec;
 
+    Vector<Vector<int> > m_is_full_precision;
+
     //! first Vector is for amr level and second is mg level
     Vector<Vector<Geometry> >            m_geom;
     Vector<Vector<BoxArray> >            m_grids;
@@ -399,6 +419,8 @@ protected:
 
     virtual void make (Vector<Vector<MultiFab> >& mf, int nc, IntVect const& ng) const;
 
+    void makeReduced (Vector<Vector<fMultiFab> >& mf, int nc, IntVect const& ng) const;
+
     virtual std::unique_ptr<FabFactory<FArrayBox> > makeFactory (int /*amrlev*/, int /*mglev*/) const {
         return std::make_unique<FArrayBoxFactory>();
     }
@@ -441,6 +463,11 @@ protected:
         } else {
             return dy;
         }
+    }
+
+    bool isFullPrecision (int amrlev, int mglev) const noexcept
+    {
+        return m_is_full_precision[amrlev][mglev];
     }
 
 private:

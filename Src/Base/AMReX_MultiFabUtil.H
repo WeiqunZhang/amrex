@@ -119,10 +119,10 @@ namespace amrex
     //! Average MultiFab onto crse MultiFab without volume weighting. This
     //! routine DOES NOT assume that the crse BoxArray is a coarsened version of
     //! the fine BoxArray. Work for both cell-centered and nodal MultiFabs.
-    void average_down (const MultiFab& S_fine, MultiFab& S_crse,
-                       int scomp, int ncomp, const IntVect& ratio);
-    void average_down (const MultiFab& S_fine, MultiFab& S_crse,
-                       int scomp, int ncomp, int ratio);
+    template <typename FMF, typename CMF>
+    void average_down (const FMF& S_fine, CMF& S_crse, int scomp, int ncomp, const IntVect& ratio);
+    template <typename FMF, typename CMF>
+    void average_down (const FMF& S_fine, CMF& S_crse, int scomp, int ncomp, int ratio);
 
     //! Add a coarsened version of the data contained in the S_fine MultiFab to
     //! S_crse, including ghost cells.
@@ -457,6 +457,134 @@ NormHelper (const MMF& mask,
     }
 
     return sm;
+}
+
+// Average fine cell-based MultiFab onto crse cell-centered MultiFab.
+// We do NOT assume that the coarse layout is a coarsened version of the fine layout.
+// This version does NOT use volume-weighting
+template <typename FMF, typename CMF>
+void average_down (const FMF& S_fine, CMF& S_crse, int scomp, int ncomp, const IntVect& ratio)
+{
+    BL_PROFILE("amrex::average_down");
+    AMREX_ASSERT(S_crse.nComp() == S_fine.nComp());
+    AMREX_ASSERT((S_crse.is_cell_centered() && S_fine.is_cell_centered()) ||
+                 (S_crse.is_nodal()         && S_fine.is_nodal()));
+
+    bool is_cell_centered = S_crse.is_cell_centered();
+
+    //
+    // Coarsen() the fine stuff on processors owning the fine data.
+    //
+    BoxArray const& crse_S_fine_BA = amrex::coarsen(S_fine.boxArray(), ratio);
+
+    if (crse_S_fine_BA == S_crse.boxArray() && S_fine.DistributionMap() == S_crse.DistributionMap())
+    {
+#ifdef AMREX_USE_GPU
+        if (Gpu::inLaunchRegion() && S_crse.isFusingCandidate()) {
+            auto const& crsema = S_crse.arrays();
+            auto const& finema = S_fine.const_arrays();
+            if (is_cell_centered) {
+                ParallelFor(S_crse, IntVect(0), ncomp,
+                [=] AMREX_GPU_DEVICE (int box_no, int i, int j, int k, int n) noexcept
+                {
+                    amrex_avgdown(i,j,k,n,crsema[box_no],finema[box_no],scomp,scomp,ratio);
+                });
+            } else {
+                ParallelFor(S_crse, IntVect(0), ncomp,
+                [=] AMREX_GPU_DEVICE (int box_no, int i, int j, int k, int n) noexcept
+                {
+                    amrex_avgdown_nodes(i,j,k,n,crsema[box_no],finema[box_no],scomp,scomp,ratio);
+                });
+            }
+            Gpu::streamSynchronize();
+        } else
+#endif
+        {
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (Gpu::notInLaunchRegion())
+#endif
+            for (MFIter mfi(S_crse,TilingIfNotGPU()); mfi.isValid(); ++mfi)
+            {
+                //  NOTE: The tilebox is defined at the coarse level.
+                const Box& bx = mfi.tilebox();
+                auto const& crsearr = S_crse.array(mfi);
+                auto const& finearr = S_fine.const_array(mfi);
+
+                if (is_cell_centered) {
+                    AMREX_HOST_DEVICE_PARALLEL_FOR_4D(bx, ncomp, i, j, k, n,
+                    {
+                        amrex_avgdown(i,j,k,n,crsearr,finearr,scomp,scomp,ratio);
+                    });
+                } else {
+                    AMREX_HOST_DEVICE_PARALLEL_FOR_4D(bx, ncomp, i, j, k, n,
+                    {
+                        amrex_avgdown_nodes(i,j,k,n,crsearr,finearr,scomp,scomp,ratio);
+                    });
+                }
+            }
+        }
+    }
+    else
+    {
+        CMF crse_S_fine(crse_S_fine_BA, S_fine.DistributionMap(), ncomp, 0);
+
+#ifdef AMREX_USE_GPU
+        if (Gpu::inLaunchRegion() && crse_S_fine.isFusingCandidate()) {
+            auto const& crsema = crse_S_fine.arrays();
+            auto const& finema = S_fine.const_arrays();
+            if (is_cell_centered) {
+                ParallelFor(crse_S_fine, IntVect(0), ncomp,
+                [=] AMREX_GPU_DEVICE (int box_no, int i, int j, int k, int n) noexcept
+                {
+                    amrex_avgdown(i,j,k,n,crsema[box_no],finema[box_no],0,scomp,ratio);
+                });
+            } else {
+                ParallelFor(crse_S_fine, IntVect(0), ncomp,
+                [=] AMREX_GPU_DEVICE (int box_no, int i, int j, int k, int n) noexcept
+                {
+                    amrex_avgdown_nodes(i,j,k,n,crsema[box_no],finema[box_no],0,scomp,ratio);
+                });
+            }
+            Gpu::streamSynchronize();
+        } else
+#endif
+        {
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (Gpu::notInLaunchRegion())
+#endif
+            for (MFIter mfi(crse_S_fine,TilingIfNotGPU()); mfi.isValid(); ++mfi)
+            {
+                //  NOTE: The tilebox is defined at the coarse level.
+                const Box& bx = mfi.tilebox();
+                auto const& crsearr = crse_S_fine.array(mfi);
+                auto const& finearr = S_fine.const_array(mfi);
+
+                //  NOTE: We copy from component scomp of the fine fab into component 0 of the crse fab
+                //        because the crse fab is a temporary which was made starting at comp 0, it is
+                //        not part of the actual crse multifab which came in.
+
+                if (is_cell_centered) {
+                    AMREX_HOST_DEVICE_PARALLEL_FOR_4D(bx, ncomp, i, j, k, n,
+                    {
+                        amrex_avgdown(i,j,k,n,crsearr,finearr,0,scomp,ratio);
+                    });
+                } else {
+                    AMREX_HOST_DEVICE_PARALLEL_FOR_4D(bx, ncomp, i, j, k, n,
+                    {
+                        amrex_avgdown_nodes(i,j,k,n,crsearr,finearr,0,scomp,ratio);
+                    });
+                }
+            }
+        }
+
+        S_crse.ParallelCopy(crse_S_fine,0,scomp,ncomp);
+    }
+}
+
+template <typename FMF, typename CMF>
+void average_down (const FMF& S_fine, CMF& S_crse, int scomp, int ncomp, int ratio)
+{
+    average_down(S_fine, S_crse, scomp, ncomp, IntVect(ratio));
 }
 
 }

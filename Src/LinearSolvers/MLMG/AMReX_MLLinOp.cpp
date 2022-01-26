@@ -651,6 +651,17 @@ MLLinOp::defineGrids (const Vector<Geometry>& a_geom,
         AMREX_ASSERT_WITH_MESSAGE(m_grids[amrlev][0].coarsenable(m_amr_ref_ratio[amrlev-1]),
                                   "MLLinOp: grids not coarsenable between AMR levels");
     }
+
+    m_is_full_precision.resize(m_num_amr_levels);
+    for (int amrlev = 0; amrlev < m_num_amr_levels; ++amrlev) {
+        m_is_full_precision[amrlev].push_back(1); // MG Level 0 always uses full precision
+        if (info.mixed_precision && sizeof(double) == sizeof(Real)) {
+            m_is_full_precision[amrlev].resize(m_num_mg_levels[amrlev], 0);
+        } else {
+            m_is_full_precision[amrlev].resize(m_num_mg_levels[amrlev], 1);
+        }
+    }
+    m_is_full_precision[0].back() = 1; // Bottom level always uses full precision
 }
 
 void
@@ -674,8 +685,28 @@ MLLinOp::make (Vector<Vector<MultiFab> >& mf, int nc, IntVect const& ng) const
         mf[alev].resize(m_num_mg_levels[alev]);
         for (int mlev = 0; mlev < m_num_mg_levels[alev]; ++mlev)
         {
-            const auto& ba = amrex::convert(m_grids[alev][mlev], m_ixtype);
-            mf[alev][mlev].define(ba, m_dmap[alev][mlev], nc, ng, MFInfo(), *m_factory[alev][mlev]);
+            if (isFullPrecision(alev,mlev)) {
+                const auto& ba = amrex::convert(m_grids[alev][mlev], m_ixtype);
+                mf[alev][mlev].define(ba, m_dmap[alev][mlev], nc, ng, MFInfo(), *m_factory[alev][mlev]);
+            }
+        }
+    }
+}
+
+void
+MLLinOp::makeReduced (Vector<Vector<fMultiFab> >& mf, int nc, IntVect const& ng) const
+{
+    mf.clear();
+    mf.resize(m_num_amr_levels);
+    for (int alev = 0; alev < m_num_amr_levels; ++alev)
+    {
+        mf[alev].resize(m_num_mg_levels[alev]);
+        for (int mlev = 0; mlev < m_num_mg_levels[alev]; ++mlev)
+        {
+            if (!isFullPrecision(alev,mlev)) {
+                const auto& ba = amrex::convert(m_grids[alev][mlev], m_ixtype);
+                mf[alev][mlev].define(ba, m_dmap[alev][mlev], nc, ng);
+            }
         }
     }
 }

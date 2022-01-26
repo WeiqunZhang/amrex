@@ -47,7 +47,7 @@ public:
     virtual bool isSingular (int amrlev) const final override { return m_is_singular[amrlev]; }
     virtual bool isBottomSingular () const final override { return m_is_singular[0]; }
     virtual void Fapply (int amrlev, int mglev, MultiFab& out, const MultiFab& in) const final override;
-    virtual void Fsmooth (int amrlev, int mglev, MultiFab& sol, const MultiFab& rsh, int redblack) const final override;
+    virtual void Fsmooth (int amrlev, int mglev, MultiFab& sol, const MultiFab& rhs, int redblack) const final override;
     virtual void FFlux (int amrlev, const MFIter& mfi,
                         const Array<FArrayBox*,AMREX_SPACEDIM>& flux,
                         const FArrayBox& sol, Location /* loc */,

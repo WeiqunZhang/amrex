@@ -305,6 +305,64 @@ Add (FabArray<FAB>& dst, FabArray<FAB> const& src, int srccomp, int dstcomp, int
     }
 }
 
+/**
+ * \brief dst = src + a*dst
+ */
+template <class FAB, class T = typename FAB::value_type,
+          class bar = std::enable_if_t<IsBaseFab<FAB>::value && std::is_arithmetic<T>::value> >
+void
+Xpay (FabArray<FAB>& dst, T a, FabArray<FAB> const& src, int srccomp, int dstcomp, int numcomp,
+      int nghost)
+{
+    Xpay(dst,a,src,srccomp,dstcomp,numcomp,IntVect(nghost));
+}
+
+/**
+ * \brief dst = src + a*dst
+ */
+template <class FAB, class T = typename FAB::value_type,
+          class bar = std::enable_if_t<IsBaseFab<FAB>::value && std::is_arithmetic<T>::value> >
+void
+Xpay (FabArray<FAB>& dst, T a, FabArray<FAB> const& src, int srccomp, int dstcomp, int numcomp,
+      const IntVect& nghost)
+{
+    BL_ASSERT(dst.boxArray() == src.boxArray());
+    BL_ASSERT(dst.DistributionMap() == src.DistributionMap());
+    BL_ASSERT(dst.nGrowVect().allGE(nghost) && src.nGrowVect().allGE(nghost));
+
+#ifdef AMREX_USE_GPU
+    if (Gpu::inLaunchRegion() && dst.isFusingCandidate()) {
+        auto const& dstfa = dst.arrays();
+        auto const& srcfa = src.const_arrays();
+        ParallelFor(dst, nghost, numcomp,
+        [=] AMREX_GPU_DEVICE (int box_no, int i, int j, int k, int n) noexcept
+        {
+            dstfa[box_no](i,j,k,n+dstcomp) = srcfa[box_no](i,j,k,n+srccomp)
+                +                        a * dstfa[box_no](i,j,k,n+dstcomp);
+        });
+        Gpu::streamSynchronize();
+    } else
+#endif
+    {
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (Gpu::notInLaunchRegion())
+#endif
+        for (MFIter mfi(dst,TilingIfNotGPU()); mfi.isValid(); ++mfi)
+        {
+            const Box& bx = mfi.growntilebox(nghost);
+            if (bx.ok())
+            {
+                auto const srcFab = src.array(mfi);
+                auto       dstFab = dst.array(mfi);
+                AMREX_HOST_DEVICE_PARALLEL_FOR_4D( bx, numcomp, i, j, k, n,
+                {
+                    dstFab(i,j,k,n+dstcomp) = srcFab(i,j,k,n+srccomp) + a * dstFab(i,j,k,n+dstcomp);
+                });
+            }
+        }
+    }
+}
+
 template <class FAB>
 class FabArray
     :
