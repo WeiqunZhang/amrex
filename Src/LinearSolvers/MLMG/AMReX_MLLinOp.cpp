@@ -899,9 +899,14 @@ MLLinOp::resizeMultiGrid (int new_size)
 Any
 MLLinOp::AnyMake (int amrlev, int mglev, IntVect const& ng) const
 {
-    return Any(MultiFab(amrex::convert(m_grids[amrlev][mglev], m_ixtype),
-                        m_dmap[amrlev][mglev], getNComp(), ng, MFInfo(),
-                        *m_factory[amrlev][mglev]));
+    if (isFullPrecision()) {
+        return Any(MultiFab(amrex::convert(m_grids[amrlev][mglev], m_ixtype),
+                            m_dmap[amrlev][mglev], getNComp(), ng, MFInfo(),
+                            *m_factory[amrlev][mglev]));
+    } else {
+        return Any(fMultiFab(amrex::convert(m_grids[amrlev][mglev], m_ixtype),
+                             m_dmap[amrlev][mglev], getNComp(), ng, MFInfo()));
+    }
 }
 
 Any
@@ -911,7 +916,11 @@ MLLinOp::AnyMakeCoarseMG (int amrlev, int mglev, IntVect const& ng) const
     IntVect ratio = (amrlev > 0) ? IntVect(2) : mg_coarsen_ratio_vec[mglev];
     cba.coarsen(ratio);
     cba.convert(m_ixtype);
-    return Any(MultiFab(cba, m_dmap[amrlev][mglev], getNComp(), ng));
+    if (isFullPrecision()) {
+        return Any(MultiFab(cba, m_dmap[amrlev][mglev], getNComp(), ng));
+    } else {
+        return Any(fMultiFab(cba, m_dmap[amrlev][mglev], getNComp(), ng));
+    }
 }
 
 Any
@@ -921,39 +930,59 @@ MLLinOp::AnyMakeCoarseAmr (int famrlev, IntVect const& ng) const
     IntVect ratio(AMRRefRatio(famrlev-1));
     cba.coarsen(ratio);
     cba.convert(m_ixtype);
-    return Any(MultiFab(cba, m_dmap[famrlev][0], getNComp(), ng));
+    if (isFullPrecision()) {
+        return Any(MultiFab(cba, m_dmap[famrlev][0], getNComp(), ng));
+    } else {
+        return Any(MultiFab(cba, m_dmap[famrlev][0], getNComp(), ng));
+    }
 }
 
 Any
 MLLinOp::AnyMakeAlias (Any const& a) const
 {
-    AMREX_ASSERT(a.is<MultiFab>());
-    MultiFab const& mf = a.get<MultiFab>();
-    return Any(MultiFab(mf, amrex::make_alias, 0, mf.nComp()));
+    if (a.is<MultiFab>()) {
+        MultiFab const& mf = a.get<MultiFab>();
+        return Any(MultiFab(mf, amrex::make_alias, 0, mf.nComp()));
+    } else {
+        fMultiFab const& mf = a.get<fMultiFab>();
+        return Any(fMultiFab(mf, amrex::make_alias, 0, mf.nComp()));
+    }
 }
 
 IntVect
 MLLinOp::AnyGrowVect (Any const& a) const
 {
-    AMREX_ASSERT(a.is<MultiFab>());
-    MultiFab const& mf = a.get<MultiFab>();
-    return mf.nGrowVect();
+    if (a.is<MultiFab>()) {
+        MultiFab const& mf = a.get<MultiFab>();
+        return mf.nGrowVect();
+    } else {
+        fMultiFab const& mf = a.get<fMultiFab>();
+        return mf.nGrowVect();
+    }
 }
 
 void
 MLLinOp::AnySetToZero (Any& a) const
 {
-    AMREX_ASSERT(a.is<MultiFab>());
-    MultiFab& mf = a.get<MultiFab>();
-    mf.setVal(0._rt);
+    if (a.is<MultiFab>()) {
+        MultiFab& mf = a.get<MultiFab>();
+        mf.setVal(0._rt);
+    } else {
+        fMultiFab& mf = a.get<fMultiFab>();
+        mf.setVal(0.f);
+    }
 }
 
 void
 MLLinOp::AnySetBndryToZero (Any& a) const
 {
-    AMREX_ASSERT(a.is<MultiFab>());
-    MultiFab& mf = a.get<MultiFab>();
-    mf.setBndry(0._rt, 0, getNComp());
+    if (a.is<MultiFab>()) {
+        MultiFab& mf = a.get<MultiFab>();
+        mf.setBndry(0._rt, 0, getNComp());
+    } else {
+        fMultiFab& mf = a.get<fMultiFab>();
+        mf.setBndry(0.f, 0, getNComp());
+    }
 }
 
 #ifdef AMREX_USE_EB
@@ -969,34 +998,77 @@ MLLinOp::AnySetCoveredToZero (Any& a) const
 void
 MLLinOp::AnyCopy (Any& dst, Any const& src, IntVect const& ng) const
 {
-    AMREX_ASSERT(dst.is<MultiFab>() && src.is<MultiFab>());
-    MultiFab& dmf = dst.get<MultiFab>();
-    MultiFab const& smf = src.get<MultiFab>();
-    MultiFab::Copy(dmf, smf, 0, 0, getNComp(), ng);
+    int const ncomp = getNComp();
+    auto tt = CartesianProduct(TypeList<MultiFab,fMultiFab>{},
+                               TypeList<MultiFab,fMultiFab>{});
+    bool r = ForEachUntil(tt, [&] (auto t) -> bool
+    {
+        using MF0 = TypeAt<0,decltype(t)>;
+        using MF1 = TypeAt<1,decltype(t)>;
+        if (dst.is<MF0>() && src.is<MF1>()) {
+            MF0      & dmf = dst.get<MF0>();
+            MF1 const& smf = src.get<MF1>();
+            amrex::Copy(dmf, smf, 0, 0, ncomp, ng);
+            return true;
+        } else {
+            return false;
+        }
+    });
+    if (!r) {
+        amrex::Abort("MLLinOp:AnyCopy: unsupported types");
+    }
 }
 
 void
 MLLinOp::AnyAdd (Any& dst, Any const& src, IntVect const& ng) const
 {
-    AMREX_ASSERT(dst.is<MultiFab>() && src.is<MultiFab>());
-    MultiFab& dmf = dst.get<MultiFab>();
-    MultiFab const& smf = src.get<MultiFab>();
-    MultiFab::Add(dmf, smf, 0, 0, getNComp(), ng);
+    int const ncomp = getNComp();
+    auto tt = CartesianProduct(TypeList<MultiFab,fMultiFab>{},
+                               TypeList<MultiFab,fMultiFab>{});
+    bool r = ForEachUntil(tt, [&] (auto t) -> bool
+    {
+        using MF0 = TypeAt<0,decltype(t)>;
+        using MF1 = TypeAt<1,decltype(t)>;
+        if (dst.is<MF0>() && src.is<MF1>()) {
+            MF0      & dmf = dst.get<MF0>();
+            MF1 const& smf = src.get<MF1>();
+            amrex::Add(dmf, smf, 0, 0, ncomp, ng);
+            return true;
+        } else {
+            return false;
+        }
+    });
+    if (!r) {
+        amrex::Abort("MLLinOp:AnyAdd: unsupported types");
+    }
 }
 
 void
 MLLinOp::AnyAverageDownSolutionRHS (int camrlev, Any& a_crse_sol, Any& a_crse_rhs,
                                     const Any& a_fine_sol, const Any& a_fine_rhs)
 {
-    AMREX_ASSERT(a_crse_sol.is<MultiFab>() &&
-                 a_crse_rhs.is<MultiFab>() &&
-                 a_fine_sol.is<MultiFab>() &&
-                 a_fine_rhs.is<MultiFab>());
-    auto& crse_sol = a_crse_sol.get<MultiFab>();
-    auto& crse_rhs = a_crse_rhs.get<MultiFab>();
-    auto& fine_sol = a_fine_sol.get<MultiFab>();
-    auto& fine_rhs = a_fine_rhs.get<MultiFab>();
-    averageDownSolutionRHS(camrlev, crse_sol, crse_rhs, fine_sol, fine_rhs);
+    bool r = ForEachUntil(TypeList<MultiFab,fMultiFab>{}, [&] (auto t) -> bool
+    {
+        using MF = decltype(t);
+        if (a_crse_sol.is<MF>() && a_crse_rhs.is<MF>() &&
+            a_fine_sol.is<MF>() && a_fine_rhs.is<MF>()) {
+            auto& crse_sol = a_crse_sol.get<MF>();
+            auto& crse_rhs = a_crse_rhs.get<MF>();
+            auto& fine_sol = a_fine_sol.get<MF>();
+            auto& fine_rhs = a_fine_rhs.get<MF>();
+            if constexpr (std::is_same<MF,MultiFab>::value) {
+                averageDownSolutionRHS(camrlev, crse_sol, crse_rhs, fine_sol, fine_rhs);
+            } else {
+                averageDownSolutionRHS_s(camrlev, crse_sol, crse_rhs, fine_sol, fine_rhs);
+            }
+            return true;
+        } else {
+            return false;
+        }
+    });
+    if (!r) {
+        amrex::Abort("MLLinOp:AnyAverageDownSolutionRHS: unsupported types");
+    }
 }
 
 void
@@ -1021,9 +1093,13 @@ void
 MLLinOp::AnySolutionResidual (int amrlev, Any& resid, Any& x, Any const& b,
                               Any const* crse_bcdata)
 {
-    AMREX_ASSERT(x.is<MultiFab>());
-    solutionResidual(amrlev, resid.get<MultiFab>(), x.get<MultiFab>(), b.get<MultiFab>(),
-                     (crse_bcdata) ? &(crse_bcdata->get<MultiFab>()) : nullptr);
+    if (isFullPrecision()) {
+        solutionResidual(amrlev, resid.get<MultiFab>(), x.get<MultiFab>(), b.get<MultiFab>(),
+                         (crse_bcdata) ? &(crse_bcdata->get<MultiFab>()) : nullptr);
+    } else {
+        solutionResidual_s(amrlev, resid.get<fMultiFab>(), x.get<fMultiFab>(), b.get<fMultiFab>(),
+                           (crse_bcdata) ? &(crse_bcdata->get<fMultiFab>()) : nullptr);
+    }
 }
 
 void

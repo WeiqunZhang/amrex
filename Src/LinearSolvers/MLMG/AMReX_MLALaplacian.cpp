@@ -301,7 +301,7 @@ MLALaplacian::Fsmooth (int amrlev, int mglev, MultiFab& sol, const MultiFab& rhs
     const int ncomp = getNComp();
 
     const MultiFab& acoef = m_a_coeffs[amrlev][mglev];
-    const auto& undrrelxr = m_undrrelxr[amrlev][mglev];
+    const auto& undrrelxr = m_undrrelxr[amrlev][mglev].get<BndryRegister>();
     const auto& maskvals  = m_maskvals [amrlev][mglev];
 
     OrientationIter oitr;

@@ -183,9 +183,10 @@ void amrex_avgdown_edges (int i, int, int, int n, Array4<Real> const& crse,
     crse(i,0,0,n+ccomp) = c * facInv;
 }
 
+template <typename TC, typename TF>
 AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
-void amrex_avgdown (Box const& bx, Array4<Real> const& crse,
-                    Array4<Real const> const& fine,
+void amrex_avgdown (Box const& bx, Array4<TC> const& crse,
+                    Array4<TF const> const& fine,
                     int ccomp, int fcomp, int ncomp,
                     IntVect const& ratio) noexcept
 {
@@ -193,33 +194,34 @@ void amrex_avgdown (Box const& bx, Array4<Real> const& crse,
     const auto chi = ubound(bx);
 
     const int facx = ratio[0];
-    const Real volfrac = 1.0/static_cast<Real>(facx);
+    const TF volfrac = TF(1.0)/static_cast<TF>(facx);
 
     for (int n = 0; n < ncomp; ++n) {
         for (int i = clo.x; i <= chi.x; ++i) {
             int ii = i*facx;
-            Real c = 0.;
+            TF c = TF(0.);
             for (int iref = 0; iref < facx; ++iref) {
                 c += fine(ii+iref,0,0,n+fcomp);
             }
-            crse(i,0,0,n+ccomp) = volfrac * c;
+            crse(i,0,0,n+ccomp) = static_cast<TC>(volfrac * c);
         }
     }
 }
 
+template <typename TC, typename TF>
 AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
-void amrex_avgdown (int i, int, int, int n, Array4<Real> const& crse,
-                    Array4<Real const> const& fine,
+void amrex_avgdown (int i, int, int, int n, Array4<TC> const& crse,
+                    Array4<TF const> const& fine,
                     int ccomp, int fcomp, IntVect const& ratio) noexcept
 {
     const int facx = ratio[0];
-    const Real volfrac = 1.0/static_cast<Real>(facx);
+    const TF volfrac = TF(1.0)/static_cast<TF>(facx);
     const int ii = i*facx;
-    Real c = Real(0.);
+    TF c = TF(0.);
     for (int iref = 0; iref < facx; ++iref) {
         c += fine(ii+iref,0,0,n+fcomp);
     }
-    crse(i,0,0,n+ccomp) = volfrac * c;
+    crse(i,0,0,n+ccomp) = static_cast<TC>(volfrac * c);
 }
 
 AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
@@ -238,10 +240,10 @@ void amrex_avgdown_with_vol (int i, int, int, int n, Array4<Real> const& crse,
     crse(i,0,0,ccomp+n) = cd/cv;
 }
 
-template <typename T>
+template <typename TC, typename TF>
 AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
-void amrex_avgdown_nodes (Box const& bx, Array4<T> const& crse,
-                          Array4<T const> const& fine,
+void amrex_avgdown_nodes (Box const& bx, Array4<TC> const& crse,
+                          Array4<TF const> const& fine,
                           int ccomp, int fcomp, int ncomp,
                           IntVect const& ratio) noexcept
 {
@@ -253,17 +255,18 @@ void amrex_avgdown_nodes (Box const& bx, Array4<T> const& crse,
     for (int n = 0; n < ncomp; ++n) {
         AMREX_PRAGMA_SIMD
         for (int i = clo.x; i <= chi.x; ++i) {
-            crse(i,0,0,n+ccomp) = fine(i*facx,0,0,n+fcomp);
+            crse(i,0,0,n+ccomp) = static_cast<TC>(fine(i*facx,0,0,n+fcomp));
         }
     }
 }
 
+template <typename TC, typename TF>
 AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
-void amrex_avgdown_nodes (int i, int, int, int n, Array4<Real> const& crse,
-                          Array4<Real const> const& fine,
+void amrex_avgdown_nodes (int i, int, int, int n, Array4<TC> const& crse,
+                          Array4<TF const> const& fine,
                           int ccomp, int fcomp, IntVect const& ratio) noexcept
 {
-    crse(i,0,0,n+ccomp) = fine(i*ratio[0],0,0,n+fcomp);
+    crse(i,0,0,n+ccomp) = static_cast<TC>(fine(i*ratio[0],0,0,n+fcomp));
 }
 
 AMREX_GPU_HOST_DEVICE

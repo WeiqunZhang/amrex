@@ -4,9 +4,9 @@
 namespace amrex {
 
 class BndryData;
-class BndryRegister;
+class BndryRegisterT;
 class BoundCond;
-class FabSet;
+class FabSetT;
 class InterpBndryData;
 class MacBndry;
 class Mask;

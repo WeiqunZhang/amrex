@@ -211,19 +211,22 @@ struct MultiArray4
 
 template <class FAB> class FabArray;
 
-template <class FAB,
-          class bar = std::enable_if_t<IsBaseFab<FAB>::value> >
+template <class FAB1, class FAB2,
+          class bar = std::enable_if_t<IsBaseFab<FAB1>::value &&
+                                       IsBaseFab<FAB2>::value> >
 void
-Copy (FabArray<FAB>& dst, FabArray<FAB> const& src, int srccomp, int dstcomp, int numcomp, int nghost)
+Copy (FabArray<FAB1>& dst, FabArray<FAB2> const& src, int srccomp, int dstcomp, int numcomp, int nghost)
 {
     Copy(dst,src,srccomp,dstcomp,numcomp,IntVect(nghost));
 }
 
-template <class FAB,
-          class bar = std::enable_if_t<IsBaseFab<FAB>::value> >
+template <class FAB1, class FAB2,
+          class bar = std::enable_if_t<IsBaseFab<FAB1>::value &&
+                                       IsBaseFab<FAB2>::value> >
 void
-Copy (FabArray<FAB>& dst, FabArray<FAB> const& src, int srccomp, int dstcomp, int numcomp, const IntVect& nghost)
+Copy (FabArray<FAB1>& dst, FabArray<FAB2> const& src, int srccomp, int dstcomp, int numcomp, const IntVect& nghost)
 {
+    using T = typename FAB1::value_type;
 #ifdef AMREX_USE_GPU
     if (Gpu::inLaunchRegion() && dst.isFusingCandidate()) {
         auto const& srcarr = src.const_arrays();
@@ -231,7 +234,7 @@ Copy (FabArray<FAB>& dst, FabArray<FAB> const& src, int srccomp, int dstcomp, in
         ParallelFor(dst, nghost, numcomp,
         [=] AMREX_GPU_DEVICE (int box_no, int i, int j, int k, int n) noexcept
         {
-            dstarr[box_no](i,j,k,dstcomp+n) = srcarr[box_no](i,j,k,srccomp+n);
+            dstarr[box_no](i,j,k,dstcomp+n) = static_cast<T>(srcarr[box_no](i,j,k,srccomp+n));
         });
         Gpu::streamSynchronize();
     } else
@@ -249,26 +252,29 @@ Copy (FabArray<FAB>& dst, FabArray<FAB> const& src, int srccomp, int dstcomp, in
                 auto       dstFab = dst.array(mfi);
                 AMREX_HOST_DEVICE_PARALLEL_FOR_4D( bx, numcomp, i, j, k, n,
                 {
-                    dstFab(i,j,k,dstcomp+n) = srcFab(i,j,k,srccomp+n);
+                    dstFab(i,j,k,dstcomp+n) = static_cast<T>(srcFab(i,j,k,srccomp+n));
                 });
             }
         }
     }
 }
 
-template <class FAB,
-          class bar = std::enable_if_t<IsBaseFab<FAB>::value> >
+template <class FAB1, class FAB2,
+          class bar = std::enable_if_t<IsBaseFab<FAB1>::value &&
+                                       IsBaseFab<FAB2>::value> >
 void
-Add (FabArray<FAB>& dst, FabArray<FAB> const& src, int srccomp, int dstcomp, int numcomp, int nghost)
+Add (FabArray<FAB1>& dst, FabArray<FAB2> const& src, int srccomp, int dstcomp, int numcomp, int nghost)
 {
     Add(dst,src,srccomp,dstcomp,numcomp,IntVect(nghost));
 }
 
-template <class FAB,
-          class bar = std::enable_if_t<IsBaseFab<FAB>::value> >
+template <class FAB1, class FAB2,
+          class bar = std::enable_if_t<IsBaseFab<FAB1>::value &&
+                                       IsBaseFab<FAB2>::value> >
 void
-Add (FabArray<FAB>& dst, FabArray<FAB> const& src, int srccomp, int dstcomp, int numcomp, const IntVect& nghost)
+Add (FabArray<FAB1>& dst, FabArray<FAB2> const& src, int srccomp, int dstcomp, int numcomp, const IntVect& nghost)
 {
+    using T = typename FAB1::value_type;
 #ifdef AMREX_USE_GPU
     if (Gpu::inLaunchRegion() && dst.isFusingCandidate()) {
         auto const& dstfa = dst.arrays();
@@ -276,7 +282,7 @@ Add (FabArray<FAB>& dst, FabArray<FAB> const& src, int srccomp, int dstcomp, int
         ParallelFor(dst, nghost, numcomp,
         [=] AMREX_GPU_DEVICE (int box_no, int i, int j, int k, int n) noexcept
         {
-            dstfa[box_no](i,j,k,n+dstcomp) += srcfa[box_no](i,j,k,n+srccomp);
+            dstfa[box_no](i,j,k,n+dstcomp) += static_cast<T>(srcfa[box_no](i,j,k,n+srccomp));
         });
         Gpu::streamSynchronize();
     } else
@@ -294,7 +300,65 @@ Add (FabArray<FAB>& dst, FabArray<FAB> const& src, int srccomp, int dstcomp, int
                 auto       dstFab = dst.array(mfi);
                 AMREX_HOST_DEVICE_PARALLEL_FOR_4D( bx, numcomp, i, j, k, n,
                 {
-                    dstFab(i,j,k,n+dstcomp) += srcFab(i,j,k,n+srccomp);
+                    dstFab(i,j,k,n+dstcomp) += static_cast<T>(srcFab(i,j,k,n+srccomp));
+                });
+            }
+        }
+    }
+}
+
+/**
+ * \brief dst = src + a*dst
+ */
+template <class FAB, class T = typename FAB::value_type,
+          class bar = std::enable_if_t<IsBaseFab<FAB>::value && std::is_arithmetic<T>::value> >
+void
+Xpay (FabArray<FAB>& dst, T a, FabArray<FAB> const& src, int srccomp, int dstcomp, int numcomp,
+      int nghost)
+{
+    Xpay(dst,a,src,srccomp,dstcomp,numcomp,IntVect(nghost));
+}
+
+/**
+ * \brief dst = src + a*dst
+ */
+template <class FAB, class T = typename FAB::value_type,
+          class bar = std::enable_if_t<IsBaseFab<FAB>::value && std::is_arithmetic<T>::value> >
+void
+Xpay (FabArray<FAB>& dst, T a, FabArray<FAB> const& src, int srccomp, int dstcomp, int numcomp,
+      const IntVect& nghost)
+{
+    BL_ASSERT(dst.boxArray() == src.boxArray());
+    BL_ASSERT(dst.DistributionMap() == src.DistributionMap());
+    BL_ASSERT(dst.nGrowVect().allGE(nghost) && src.nGrowVect().allGE(nghost));
+
+#ifdef AMREX_USE_GPU
+    if (Gpu::inLaunchRegion() && dst.isFusingCandidate()) {
+        auto const& dstfa = dst.arrays();
+        auto const& srcfa = src.const_arrays();
+        ParallelFor(dst, nghost, numcomp,
+        [=] AMREX_GPU_DEVICE (int box_no, int i, int j, int k, int n) noexcept
+        {
+            dstfa[box_no](i,j,k,n+dstcomp) = srcfa[box_no](i,j,k,n+srccomp)
+                +                        a * dstfa[box_no](i,j,k,n+dstcomp);
+        });
+        Gpu::streamSynchronize();
+    } else
+#endif
+    {
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (Gpu::notInLaunchRegion())
+#endif
+        for (MFIter mfi(dst,TilingIfNotGPU()); mfi.isValid(); ++mfi)
+        {
+            const Box& bx = mfi.growntilebox(nghost);
+            if (bx.ok())
+            {
+                auto const srcFab = src.array(mfi);
+                auto       dstFab = dst.array(mfi);
+                AMREX_HOST_DEVICE_PARALLEL_FOR_4D( bx, numcomp, i, j, k, n,
+                {
+                    dstFab(i,j,k,n+dstcomp) = srcFab(i,j,k,n+srccomp) + a * dstFab(i,j,k,n+dstcomp);
                 });
             }
         }

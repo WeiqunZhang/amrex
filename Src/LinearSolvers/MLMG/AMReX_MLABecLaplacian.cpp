@@ -661,7 +661,7 @@ MLABecLaplacian::Fsmooth (int amrlev, int mglev, MultiFab& sol, const MultiFab& 
     AMREX_D_TERM(const MultiFab& bxcoef = m_b_coeffs[amrlev][mglev][0];,
                  const MultiFab& bycoef = m_b_coeffs[amrlev][mglev][1];,
                  const MultiFab& bzcoef = m_b_coeffs[amrlev][mglev][2];);
-    const auto& undrrelxr = m_undrrelxr[amrlev][mglev];
+    const auto& undrrelxr = m_undrrelxr[amrlev][mglev].get<BndryRegister>();
     const auto& maskvals  = m_maskvals [amrlev][mglev];
 
     OrientationIter oitr;

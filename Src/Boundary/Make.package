@@ -1,5 +1,5 @@
 
-CEXE_sources += AMReX_FabSet.cpp AMReX_BndryRegister.cpp AMReX_Mask.cpp AMReX_MultiMask.cpp\
+CEXE_sources += AMReX_Mask.cpp AMReX_MultiMask.cpp\
                              AMReX_BndryData.cpp AMReX_InterpBndryData.cpp AMReX_MacBndry.cpp \
                              AMReX_LO_BCTYPES.cpp
 

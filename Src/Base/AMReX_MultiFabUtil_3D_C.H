@@ -333,9 +333,10 @@ void amrex_avgdown_edges (int i, int j, int k, int n, Array4<Real> const& crse,
     }
 }
 
+template <typename TC, typename TF>
 AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
-void amrex_avgdown (Box const& bx, Array4<Real> const& crse,
-                    Array4<Real const> const& fine,
+void amrex_avgdown (Box const& bx, Array4<TC> const& crse,
+                    Array4<TF const> const& fine,
                     int ccomp, int fcomp, int ncomp,
                     IntVect const& ratio) noexcept
 {
@@ -344,7 +345,7 @@ void amrex_avgdown (Box const& bx, Array4<Real> const& crse,
     const int facx = ratio[0];
     const int facy = ratio[1];
     const int facz = ratio[2];
-    const Real volfrac = Real(1.0)/(facx*facy*facz);
+    const TF volfrac = TF(1.0)/(facx*facy*facz);
 
     for (int n = 0; n < ncomp; ++n) {
         for (int k = clo.z; k <= chi.z; ++k) {
@@ -353,36 +354,37 @@ void amrex_avgdown (Box const& bx, Array4<Real> const& crse,
             int ii = i*facx;
             int jj = j*facy;
             int kk = k*facz;
-            Real c = 0.;
+            TF c = TF(0.);
             for (int kref = 0; kref < facz; ++kref) {
             for (int jref = 0; jref < facy; ++jref) {
             for (int iref = 0; iref < facx; ++iref) {
                 c += fine(ii+iref,jj+jref,kk+kref,n+fcomp);
             }}}
-            crse(i,j,k,n+ccomp) = volfrac * c;
+            crse(i,j,k,n+ccomp) = static_cast<TC>(volfrac * c);
         }}}
     }
 }
 
+template <typename TC, typename TF>
 AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
-void amrex_avgdown (int i, int j, int k, int n, Array4<Real> const& crse,
-                    Array4<Real const> const& fine,
+void amrex_avgdown (int i, int j, int k, int n, Array4<TC> const& crse,
+                    Array4<TF const> const& fine,
                     int ccomp, int fcomp, IntVect const& ratio) noexcept
 {
     const int facx = ratio[0];
     const int facy = ratio[1];
     const int facz = ratio[2];
-    const Real volfrac = Real(1.0)/(facx*facy*facz);
+    const TF volfrac = TF(1.0)/(facx*facy*facz);
     const int ii = i*facx;
     const int jj = j*facy;
     const int kk = k*facz;
-    Real c = Real(0.);
+    TF c = TF(0.);
     for (int kref = 0; kref < facz; ++kref) {
     for (int jref = 0; jref < facy; ++jref) {
     for (int iref = 0; iref < facx; ++iref) {
         c += fine(ii+iref,jj+jref,kk+kref,n+fcomp);
     }}}
-    crse(i,j,k,n+ccomp) = volfrac * c;
+    crse(i,j,k,n+ccomp) = static_cast<TC>(volfrac * c);
 }
 
 AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
@@ -407,10 +409,10 @@ void amrex_avgdown_with_vol (int i, int j, int k, int n, Array4<Real> const& crs
     crse(i,j,k,n+ccomp) = cd/cv;
 }
 
-template <typename T>
+template <typename TC, typename TF>
 AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
-void amrex_avgdown_nodes (Box const& bx, Array4<T> const& crse,
-                          Array4<T const> const& fine,
+void amrex_avgdown_nodes (Box const& bx, Array4<TC> const& crse,
+                          Array4<TF const> const& fine,
                           int ccomp, int fcomp, int ncomp,
                           IntVect const& ratio) noexcept
 {
@@ -427,19 +429,20 @@ void amrex_avgdown_nodes (Box const& bx, Array4<T> const& crse,
                 int jj = j*facy;
                 AMREX_PRAGMA_SIMD
                 for (int i = clo.x; i <= chi.x; ++i) {
-                    crse(i,j,k,n+ccomp) = fine(i*facx,jj,kk,n+fcomp);
+                    crse(i,j,k,n+ccomp) = static_cast<TC>(fine(i*facx,jj,kk,n+fcomp));
                 }
             }
         }
     }
 }
 
+template <typename TC, typename TF>
 AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
-void amrex_avgdown_nodes (int i, int j, int k, int n, Array4<Real> const& crse,
-                          Array4<Real const> const& fine,
+void amrex_avgdown_nodes (int i, int j, int k, int n, Array4<TC> const& crse,
+                          Array4<TF const> const& fine,
                           int ccomp, int fcomp, IntVect const& ratio) noexcept
 {
-    crse(i,j,k,n+ccomp) = fine(i*ratio[0],j*ratio[1],k*ratio[2],n+fcomp);
+    crse(i,j,k,n+ccomp) = static_cast<TC>(fine(i*ratio[0],j*ratio[1],k*ratio[2],n+fcomp));
 }
 
 AMREX_GPU_HOST_DEVICE

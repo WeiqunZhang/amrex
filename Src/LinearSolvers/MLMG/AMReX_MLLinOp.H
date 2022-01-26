@@ -44,6 +44,7 @@ struct LPInfo
     int max_semicoarsening_level = 0;
     int semicoarsening_direction = -1;
     int hidden_direction = -1;
+    bool single_precision = false;
 
     LPInfo& setAgglomeration (bool x) noexcept { do_agglomeration = x; return *this; }
     LPInfo& setConsolidation (bool x) noexcept { do_consolidation = x; return *this; }
@@ -55,6 +56,7 @@ struct LPInfo
     LPInfo& setMaxSemicoarseningLevel (int n) noexcept { max_semicoarsening_level = n; return *this; }
     LPInfo& setSemicoarseningDirection (int n) noexcept { semicoarsening_direction = n; return *this; }
     LPInfo& setHiddenDirection (int n) noexcept { hidden_direction = n; return *this; }
+    LPInfo& setSinglePrecision (bool x) noexcept { single_precision = x; return *this; }
 
     bool hasHiddenDimension () const noexcept {
         return hidden_direction >=0 && hidden_direction < AMREX_SPACEDIM;
@@ -199,23 +201,44 @@ public:
     virtual void update () {}
 
     virtual void restriction (int /*amrlev*/, int /*cmglev*/, MultiFab& /*crse*/, MultiFab& /*fine*/) const {}
+    virtual void restriction_d2s (int /*amrlev*/, int /*cmglev*/, fMultiFab& /*crse*/, MultiFab& /*fine*/) const {}
+    virtual void restriction_s2d (int /*amrlev*/, int /*cmglev*/, MultiFab& /*crse*/, fMultiFab& /*fine*/) const {}
+    virtual void restriction_s2s (int /*amrlev*/, int /*cmglev*/, fMultiFab& /*crse*/, fMultiFab& /*fine*/) const {}
+
     virtual void interpolation (int /*amrlev*/, int /*fmglev*/, MultiFab& /*fine*/, const MultiFab& /*crse*/) const {}
+    virtual void interpolation_d2s (int /*amrlev*/, int /*fmglev*/, fMultiFab& /*fine*/, const MultiFab& /*crse*/) const {}
+    virtual void interpolation_s2d (int /*amrlev*/, int /*fmglev*/, MultiFab& /*fine*/, const fMultiFab& /*crse*/) const {}
+    virtual void interpolation_s2s (int /*amrlev*/, int /*fmglev*/, fMultiFab& /*fine*/, const fMultiFab& /*crse*/) const {}
+
     virtual void interpAssign (int /*amrlev*/, int /*fmglev*/, MultiFab& /*fine*/, MultiFab& /*crse*/) const {}
+
     virtual void averageDownSolutionRHS (int /*camrlev*/, MultiFab& /*crse_sol*/, MultiFab& /*crse_rhs*/,
                                          const MultiFab& /*fine_sol*/, const MultiFab& /*fine_rhs*/) {}
+    virtual void averageDownSolutionRHS_s (int /*camrlev*/, fMultiFab& /*crse_sol*/, fMultiFab& /*crse_rhs*/,
+                                           const fMultiFab& /*fine_sol*/, const fMultiFab& /*fine_rhs*/) {}
 
     virtual void apply (int /*amrlev*/, int /*mglev*/, MultiFab& /*out*/, MultiFab& /*in*/, BCMode /*bc_mode*/,
                         StateMode /*s_mode*/, const MLMGBndry* /*bndry*/=nullptr) const {}
+    virtual void apply_s (int /*amrlev*/, int /*mglev*/, fMultiFab& /*out*/, fMultiFab& /*in*/, BCMode /*bc_mode*/,
+                          StateMode /*s_mode*/, const MLMGBndry* /*bndry*/=nullptr) const {}
+
     virtual void smooth (int /*amrlev*/, int /*mglev*/, MultiFab& /*sol*/, const MultiFab& /*rhs*/,
                          bool /*skip_fillboundary*/=false) const {}
+    virtual void smooth_s (int /*amrlev*/, int /*mglev*/, fMultiFab& /*sol*/, const fMultiFab& /*rhs*/,
+                           bool /*skip_fillboundary*/=false) const {}
 
     // Divide mf by the diagonal component of the operator. Used by bicgstab.
     virtual void normalize (int /*amrlev*/, int /*mglev*/, MultiFab& /*mf*/) const {}
 
     virtual void solutionResidual (int /*amrlev*/, MultiFab& /*resid*/, MultiFab& /*x*/, const MultiFab& /*b*/,
                                    const MultiFab* /*crse_bcdata*/=nullptr) {}
+    virtual void solutionResidual_s (int /*amrlev*/, fMultiFab& /*resid*/, fMultiFab& /*x*/, const fMultiFab& /*b*/,
+                                     const fMultiFab* /*crse_bcdata*/=nullptr) {}
     virtual void correctionResidual (int /*amrlev*/, int /*mglev*/, MultiFab& /*resid*/, MultiFab& /*x*/, const MultiFab& /*b*/,
                                      BCMode /*bc_mode*/, const MultiFab* /*crse_bcdata*/=nullptr) {}
+    virtual void correctionResidual_s (int /*amrlev*/, int /*mglev*/, fMultiFab& /*resid*/,
+                                       fMultiFab& /*x*/, const fMultiFab& /*b*/) const
+        {}
 
     virtual void reflux (int /*crse_amrlev*/,
                          MultiFab& /*res*/, const MultiFab& /*crse_sol*/, const MultiFab& /*crse_rhs*/,
@@ -498,6 +521,20 @@ protected:
         } else {
             return dy;
         }
+    }
+
+    bool isFullPrecision () const noexcept
+    {
+        if constexpr (std::is_same<Real,float>::value) {
+            return true;
+        } else {
+            return !info.single_precision;
+        }
+    }
+
+    bool isSamePrecision (Any const& a) const noexcept
+    {
+        return a.is<MultiFab>() == isFullPrecision();
     }
 
 private:

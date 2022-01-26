@@ -163,7 +163,7 @@ MLEBABecLap::Fsmooth (int amrlev, int mglev, MultiFab& sol, const MultiFab& rhs,
                  const MultiFab& bycoef = m_b_coeffs[amrlev][mglev][1];,
                  const MultiFab& bzcoef = m_b_coeffs[amrlev][mglev][2];);
     const iMultiFab& ccmask = m_cc_mask[amrlev][mglev];
-    const auto& undrrelxr = m_undrrelxr[amrlev][mglev];
+    const auto& undrrelxr = m_undrrelxr[amrlev][mglev].get<BndryRegister>();
     const auto& maskvals  = m_maskvals [amrlev][mglev];
 
     OrientationIter oitr;

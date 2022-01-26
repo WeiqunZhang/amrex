@@ -153,7 +153,6 @@ public:
     Real ResNormInf (int amrlev, bool local = false);
     Real MLResNormInf (int alevmax, bool local = false);
     Real MLRhsNormInf (bool local = false);
-    void buildFineMask ();
 
     void makeSolvable ();
     void makeSolvable (int amrlev, int mglev, Any& mf);
@@ -258,6 +257,24 @@ private:
     Vector<Vector<Any> > cor_hold;
     Vector<Vector<Any> > rescor;  //!< = res - L(cor)
                                   //!  Residual of the correction form
+#if 0
+    // xxxxx
+    Vector<Vector<MultiFab> >                   res;     //! = rhs - L(sol)
+    Vector<Vector<std::unique_ptr<MultiFab> > > cor;     //!< L(cor) = res
+    Vector<Vector<std::unique_ptr<MultiFab> > > cor_hold;
+    Vector<Vector<MultiFab> >                   rescor;  //!< = res - L(cor)
+                                                         //!  Residual of the correction form
+    Vector<Vector<fMultiFab> >                   res_s;
+    Vector<Vector<std::unique_ptr<fMultiFab> > > cor_s;
+    Vector<Vector<std::unique_ptr<fMultiFab> > > cor_hold_s;
+    Vector<Vector<fMultiFab> >                   rescor_s;
+
+    Vector<std::unique_ptr<iMultiFab> > fine_mask;
+
+    Vector<Vector<Real> > volinv;      //!< used by makeSolvable
+
+    Vector<std::unique_ptr<MultiFab> > scratch;
+#endif
 
     enum timer_types { solve_time=0, iter_time, bottom_time, ntimers };
     Vector<double> timer;
@@ -270,7 +287,41 @@ private:
 
     void checkPoint (const Vector<MultiFab*>& a_sol, const Vector<MultiFab const*>& a_rhs,
                      Real a_tol_rel, Real a_tol_abs, const char* a_file_name) const;
+
+#if 0
+    // xxxxx
+    template <typename FMF, typename CMF, typename P>
+    void addInterpCorrection (int alev, int mglev, FMF& fine_cor, CMF const& crse_cor, P&& interp);
+#endif
 };
+
+#if 0
+// xxxxx
+template <typename FMF, typename CMF, typename P>
+void MLMG::addInterpCorrection (int alev, int mglev, FMF& fine_cor, CMF const& crse_cor, P&& interp)
+{
+    const int ncomp = linop.getNComp();
+
+    CMF cfine;
+    const CMF* cmf;
+
+    if (amrex::isMFIterSafe(crse_cor, fine_cor))
+    {
+        cmf = &crse_cor;
+    }
+    else
+    {
+        IntVect ratio = (alev > 0) ? IntVect(2) : linop.mg_coarsen_ratio_vec[mglev];
+        BoxArray const& cba = amrex::coarsen(fine_cor.boxArray(), ratio);
+        const int ng = 0;
+        cfine.define(cba, fine_cor.DistributionMap(), ncomp, ng);
+        cfine.ParallelCopy(crse_cor);
+        cmf = &cfine;
+    }
+
+    interp(alev, mglev, fine_cor, *cmf);
+}
+#endif
 
 }
 

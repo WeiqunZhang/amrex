@@ -2,8 +2,6 @@ target_include_directories(amrex PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_D
 
 target_sources(amrex
    PRIVATE
-   AMReX_FabSet.cpp
-   AMReX_BndryRegister.cpp
    AMReX_Mask.cpp
    AMReX_MultiMask.cpp
    AMReX_BndryData.cpp
