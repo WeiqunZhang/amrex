@@ -192,6 +192,12 @@ private:
     F             m_f;
 };
 
+struct Functor
+{
+    AMREX_GPU_DEVICE
+    void operator() (const amrex::Real /*time*/) const {}
+};
+
 template <class F>
 void
 GpuBndryFuncFab<F>::operator() (Box const& bx, FArrayBox& dest,
@@ -200,6 +206,30 @@ GpuBndryFuncFab<F>::operator() (Box const& bx, FArrayBox& dest,
                                 const Vector<BCRec>& bcr, const int bcomp,
                                 const int orig_comp)
 {
+    {
+        Gpu::synchronize();
+        amrex::Print() << "\nxxxxx " << __PRETTY_FUNCTION__ << ": " << __LINE__ << "\n" << std::endl;
+
+        const Real t = time;
+        Functor f{};
+
+        ParallelFor(2560, [=] AMREX_GPU_DEVICE (int i) noexcept
+        {
+            f(t);
+        });
+
+        Gpu::synchronize();
+        amrex::Print() << "\nxxxxx " << __PRETTY_FUNCTION__ << ": " << __LINE__ << "\n" << std::endl;
+
+        ParallelFor(2560, [=] AMREX_GPU_DEVICE (int i) noexcept
+        {
+            f(time);
+        });
+
+        Gpu::synchronize();
+        amrex::Print() << "\nxxxxx " << __PRETTY_FUNCTION__ << ": " << __LINE__ << "\n" << std::endl;
+    }
+
     if (bx.ixType().cellCentered()) {
         ccfcdoit(bx,dest,dcomp,numcomp,geom,time,bcr,bcomp,orig_comp, FilccCell{});
     } else if (bx.ixType().nodeCentered()) {
@@ -341,6 +371,30 @@ GpuBndryFuncFab<F>::ccfcdoit (Box const& bx, FArrayBox& dest,
                               const Vector<BCRec>& bcr, const int bcomp,
                               const int orig_comp, FF&& fillfunc)
 {
+    {
+        Gpu::synchronize();
+        amrex::Print() << "\nxxxxx " << __PRETTY_FUNCTION__ << ": " << __LINE__ << "\n" << std::endl;
+
+        const Real t = time;
+        Functor f{};
+
+        ParallelFor(2560, [=] AMREX_GPU_DEVICE (int i) noexcept
+        {
+            f(t);
+        });
+
+        Gpu::synchronize();
+        amrex::Print() << "\nxxxxx " << __PRETTY_FUNCTION__ << ": " << __LINE__ << "\n" << std::endl;
+
+        ParallelFor(2560, [=] AMREX_GPU_DEVICE (int i) noexcept
+        {
+            f(time);
+        });
+
+        Gpu::synchronize();
+        amrex::Print() << "\nxxxxx " << __PRETTY_FUNCTION__ << ": " << __LINE__ << "\n" << std::endl;
+    }
+
     const IntVect& len = bx.length();
 
     IndexType idxType = bx.ixType();
