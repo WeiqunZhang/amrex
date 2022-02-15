@@ -9,67 +9,6 @@
 
 namespace amrex {
 
-namespace {
-    // Have to put it here due to CUDA extended lambda limitation
-    struct ABCTag {
-        Array4<Real> fab;
-        Array4<Real const> bcval_lo;
-        Array4<Real const> bcval_hi;
-        Array4<int const> mask_lo;
-        Array4<int const> mask_hi;
-        Real bcloc_lo;
-        Real bcloc_hi;
-        Box bx;
-        BoundCond bctype_lo;
-        BoundCond bctype_hi;
-        int blen;
-        int comp;
-        int dir;
-
-        AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
-        Box const& box() const noexcept { return bx; }
-    };
-
-    struct PSTag {
-        Array4<Real> flo;
-        Array4<Real> fhi;
-        Array4<int const> mlo;
-        Array4<int const> mhi;
-        Real bcllo;
-        Real bclhi;
-        Box bx;
-        BoundCond bctlo;
-        BoundCond bcthi;
-        int blen;
-        int comp;
-        int dir;
-
-        AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
-        Box const& box() const noexcept { return bx; }
-    };
-
-#ifdef AMREX_USE_EB
-    struct PSEBTag {
-        Array4<Real> flo;
-        Array4<Real> fhi;
-        Array4<Real const> ap;
-        Array4<int const> mlo;
-        Array4<int const> mhi;
-        Real bcllo;
-        Real bclhi;
-        Box bx;
-        BoundCond bctlo;
-        BoundCond bcthi;
-        int blen;
-        int comp;
-        int dir;
-
-        AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
-        Box const& box() const noexcept { return bx; }
-    };
-#endif
-}
-
 MLCellLinOp::MLCellLinOp ()
 {
     m_ixtype = IntVect::TheCellVector();

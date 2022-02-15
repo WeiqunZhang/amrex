@@ -6,6 +6,69 @@
 
 namespace amrex {
 
+namespace detail {
+    template <typename T>
+    struct ABCTag {
+        Array4<T> fab;
+        Array4<Real const> bcval_lo;
+        Array4<Real const> bcval_hi;
+        Array4<int const> mask_lo;
+        Array4<int const> mask_hi;
+        T bcloc_lo;
+        T bcloc_hi;
+        Box bx;
+        BoundCond bctype_lo;
+        BoundCond bctype_hi;
+        int blen;
+        int comp;
+        int dir;
+
+        AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+        Box const& box() const noexcept { return bx; }
+    };
+
+    template <typename T>
+    struct PSTag {
+        Array4<T> flo;
+        Array4<T> fhi;
+        Array4<int const> mlo;
+        Array4<int const> mhi;
+        Real bcllo;
+        Real bclhi;
+        Box bx;
+        BoundCond bctlo;
+        BoundCond bcthi;
+        int blen;
+        int comp;
+        int dir;
+
+        AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+        Box const& box() const noexcept { return bx; }
+    };
+
+#ifdef AMREX_USE_EB
+    template <typename T>
+    struct PSEBTag {
+        Array4<T> flo;
+        Array4<T> fhi;
+        Array4<Real const> ap;
+        Array4<int const> mlo;
+        Array4<int const> mhi;
+        T bcllo;
+        T bclhi;
+        Box bx;
+        BoundCond bctlo;
+        BoundCond bcthi;
+        int blen;
+        int comp;
+        int dir;
+
+        AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+        Box const& box() const noexcept { return bx; }
+    };
+#endif
+}
+
 class MLCellLinOp
     : public MLLinOp
 {
@@ -266,6 +329,8 @@ MLCellLinOp::prepareForSolveT (int amrlev, int mglev, BndryRegisterT<MF>& undrre
 
     MultiFab foo(m_grids[amrlev][mglev], m_dmap[amrlev][mglev], ncomp, 0, MFInfo().SetAlloc(false));
 
+    using T = typename MF::value_type;
+
 #ifdef AMREX_USE_EB
     auto factory = dynamic_cast<EBFArrayBoxFactory const*>(m_factory[amrlev][mglev].get());
     const FabArray<EBCellFlagFab>* flags =
@@ -278,7 +343,7 @@ MLCellLinOp::prepareForSolveT (int amrlev, int mglev, BndryRegisterT<MF>& undrre
     if (Gpu::inLaunchRegion()) {
 #ifdef AMREX_USE_EB
         if (factory) {
-            Vector<PSEBTag> tags;
+            Vector<detail::PSEBTag<T> > tags;
             tags.reserve(foo.local_size()*AMREX_SPACEDIM*ncomp);
 
             for (MFIter mfi(foo); mfi.isValid(); ++mfi)
@@ -298,12 +363,14 @@ MLCellLinOp::prepareForSolveT (int amrlev, int mglev, BndryRegisterT<MF>& undrre
                         auto const& ap = (fabtyp == FabType::singlevalued)
                             ? area[idim]->const_array(mfi) : Array4<Real const>{};
                         for (int icomp = 0; icomp < ncomp; ++icomp) {
-                            tags.emplace_back(PSEBTag{undrrelxr[olo].array(mfi),
+                            tags.emplace_back(detail::PSEBTag<T>{
+                                                      undrrelxr[olo].array(mfi),
                                                       undrrelxr[ohi].array(mfi),
                                                       ap,
                                                       maskvals[olo].const_array(mfi),
                                                       maskvals[ohi].const_array(mfi),
-                                                      bdlv[icomp][olo], bdlv[icomp][ohi],
+                                                      static_cast<T>(bdlv[icomp][olo]),
+                                                      static_cast<T>(bdlv[icomp][ohi]),
                                                       amrex::adjCell(vbx,olo),
                                                       bdcv[icomp][olo], bdcv[icomp][ohi],
                                                       vbx.length(idim), icomp, idim});
@@ -313,7 +380,7 @@ MLCellLinOp::prepareForSolveT (int amrlev, int mglev, BndryRegisterT<MF>& undrre
             }
 
             ParallelFor(tags,
-            [=] AMREX_GPU_DEVICE (int i, int j, int k, PSEBTag const& tag) noexcept
+            [=] AMREX_GPU_DEVICE (int i, int j, int k, detail::PSEBTag<T> const& tag) noexcept
             {
                 if (tag.ap) {
                     if (tag.dir == 0)
@@ -388,7 +455,7 @@ MLCellLinOp::prepareForSolveT (int amrlev, int mglev, BndryRegisterT<MF>& undrre
         } else
 #endif
         {
-            Vector<PSTag> tags;
+            Vector<detail::PSTag<T> > tags;
             tags.reserve(foo.local_size()*AMREX_SPACEDIM*ncomp);
 
             for (MFIter mfi(foo); mfi.isValid(); ++mfi)
@@ -404,11 +471,13 @@ MLCellLinOp::prepareForSolveT (int amrlev, int mglev, BndryRegisterT<MF>& undrre
                         const Orientation olo(idim,Orientation::low);
                         const Orientation ohi(idim,Orientation::high);
                         for (int icomp = 0; icomp < ncomp; ++icomp) {
-                            tags.emplace_back(PSTag{undrrelxr[olo].array(mfi),
+                            tags.emplace_back(detail::PSTag<T>{
+                                                    undrrelxr[olo].array(mfi),
                                                     undrrelxr[ohi].array(mfi),
                                                     maskvals[olo].const_array(mfi),
                                                     maskvals[ohi].const_array(mfi),
-                                                    bdlv[icomp][olo], bdlv[icomp][ohi],
+                                                    static_cast<T>(bdlv[icomp][olo]),
+                                                    static_cast<T>(bdlv[icomp][ohi]),
                                                     amrex::adjCell(vbx,olo),
                                                     bdcv[icomp][olo], bdcv[icomp][ohi],
                                                     vbx.length(idim), icomp, idim});
@@ -418,7 +487,7 @@ MLCellLinOp::prepareForSolveT (int amrlev, int mglev, BndryRegisterT<MF>& undrre
             }
 
             ParallelFor(tags,
-            [=] AMREX_GPU_DEVICE (int i, int j, int k, PSTag const& tag) noexcept
+            [=] AMREX_GPU_DEVICE (int i, int j, int k, detail::PSTag<T> const& tag) noexcept
             {
                 if (tag.dir == 0)
                 {
@@ -585,7 +654,7 @@ MLCellLinOp::applyBCT (int amrlev, int mglev, MF& in, BCMode bc_mode, const MLMG
 #ifdef AMREX_USE_GPU
     if (Gpu::inLaunchRegion())
     {
-        Vector<ABCTag> tags;
+        Vector<detail::ABCTag<T> > tags;
         tags.reserve(in.local_size()*AMREX_SPACEDIM*ncomp);
 
         for (MFIter mfi(in); mfi.isValid(); ++mfi) {
@@ -603,7 +672,7 @@ MLCellLinOp::applyBCT (int amrlev, int mglev, MF& in, BCMode bc_mode, const MLMG
                     const auto& bvhi = (bndry != nullptr) ?
                         bndry->bndryValues(ohi).const_array(mfi) : foo;
                     for (int icomp = 0; icomp < ncomp; ++icomp) {
-                        tags.emplace_back(ABCTag{iofab, bvlo, bvhi,
+                        tags.emplace_back(detail::ABCTag<T>{iofab, bvlo, bvhi,
                                                  maskvals[olo].const_array(mfi),
                                                  maskvals[ohi].const_array(mfi),
                                                  static_cast<T>(bdlv[icomp][olo]),
@@ -617,7 +686,7 @@ MLCellLinOp::applyBCT (int amrlev, int mglev, MF& in, BCMode bc_mode, const MLMG
         }
 
         ParallelFor(tags,
-        [=] AMREX_GPU_DEVICE (int i, int j, int k, ABCTag const& tag) noexcept
+        [=] AMREX_GPU_DEVICE (int i, int j, int k, detail::ABCTag<T> const& tag) noexcept
         {
             if (tag.dir == 0)
             {
