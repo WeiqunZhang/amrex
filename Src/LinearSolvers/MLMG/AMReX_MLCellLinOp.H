@@ -329,8 +329,6 @@ MLCellLinOp::prepareForSolveT (int amrlev, int mglev, BndryRegisterT<MF>& undrre
 
     MultiFab foo(m_grids[amrlev][mglev], m_dmap[amrlev][mglev], ncomp, 0, MFInfo().SetAlloc(false));
 
-    using T = typename MF::value_type;
-
 #ifdef AMREX_USE_EB
     auto factory = dynamic_cast<EBFArrayBoxFactory const*>(m_factory[amrlev][mglev].get());
     const FabArray<EBCellFlagFab>* flags =
@@ -340,6 +338,8 @@ MLCellLinOp::prepareForSolveT (int amrlev, int mglev, BndryRegisterT<MF>& undrre
 #endif
 
 #ifdef AMREX_USE_GPU
+    using T = typename MF::value_type;
+
     if (Gpu::inLaunchRegion()) {
 #ifdef AMREX_USE_EB
         if (factory) {
