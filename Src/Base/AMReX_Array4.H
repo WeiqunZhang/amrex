@@ -10,7 +10,7 @@
 #include <sstream>
 
 //#if !defined(AMREX_USE_GPU)
-#define AMREX_ARRAY4_HAS_STRIDE 1
+//#define AMREX_ARRAY4_HAS_STRIDE 1
 //#endif
 
 namespace amrex {
@@ -71,9 +71,9 @@ namespace amrex {
               nstride(rhs.nstride),
 #else
             : p((T*)(rhs.p+start_comp
-                     *static_cast<Long>(a.end.x-a.begin.x)
-                     *static_cast<Long>(a.end.y-a.begin.y)
-                     *static_cast<Long>(a.end.z-a.begin.z))),
+                     *static_cast<Long>(rhs.end.x-rhs.begin.x)
+                     *static_cast<Long>(rhs.end.y-rhs.begin.y)
+                     *static_cast<Long>(rhs.end.z-rhs.begin.z))),
 #endif
               begin(rhs.begin),
               end(rhs.end),
@@ -93,9 +93,9 @@ namespace amrex {
               nstride(rhs.nstride),
 #else
             : p((T*)(rhs.p+start_comp
-                     *static_cast<Long>(a.end.x-a.begin.x)
-                     *static_cast<Long>(a.end.y-a.begin.y)
-                     *static_cast<Long>(a.end.z-a.begin.z))),
+                     *static_cast<Long>(rhs.end.x-rhs.begin.x)
+                     *static_cast<Long>(rhs.end.y-rhs.begin.y)
+                     *static_cast<Long>(rhs.end.z-rhs.begin.z))),
 #endif
               begin(rhs.begin),
               end(rhs.end),
@@ -115,9 +115,9 @@ namespace amrex {
             return p[(i-begin.x)+(j-begin.y)*jstride+(k-begin.z)*kstride];
 #else
             return p[(i-begin.x) +
-                     (j-begin.y)*static_cast<Long>(a.end.x-a.begin.x) +
-                     (k-begin.z)*static_cast<Long>(a.end.x-a.begin.x)*
-                                 static_cast<Long>(a.end.y-a.begin.y)];
+                     (j-begin.y)*static_cast<Long>(end.x-begin.x) +
+                     (k-begin.z)*static_cast<Long>(end.x-begin.x)*
+                                 static_cast<Long>(end.y-begin.y)];
 #endif
         }
 
@@ -131,12 +131,12 @@ namespace amrex {
             return p[(i-begin.x)+(j-begin.y)*jstride+(k-begin.z)*kstride+n*nstride];
 #else
             return p[(i-begin.x) +
-                     (j-begin.y)*static_cast<Long>(a.end.x-a.begin.x) +
-                     (k-begin.z)*static_cast<Long>(a.end.x-a.begin.x)*
-                                 static_cast<Long>(a.end.y-a.begin.y) +
-                     n          *static_cast<Long>(a.end.x-a.begin.x)*
-                                 static_cast<Long>(a.end.y-a.begin.y)*
-                                 static_cast<Long>(a.end.z-a.begin.z)];
+                     (j-begin.y)*static_cast<Long>(end.x-begin.x) +
+                     (k-begin.z)*static_cast<Long>(end.x-begin.x)*
+                                 static_cast<Long>(end.y-begin.y) +
+                     n          *static_cast<Long>(end.x-begin.x)*
+                                 static_cast<Long>(end.y-begin.y)*
+                                 static_cast<Long>(end.z-begin.z)];
 #endif
         }
 
@@ -150,9 +150,9 @@ namespace amrex {
             return p + ((i-begin.x)+(j-begin.y)*jstride+(k-begin.z)*kstride);
 #else
             return p[(i-begin.x) +
-                     (j-begin.y)*static_cast<Long>(a.end.x-a.begin.x) +
-                     (k-begin.z)*static_cast<Long>(a.end.x-a.begin.x)*
-                                 static_cast<Long>(a.end.y-a.begin.y)];
+                     (j-begin.y)*static_cast<Long>(end.x-begin.x) +
+                     (k-begin.z)*static_cast<Long>(end.x-begin.x)*
+                                 static_cast<Long>(end.y-begin.y)];
 #endif
         }
 
@@ -166,12 +166,12 @@ namespace amrex {
             return p + ((i-begin.x)+(j-begin.y)*jstride+(k-begin.z)*kstride+n*nstride);
 #else
             return p[(i-begin.x) +
-                     (j-begin.y)*static_cast<Long>(a.end.x-a.begin.x) +
-                     (k-begin.z)*static_cast<Long>(a.end.x-a.begin.x)*
-                                 static_cast<Long>(a.end.y-a.begin.y) +
-                     n          *static_cast<Long>(a.end.x-a.begin.x)*
-                                 static_cast<Long>(a.end.y-a.begin.y)*
-                                 static_cast<Long>(a.end.z-a.begin.z)];
+                     (j-begin.y)*static_cast<Long>(end.x-begin.x) +
+                     (k-begin.z)*static_cast<Long>(end.x-begin.x)*
+                                 static_cast<Long>(end.y-begin.y) +
+                     n          *static_cast<Long>(end.x-begin.x)*
+                                 static_cast<Long>(end.y-begin.y)*
+                                 static_cast<Long>(end.z-begin.z)];
 #endif
         }
 
@@ -233,9 +233,9 @@ namespace amrex {
 #ifdef AMREX_ARRAY4_HAS_STRIDE
             return this->nstride * this->ncomp;
 #else
-            return static_cast<Long>(a.end.x-a.begin.x)
-                *  static_cast<Long>(a.end.y-a.begin.y)
-                *  static_cast<Long>(a.end.z-a.begin.z) * ncomp;
+            return static_cast<Long>(end.x-begin.x)
+                *  static_cast<Long>(end.y-begin.y)
+                *  static_cast<Long>(end.z-begin.z) * ncomp;
 #endif
 
         }

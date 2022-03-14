@@ -1960,7 +1960,7 @@ BaseFab<T>::BaseFab (Array4<T> const& a) noexcept
     : dptr(a.p),
       domain(IntVect(AMREX_D_DECL(a.begin.x,a.begin.y,a.begin.z)),
              IntVect(AMREX_D_DECL(a.end.x-1,a.end.y-1,a.end.z-1))),
-      nvar(a.ncomp), truesize(a.ncomp*a.nstride)
+      nvar(a.ncomp), truesize(static_cast<Long>(a.size()))
 {}
 
 template<class T>
@@ -1968,7 +1968,7 @@ BaseFab<T>::BaseFab (Array4<T> const& a, IndexType t) noexcept
     : dptr(a.p),
       domain(IntVect(AMREX_D_DECL(a.begin.x,a.begin.y,a.begin.z)),
              IntVect(AMREX_D_DECL(a.end.x-1,a.end.y-1,a.end.z-1)), t),
-      nvar(a.ncomp), truesize(a.ncomp*a.nstride)
+      nvar(a.ncomp), truesize(static_cast<Long>(a.size()))
 {}
 
 template<class T>
@@ -1976,7 +1976,7 @@ BaseFab<T>::BaseFab (Array4<T const> const& a) noexcept
     : dptr(const_cast<T*>(a.p)),
       domain(IntVect(AMREX_D_DECL(a.begin.x,a.begin.y,a.begin.z)),
              IntVect(AMREX_D_DECL(a.end.x-1,a.end.y-1,a.end.z-1))),
-      nvar(a.ncomp), truesize(a.ncomp*a.nstride)
+      nvar(a.ncomp), truesize(static_cast<Long>(a.size()))
 {}
 
 template<class T>
@@ -1984,7 +1984,7 @@ BaseFab<T>::BaseFab (Array4<T const> const& a, IndexType t) noexcept
     : dptr(const_cast<T*>(a.p)),
       domain(IntVect(AMREX_D_DECL(a.begin.x,a.begin.y,a.begin.z)),
              IntVect(AMREX_D_DECL(a.end.x-1,a.end.y-1,a.end.z-1)), t),
-      nvar(a.ncomp), truesize(a.ncomp*a.nstride)
+      nvar(a.ncomp), truesize(static_cast<Long>(a.size()))
 {}
 
 template <class T>
