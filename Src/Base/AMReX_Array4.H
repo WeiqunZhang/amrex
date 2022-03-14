@@ -9,15 +9,21 @@
 #include <iostream>
 #include <sstream>
 
+//#if !defined(AMREX_USE_GPU)
+#define AMREX_ARRAY4_HAS_STRIDE 1
+//#endif
+
 namespace amrex {
 
     template <typename T>
     struct Array4
     {
         T* AMREX_RESTRICT p;
+#ifdef AMREX_ARRAY4_HAS_STRIDE
         Long jstride = 0;
         Long kstride = 0;
         Long nstride = 0;
+#endif
         Dim3 begin{1,1,1};
         Dim3 end{0,0,0};  // end is hi + 1
         int  ncomp=0;
@@ -29,9 +35,11 @@ namespace amrex {
         AMREX_GPU_HOST_DEVICE
         constexpr Array4 (Array4<typename std::remove_const<T>::type> const& rhs) noexcept
             : p(rhs.p),
+#ifdef AMREX_ARRAY4_HAS_STRIDE
               jstride(rhs.jstride),
               kstride(rhs.kstride),
               nstride(rhs.nstride),
+#endif
               begin(rhs.begin),
               end(rhs.end),
               ncomp(rhs.ncomp)
@@ -40,9 +48,11 @@ namespace amrex {
         AMREX_GPU_HOST_DEVICE
         constexpr Array4 (T* a_p, Dim3 const& a_begin, Dim3 const& a_end, int a_ncomp) noexcept
             : p(a_p),
+#ifdef AMREX_ARRAY4_HAS_STRIDE
               jstride(a_end.x-a_begin.x),
               kstride(jstride*(a_end.y-a_begin.y)),
               nstride(kstride*(a_end.z-a_begin.z)),
+#endif
               begin(a_begin),
               end(a_end),
               ncomp(a_ncomp)
@@ -54,10 +64,17 @@ namespace amrex {
                                 typename std::remove_const<U>::type>::value,int>::type = 0>
         AMREX_GPU_HOST_DEVICE
         constexpr Array4 (Array4<U> const& rhs, int start_comp) noexcept
+#ifdef AMREX_ARRAY4_HAS_STRIDE
             : p((T*)(rhs.p+start_comp*rhs.nstride)),
               jstride(rhs.jstride),
               kstride(rhs.kstride),
               nstride(rhs.nstride),
+#else
+            : p((T*)(rhs.p+start_comp
+                     *static_cast<Long>(a.end.x-a.begin.x)
+                     *static_cast<Long>(a.end.y-a.begin.y)
+                     *static_cast<Long>(a.end.z-a.begin.z))),
+#endif
               begin(rhs.begin),
               end(rhs.end),
               ncomp(rhs.ncomp-start_comp)
@@ -69,10 +86,17 @@ namespace amrex {
                                 typename std::remove_const<U>::type>::value,int>::type = 0>
         AMREX_GPU_HOST_DEVICE
         constexpr Array4 (Array4<U> const& rhs, int start_comp, int num_comps) noexcept
+#ifdef AMREX_ARRAY4_HAS_STRIDE
             : p((T*)(rhs.p+start_comp*rhs.nstride)),
               jstride(rhs.jstride),
               kstride(rhs.kstride),
               nstride(rhs.nstride),
+#else
+            : p((T*)(rhs.p+start_comp
+                     *static_cast<Long>(a.end.x-a.begin.x)
+                     *static_cast<Long>(a.end.y-a.begin.y)
+                     *static_cast<Long>(a.end.z-a.begin.z))),
+#endif
               begin(rhs.begin),
               end(rhs.end),
               ncomp(num_comps)
@@ -87,7 +111,14 @@ namespace amrex {
 #if defined(AMREX_DEBUG) || defined(AMREX_BOUND_CHECK)
             index_assert(i,j,k,0);
 #endif
+#ifdef AMREX_ARRAY4_HAS_STRIDE
             return p[(i-begin.x)+(j-begin.y)*jstride+(k-begin.z)*kstride];
+#else
+            return p[(i-begin.x) +
+                     (j-begin.y)*static_cast<Long>(a.end.x-a.begin.x) +
+                     (k-begin.z)*static_cast<Long>(a.end.x-a.begin.x)*
+                                 static_cast<Long>(a.end.y-a.begin.y)];
+#endif
         }
 
         template <class U=T, typename std::enable_if<!std::is_void<U>::value,int>::type = 0>
@@ -96,7 +127,17 @@ namespace amrex {
 #if defined(AMREX_DEBUG) || defined(AMREX_BOUND_CHECK)
             index_assert(i,j,k,n);
 #endif
+#ifdef AMREX_ARRAY4_HAS_STRIDE
             return p[(i-begin.x)+(j-begin.y)*jstride+(k-begin.z)*kstride+n*nstride];
+#else
+            return p[(i-begin.x) +
+                     (j-begin.y)*static_cast<Long>(a.end.x-a.begin.x) +
+                     (k-begin.z)*static_cast<Long>(a.end.x-a.begin.x)*
+                                 static_cast<Long>(a.end.y-a.begin.y) +
+                     n          *static_cast<Long>(a.end.x-a.begin.x)*
+                                 static_cast<Long>(a.end.y-a.begin.y)*
+                                 static_cast<Long>(a.end.z-a.begin.z)];
+#endif
         }
 
         template <class U=T, typename std::enable_if<!std::is_void<U>::value,int>::type = 0>
@@ -105,7 +146,14 @@ namespace amrex {
 #if defined(AMREX_DEBUG) || defined(AMREX_BOUND_CHECK)
             index_assert(i,j,k,0);
 #endif
+#ifdef AMREX_ARRAY4_HAS_STRIDE
             return p + ((i-begin.x)+(j-begin.y)*jstride+(k-begin.z)*kstride);
+#else
+            return p[(i-begin.x) +
+                     (j-begin.y)*static_cast<Long>(a.end.x-a.begin.x) +
+                     (k-begin.z)*static_cast<Long>(a.end.x-a.begin.x)*
+                                 static_cast<Long>(a.end.y-a.begin.y)];
+#endif
         }
 
         template <class U=T, typename std::enable_if<!std::is_void<U>::value,int>::type = 0>
@@ -114,7 +162,17 @@ namespace amrex {
 #if defined(AMREX_DEBUG) || defined(AMREX_BOUND_CHECK)
             index_assert(i,j,k,0);
 #endif
+#ifdef AMREX_ARRAY4_HAS_STRIDE
             return p + ((i-begin.x)+(j-begin.y)*jstride+(k-begin.z)*kstride+n*nstride);
+#else
+            return p[(i-begin.x) +
+                     (j-begin.y)*static_cast<Long>(a.end.x-a.begin.x) +
+                     (k-begin.z)*static_cast<Long>(a.end.x-a.begin.x)*
+                                 static_cast<Long>(a.end.y-a.begin.y) +
+                     n          *static_cast<Long>(a.end.x-a.begin.x)*
+                                 static_cast<Long>(a.end.y-a.begin.y)*
+                                 static_cast<Long>(a.end.z-a.begin.z)];
+#endif
         }
 
         template <class U=T, typename std::enable_if<!std::is_void<U>::value,int>::type = 0>
@@ -172,7 +230,14 @@ namespace amrex {
 
         AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
         std::size_t size () const noexcept {
+#ifdef AMREX_ARRAY4_HAS_STRIDE
             return this->nstride * this->ncomp;
+#else
+            return static_cast<Long>(a.end.x-a.begin.x)
+                *  static_cast<Long>(a.end.y-a.begin.y)
+                *  static_cast<Long>(a.end.z-a.begin.z) * ncomp;
+#endif
+
         }
 
         AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
