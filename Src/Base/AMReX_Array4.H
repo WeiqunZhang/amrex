@@ -165,13 +165,13 @@ namespace amrex {
 #ifdef AMREX_ARRAY4_HAS_STRIDE
             return p + ((i-begin.x)+(j-begin.y)*jstride+(k-begin.z)*kstride+n*nstride);
 #else
-            return p[(i-begin.x) +
-                     (j-begin.y)*static_cast<Long>(end.x-begin.x) +
-                     (k-begin.z)*static_cast<Long>(end.x-begin.x)*
-                                 static_cast<Long>(end.y-begin.y) +
-                     n          *static_cast<Long>(end.x-begin.x)*
-                                 static_cast<Long>(end.y-begin.y)*
-                                 static_cast<Long>(end.z-begin.z)];
+            return p + ((i-begin.x) +
+                        (j-begin.y)*static_cast<Long>(end.x-begin.x) +
+                        (k-begin.z)*static_cast<Long>(end.x-begin.x)*
+                                    static_cast<Long>(end.y-begin.y) +
+                        n          *static_cast<Long>(end.x-begin.x)*
+                                    static_cast<Long>(end.y-begin.y)*
+                                    static_cast<Long>(end.z-begin.z));
 #endif
         }
 
