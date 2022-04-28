@@ -21,8 +21,10 @@ MyTest::solve ()
     info.setAgglomeration(agglomeration);
     info.setConsolidation(consolidation);
     info.setSemicoarsening(semicoarsening);
+    info.setSemicoarseningDirection(2);
     info.setMaxCoarseningLevel(max_coarsening_level);
-    info.setMaxSemicoarseningLevel(max_semicoarsening_level);
+//    info.setMaxSemicoarseningLevel(max_semicoarsening_level);
+    info.setMaxSemicoarseningLevel(30);
 
     if (composite_solve)
     {
@@ -190,7 +192,7 @@ MyTest::initData ()
     exact_solution.resize(nlevels);
     sigma.resize(nlevels);
 
-    RealBox rb({AMREX_D_DECL(0.,0.,0.)}, {AMREX_D_DECL(1.,1.,1.)});
+    RealBox rb({AMREX_D_DECL(0.,0.,0.)}, {AMREX_D_DECL(1.,1.,10.)});
     Array<int,AMREX_SPACEDIM> is_periodic{AMREX_D_DECL(0,0,0)};
     Geometry::Setup(&rb, 0, is_periodic.data());
     Box domain0(IntVect{AMREX_D_DECL(0,0,0)}, IntVect{AMREX_D_DECL(n_cell-1,n_cell-1,n_cell-1)});
@@ -253,4 +255,3 @@ MyTest::initData ()
         sigma[ilev].setVal(1.0);
     }
 }
-

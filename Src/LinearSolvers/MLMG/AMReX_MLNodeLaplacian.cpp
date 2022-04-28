@@ -181,14 +181,16 @@ MLNodeLaplacian::setSigma (int amrlev, const MultiFab& a_sigma)
     if (a_sigma.nComp() > 1)
     {
         AMREX_ALWAYS_ASSERT(a_sigma.nComp() == AMREX_SPACEDIM);
-        for (int idim = 1; idim < AMREX_SPACEDIM; idim++)
+        for (int idim = 1; idim < AMREX_SPACEDIM; idim++) {
             m_sigma[amrlev][0][idim] = std::make_unique<MultiFab>(m_grids[amrlev][0],
                                                                   m_dmap[amrlev][0],
                                                                   1, 1, MFInfo());
+        }
         setMapped(true);
 
-        for (int idim = 0; idim < AMREX_SPACEDIM; idim++)
+        for (int idim = 0; idim < AMREX_SPACEDIM; idim++) {
             MultiFab::Copy(*m_sigma[amrlev][0][idim], a_sigma, idim, 0, 1, 0);
+        }
 
     } else {
         MultiFab::Copy(*m_sigma[amrlev][0][0], a_sigma, 0, 0, 1, 0);
@@ -247,6 +249,8 @@ void
 MLNodeLaplacian::prepareForSolve ()
 {
     BL_PROFILE("MLNodeLaplacian::prepareForSolve()");
+
+    AMREX_ASSERT(!info.do_semicoarsening || CoarseningStrategy::Sigma == m_coarsening_strategy);
 
     MLNodeLinOp::prepareForSolve();
 
@@ -390,7 +394,7 @@ MLNodeLaplacian::interpolation (int amrlev, int fmglev, MultiFab& fine, const Mu
     const iMultiFab& dmsk = *m_dirichlet_mask[amrlev][fmglev];
 
     bool regular_coarsening = true; int idir = 2;
-    if (fmglev > 0) {
+    {
         regular_coarsening = mg_coarsen_ratio_vec[fmglev] == mg_coarsen_ratio;
         IntVect ratio = mg_coarsen_ratio_vec[fmglev];
         if (ratio[1] == 1) {
@@ -398,9 +402,6 @@ MLNodeLaplacian::interpolation (int amrlev, int fmglev, MultiFab& fine, const Mu
         } else if (ratio[0] == 1) {
             idir = 0;
         }
-    }
-    if (sigma[0] == nullptr) {
-        AMREX_ALWAYS_ASSERT(regular_coarsening);
     }
 
 #ifdef AMREX_USE_GPU
@@ -419,10 +420,17 @@ MLNodeLaplacian::interpolation (int amrlev, int fmglev, MultiFab& fine, const Mu
         }
         else if (sigma[0] == nullptr)
         {
-            ParallelFor(fine, [=] AMREX_GPU_DEVICE(int box_no, int i, int j, int k) noexcept
-            {
-                mlndlap_interpadd_c(i, j, k, fine_ma[box_no], crse_ma[box_no], msk_ma[box_no]);
-            });
+            if (regular_coarsening) {
+                ParallelFor(fine, [=] AMREX_GPU_DEVICE(int box_no, int i, int j, int k) noexcept
+                {
+                    mlndlap_interpadd_c(i, j, k, fine_ma[box_no], crse_ma[box_no], msk_ma[box_no]);
+                });
+            } else {
+                ParallelFor(fine, [=] AMREX_GPU_DEVICE(int box_no, int i, int j, int k) noexcept
+                {
+                    mlndlap_semi_interpadd_c(i, j, k, fine_ma[box_no], crse_ma[box_no], msk_ma[box_no],idir);
+                });
+            }
         }
         else if ( (m_use_harmonic_average && fmglev > 0) ||
                    m_use_mapped )
@@ -430,26 +438,40 @@ MLNodeLaplacian::interpolation (int amrlev, int fmglev, MultiFab& fine, const Mu
             AMREX_D_TERM(MultiArray4<Real const> const& sx_ma = sigma[0]->const_arrays();,
                          MultiArray4<Real const> const& sy_ma = sigma[1]->const_arrays();,
                          MultiArray4<Real const> const& sz_ma = sigma[2]->const_arrays(););
-            ParallelFor(fine, [=] AMREX_GPU_DEVICE(int box_no, int i, int j, int k) noexcept
-            {
-                mlndlap_interpadd_ha(i, j, k, fine_ma[box_no], crse_ma[box_no], AMREX_D_DECL(sx_ma[box_no], sy_ma[box_no], sz_ma[box_no]), msk_ma[box_no]);
-            });
-        }
-        else if (regular_coarsening)
-        {
-            auto sig_ma = sigma[0]->const_arrays();
-            ParallelFor(fine, [=] AMREX_GPU_DEVICE(int box_no, int i, int j, int k) noexcept
-            {
-                mlndlap_interpadd_aa(i, j, k, fine_ma[box_no], crse_ma[box_no], sig_ma[box_no], msk_ma[box_no]);
-            });
+            if (regular_coarsening) {
+                ParallelFor(fine, [=] AMREX_GPU_DEVICE(int box_no, int i, int j, int k) noexcept
+                {
+                    mlndlap_interpadd_ha(i, j, k, fine_ma[box_no], crse_ma[box_no],
+                                         AMREX_D_DECL(sx_ma[box_no], sy_ma[box_no], sz_ma[box_no]),
+                                         msk_ma[box_no]);
+                });
+            } else {
+                ParallelFor(fine, [=] AMREX_GPU_DEVICE(int box_no, int i, int j, int k) noexcept
+                {
+                    mlndlap_semi_interpadd_ha(i, j, k, fine_ma[box_no], crse_ma[box_no],
+                                              AMREX_D_DECL(sx_ma[box_no], sy_ma[box_no], sz_ma[box_no]),
+                                              msk_ma[box_no], idir);
+                });
+            }
         }
         else
         {
-            auto sig_ma = sigma[0]->const_arrays();
-            ParallelFor(fine, [=] AMREX_GPU_DEVICE(int box_no, int i, int j, int k) noexcept
+            if (regular_coarsening)
             {
-                mlndlap_semi_interpadd_aa(i, j, k, fine_ma[box_no], crse_ma[box_no], sig_ma[box_no], msk_ma[box_no], idir);
-            });
+                auto sig_ma = sigma[0]->const_arrays();
+                ParallelFor(fine, [=] AMREX_GPU_DEVICE(int box_no, int i, int j, int k) noexcept
+                {
+                    mlndlap_interpadd_aa(i, j, k, fine_ma[box_no], crse_ma[box_no], sig_ma[box_no], msk_ma[box_no]);
+                });
+            }
+            else
+            {
+                auto sig_ma = sigma[0]->const_arrays();
+                ParallelFor(fine, [=] AMREX_GPU_DEVICE(int box_no, int i, int j, int k) noexcept
+                {
+                    mlndlap_semi_interpadd_aa(i, j, k, fine_ma[box_no], crse_ma[box_no], sig_ma[box_no], msk_ma[box_no], idir);
+                });
+            }
         }
         Gpu::synchronize();
     } else
@@ -474,10 +496,17 @@ MLNodeLaplacian::interpolation (int amrlev, int fmglev, MultiFab& fine, const Mu
             }
             else if (sigma[0] == nullptr)
             {
-                amrex::LoopConcurrentOnCpu(bx, [&] (int i, int j, int k) noexcept
-                {
-                    mlndlap_interpadd_c(i,j,k,ffab,cfab,mfab);
-                });
+                if (regular_coarsening) {
+                    amrex::LoopConcurrentOnCpu(bx, [&] (int i, int j, int k) noexcept
+                    {
+                        mlndlap_interpadd_c(i,j,k,ffab,cfab,mfab);
+                    });
+                } else {
+                    amrex::LoopConcurrentOnCpu(bx, [&] (int i, int j, int k) noexcept
+                    {
+                        mlndlap_semi_interpadd_c(i,j,k,ffab,cfab,mfab, idir);
+                    });
+                }
             }
             else if ( (m_use_harmonic_average && fmglev > 0) ||
                        m_use_mapped )
@@ -485,10 +514,17 @@ MLNodeLaplacian::interpolation (int amrlev, int fmglev, MultiFab& fine, const Mu
                 AMREX_D_TERM(Array4<Real const> const& sxfab = sigma[0]->const_array(mfi);,
                              Array4<Real const> const& syfab = sigma[1]->const_array(mfi);,
                              Array4<Real const> const& szfab = sigma[2]->const_array(mfi);)
-                amrex::LoopConcurrentOnCpu(bx, [&] (int i, int j, int k) noexcept
-                {
-                    mlndlap_interpadd_ha(i,j,k,ffab,cfab,AMREX_D_DECL(sxfab,syfab,szfab),mfab);
-                });
+                if (regular_coarsening) {
+                    amrex::LoopConcurrentOnCpu(bx, [&] (int i, int j, int k) noexcept
+                    {
+                        mlndlap_interpadd_ha(i,j,k,ffab,cfab,AMREX_D_DECL(sxfab,syfab,szfab),mfab);
+                    });
+                } else {
+                    amrex::LoopConcurrentOnCpu(bx, [&] (int i, int j, int k) noexcept
+                    {
+                        mlndlap_semi_interpadd_ha(i,j,k,ffab,cfab,AMREX_D_DECL(sxfab,syfab,szfab),mfab,idir);
+                    });
+                }
             }
             else
             {

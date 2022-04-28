@@ -192,7 +192,6 @@ MLNodeLaplacian::Fapply (int amrlev, int mglev, MultiFab& out, const MultiFab& i
 
     const iMultiFab& dmsk = *m_dirichlet_mask[amrlev][mglev];
 
-
 #ifdef AMREX_USE_GPU
     if (Gpu::inLaunchRegion()) {
         auto xarr_ma = in.const_arrays();
@@ -416,13 +415,10 @@ MLNodeLaplacian::Fsmooth (int amrlev, int mglev, MultiFab& sol, const MultiFab& 
     else // cpu
 #endif
     {
-        bool regular_coarsening = true;
-        if (amrlev == 0 && mglev > 0)
-        {
-            regular_coarsening = mg_coarsen_ratio_vec[mglev-1] == mg_coarsen_ratio;
-        }
-        if (sigma[0] == nullptr) {
-            AMREX_ALWAYS_ASSERT(regular_coarsening);
+        bool not_line_solve = true;
+        if (amrlev == 0 && mglev > 0) {
+            not_line_solve = (mg_coarsen_ratio_vec[mglev-1] == mg_coarsen_ratio)
+                || (info.semicoarsening_direction != -1);
         }
 
         if (m_use_gauss_seidel)
@@ -508,7 +504,7 @@ MLNodeLaplacian::Fsmooth (int amrlev, int mglev, MultiFab& sol, const MultiFab& 
                     Array4<Real const> const& rhsarr = rhs.const_array(mfi);
                     Array4<int const> const& dmskarr = dmsk.const_array(mfi);
 
-                    if ( regular_coarsening )
+                    if (not_line_solve)
                     {
                         for (int ns = 0; ns < m_smooth_num_sweeps; ++ns) {
                             mlndlap_gauss_seidel_aa(bx, solarr, rhsarr,

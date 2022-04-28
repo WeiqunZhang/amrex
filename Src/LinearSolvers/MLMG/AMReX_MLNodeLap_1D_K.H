@@ -159,6 +159,12 @@ void mlndlap_interpadd_c (int /*i*/, int /*j*/, int /*k*/, Array4<Real> const&,
 {}
 
 AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+void mlndlap_semi_interpadd_c (int /*i*/, int /*j*/, int /*k*/, Array4<Real> const&,
+                               Array4<Real const> const&,
+                               Array4<int const> const&, int) noexcept
+{}
+
+AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
 void mlndlap_interpadd_aa (int /*i*/, int /*j*/, int /*k*/, Array4<Real> const&,
                            Array4<Real const> const&, Array4<Real const> const&,
                            Array4<int const> const&) noexcept
@@ -174,6 +180,12 @@ AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
 void mlndlap_interpadd_ha (int /*i*/, int /*j*/, int /*k*/, Array4<Real> const&,
                            Array4<Real const> const&, Array4<Real const> const&,
                            Array4<int const> const&) noexcept
+{}
+
+AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+void mlndlap_semi_interpadd_ha (int /*i*/, int /*j*/, int /*k*/, Array4<Real> const&,
+                                Array4<Real const> const&, Array4<Real const> const&,
+                                Array4<int const> const&, int) noexcept
 {}
 
 AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE

@@ -866,7 +866,7 @@ void mlndlap_semi_restriction (int i, int j, int k, Array4<Real> const& crse,
         } else {
             crse(i,j,k) = Real(1./4.)*(fine(ii-1,jj,kk) + Real(2.)*fine(ii,jj,kk) + fine(ii+1,jj,kk));
         }
-    } else if (idir == 0) {
+    } else {
         int ii = i;
         int jj = j*2;
         if (msk(ii,jj,kk)) {
@@ -946,6 +946,38 @@ void mlndlap_interpadd_c (int i, int j, int, Array4<Real> const& fine,
 }
 
 AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+void mlndlap_semi_interpadd_c (int i, int j, int, Array4<Real> const& fine,
+                               Array4<Real const> const& crse,
+                               Array4<int const> const& msk, int idir) noexcept
+{
+    if (idir == 1) {
+        if (!msk(i,j,0)) {
+            int ic = amrex::coarsen(i,2);
+            bool i_is_odd = (ic*2 != i);
+            if (i_is_odd) {
+                // Node on X line
+                fine(i,j,0) += Real(0.5) * (crse(ic,j,0)+crse(ic+1,j,0));
+            } else {
+                // Node coincident with coarse node
+                fine(i,j,0) += crse(ic,j,0);
+            }
+        }
+    } else {
+        if (!msk(i,j,0)) {
+            int jc = amrex::coarsen(j,2);
+            bool j_is_odd = (jc*2 != j);
+            if (j_is_odd) {
+                // Node on Y line
+                fine(i,j,0) += Real(0.5) * (crse(i,jc,0)+crse(i,jc+1,0));
+            } else {
+                // Node coincident with coarse node
+                fine(i,j,0) += crse(i,jc,0);
+            }
+        }
+    }
+}
+
+AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
 void mlndlap_interpadd_aa (int i, int j, int, Array4<Real> const& fine,
                            Array4<Real const> const& crse, Array4<Real const> const& sig,
                            Array4<int const> const& msk) noexcept
@@ -979,27 +1011,25 @@ void mlndlap_semi_interpadd_aa (int i, int j, int, Array4<Real> const& fine,
     if (idir == 1) {
         if (!msk(i,j,0)) {
             int ic = amrex::coarsen(i,2);
-            int jc = j;
             bool i_is_odd = (ic*2 != i);
             if (i_is_odd) {
                 // Node on X line
-                fine(i,j,0) += aa_interp_line_x(crse,sig,i,j,ic,jc);
+                fine(i,j,0) += aa_interp_line_x(crse,sig,i,j,ic,j);
             } else {
                 //Node coincident with coarse node
-                fine(i,j,0) += crse(ic,jc,0);
+                fine(i,j,0) += crse(ic,j,0);
             }
         }
-    } else if (idir == 0 ) {
+    } else {
         if (!msk(i,j,0)) {
-            int ic = i;
             int jc = amrex::coarsen(j,2);
-            bool j_is_odd = (ic*2 != i);
+            bool j_is_odd = (i*2 != i);
             if (j_is_odd) {
                 // Node on Y line
-                fine(i,j,0) += aa_interp_line_y(crse,sig,i,j,ic,jc);
+                fine(i,j,0) += aa_interp_line_y(crse,sig,i,j,i,jc);
             } else {
                 //Node coincident with coarse node
-                fine(i,j,0) += crse(ic,jc,0);
+                fine(i,j,0) += crse(i,jc,0);
             }
         }
     }
@@ -1045,6 +1075,37 @@ void mlndlap_interpadd_ha (int i, int j, int,
         } else {
             // Node coincident with coarse node
             fine(i,j,0) += crse(ic,jc,0);
+        }
+    }
+}
+
+AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+void mlndlap_semi_interpadd_ha (int i, int j, int,
+                                Array4<Real> const& fine, Array4<Real const> const& crse,
+                                Array4<Real const> const& sigx, Array4<Real const> const& sigy,
+                                Array4<int const> const& msk, int idir) noexcept
+{
+    if (idir == 1) {
+        if (!msk(i,j,0)) {
+            int ic = amrex::coarsen(i,2);
+            bool i_is_odd = (ic*2 != i);
+            if (i_is_odd) {
+                // Node on X line
+                fine(i,j,0) += aa_interp_line_x(crse,sigx,i,j,ic,j);
+            } else {
+                // Node coincident with coarse node
+                fine(i,j,0) += crse(ic,j,0);
+            }
+        }
+    } else {
+        int jc = amrex::coarsen(j,2);
+        bool j_is_odd = (jc*2 != j);
+        if (j_is_odd) {
+            // Node on Y line
+            fine(i,j,0) += aa_interp_line_y(crse,sigy,i,j,i,jc);
+        } else {
+            // Node coincident with coarse node
+            fine(i,j,0) += crse(i,jc,0);
         }
     }
 }
