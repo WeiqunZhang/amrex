@@ -59,7 +59,7 @@ public:
     virtual MultiFab const* getACoeffs (int amrlev, int mglev) const = 0;
     virtual Array<MultiFab const*,AMREX_SPACEDIM> getBCoeffs (int amrlev, int mglev) const = 0;
 
-    virtual void applyInhomogNeumannTerm (int amrlev, Any& rhs) const final override;
+    virtual void applyInhomogNeumannTerm (int amrlev, Any& rhs) const override;
 
     virtual void addInhomogNeumannFlux (
         int amrlev, const Array<MultiFab*,AMREX_SPACEDIM>& grad,

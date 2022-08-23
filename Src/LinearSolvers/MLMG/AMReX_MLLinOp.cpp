@@ -591,13 +591,15 @@ MLLinOp::setDomainBC (const Vector<Array<BCType,AMREX_SPACEDIM> >& a_lobc,
             }
 
             if (m_lobc[icomp][idim] == LinOpBCType::inhomogNeumann ||
-                m_lobc[icomp][idim] == LinOpBCType::Robin)
+                m_lobc[icomp][idim] == LinOpBCType::Robin ||
+                m_lobc[icomp][idim] == LinOpBCType::inhomogStress)
             {
                 m_lobc[icomp][idim] = LinOpBCType::Neumann;
             }
 
             if (m_hibc[icomp][idim] == LinOpBCType::inhomogNeumann ||
-                m_hibc[icomp][idim] == LinOpBCType::Robin)
+                m_hibc[icomp][idim] == LinOpBCType::Robin |
+                m_hibc[icomp][idim] == LinOpBCType::inhomogStress)
             {
                 m_hibc[icomp][idim] = LinOpBCType::Neumann;
             }
@@ -617,6 +619,9 @@ MLLinOp::setDomainBC (const Vector<Array<BCType,AMREX_SPACEDIM> >& a_lobc,
     }
     if (hasRobinBC() && !supportRobinBC()) {
         amrex::Abort("Robin BC not supported");
+    }
+    if (hasInhomogStressBC() && !supportInhomogStressBC()) {
+        amrex::Abort("Inhomogeneous Stress BC not supported");
     }
 }
 
@@ -644,6 +649,22 @@ MLLinOp::hasRobinBC () const noexcept
         for (int idim = 0; idim <AMREX_SPACEDIM; ++idim) {
             if (m_lobc_orig[n][idim] == BCType::Robin ||
                 m_hibc_orig[n][idim] == BCType::Robin)
+            {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+bool
+MLLinOp::hasInhomogStressBC () const noexcept
+{
+    int ncomp = m_lobc_orig.size();
+    for (int n = 0; n < ncomp; ++n) {
+        for (int idim = 0; idim <AMREX_SPACEDIM; ++idim) {
+            if (m_lobc_orig[n][idim] == BCType::inhomogStress||
+                m_hibc_orig[n][idim] == BCType::inhomogStress)
             {
                 return true;
             }

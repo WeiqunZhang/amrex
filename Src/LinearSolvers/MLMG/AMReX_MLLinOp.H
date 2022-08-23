@@ -434,9 +434,11 @@ protected:
 
     bool hasInhomogNeumannBC () const noexcept;
     bool hasRobinBC () const noexcept;
+    bool hasInhomogStressBC () const noexcept;
 
     virtual bool supportRobinBC () const noexcept { return false; }
     virtual bool supportInhomogNeumannBC () const noexcept { return false; }
+    virtual bool supportInhomogStressBC () const noexcept { return false; }
 
 #ifdef BL_USE_MPI
     bool isBottomActive () const noexcept { return m_bottom_comm != MPI_COMM_NULL; }

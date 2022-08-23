@@ -63,6 +63,8 @@ MLTensorOp::define (const Vector<Geometry>& a_geom,
             }
         }
     }
+
+    m_inhomog_stress_f.resize(NAMRLevels());
 }
 
 void
@@ -312,6 +314,76 @@ MLTensorOp::apply (int amrlev, int mglev, MultiFab& out, MultiFab& in, BCMode bc
                                               bvzlo, bvzhi, bct, dlo, dhi);
                   }
                 );
+
+                // For the stress BC in x-direction, we need to set fx to zero.
+                // For fy, we need to use the "correct" dudx and dvdx on y-faces.
+                // For fz, we need to use the "correct" dudx and dwdx on z-faces.
+                // Right now they are computed with Neumann BC on the x-lo domain.
+                // So it's not exactly correct.
+                if (m_lobc_orig[0][0] == LinOpBCType::inhomogStress
+                    && xbx.smallEnd(0) == domain.smallEnd(0)) {
+                    Box bbox = amrex::bdryLo(xbx, 0);
+                    AMREX_HOST_DEVICE_PARALLEL_FOR_3D(bbox, i, j, k,
+                    {
+                        AMREX_D_TERM(fxfab(i,j,k,0) = Real(0.);,
+                                     fxfab(i,j,k,1) = Real(0.);,
+                                     fxfab(i,j,k,2) = Real(0.);)
+                    });
+                }
+                if (m_hibc_orig[0][0] == LinOpBCType::inhomogStress
+                    && xbx.bigEnd(0) == domain.bigEnd(0)+1) {
+                    Box bbox = amrex::bdryHi(xbx, 0);
+                    AMREX_HOST_DEVICE_PARALLEL_FOR_3D(bbox, i, j, k,
+                    {
+                        AMREX_D_TERM(fxfab(i,j,k,0) = Real(0.);,
+                                     fxfab(i,j,k,1) = Real(0.);,
+                                     fxfab(i,j,k,2) = Real(0.);)
+                    });
+                }
+#if (AMREX_SPACEDIM >= 2)
+                if (m_lobc_orig[0][1] == LinOpBCType::inhomogStress
+                    && ybx.smallEnd(1) == domain.smallEnd(1)) {
+                    Box bbox = amrex::bdryLo(ybx, 1);
+                    AMREX_HOST_DEVICE_PARALLEL_FOR_3D(bbox, i, j, k,
+                    {
+                        AMREX_D_TERM(fyfab(i,j,k,0) = Real(0.);,
+                                     fyfab(i,j,k,1) = Real(0.);,
+                                     fyfab(i,j,k,2) = Real(0.);)
+                    });
+                }
+                if (m_hibc_orig[0][1] == LinOpBCType::inhomogStress
+                    && ybx.bigEnd(1) == domain.bigEnd(1)+1) {
+                    Box bbox = amrex::bdryHi(ybx, 1);
+                    AMREX_HOST_DEVICE_PARALLEL_FOR_3D(bbox, i, j, k,
+                    {
+                        AMREX_D_TERM(fyfab(i,j,k,0) = Real(0.);,
+                                     fyfab(i,j,k,1) = Real(0.);,
+                                     fyfab(i,j,k,2) = Real(0.);)
+                    });
+                }
+#endif
+#if (AMREX_SPACEDIM == 3)
+                if (m_lobc_orig[0][2] == LinOpBCType::inhomogStress
+                    && zbx.smallEnd(2) == domain.smallEnd(2)) {
+                    Box bbox = amrex::bdryLo(zbx, 2);
+                    AMREX_HOST_DEVICE_PARALLEL_FOR_3D(bbox, i, j, k,
+                    {
+                        AMREX_D_TERM(fzfab(i,j,k,0) = Real(0.);,
+                                     fzfab(i,j,k,1) = Real(0.);,
+                                     fzfab(i,j,k,2) = Real(0.);)
+                    });
+                }
+                if (m_hibc_orig[0][2] == LinOpBCType::inhomogStress
+                    && zbx.bigEnd(2) == domain.bigEnd(2)+1) {
+                    Box bbox = amrex::bdryHi(zbx, 2);
+                    AMREX_HOST_DEVICE_PARALLEL_FOR_3D(bbox, i, j, k,
+                    {
+                        AMREX_D_TERM(fzfab(i,j,k,0) = Real(0.);,
+                                     fzfab(i,j,k,1) = Real(0.);,
+                                     fzfab(i,j,k,2) = Real(0.);)
+                    });
+                }
+#endif
             }
 
             if (m_overset_mask[amrlev][mglev]) {
@@ -445,6 +517,88 @@ MLTensorOp::applyBCTensor (int amrlev, int mglev, MultiFab& vel,
     }
 
 #endif
+}
+
+void
+MLTensorOp::applyInhomogNeumannTerm (int amrlev, Any& a_rhs) const
+{
+    MLCellABecLap::applyInhomogNeumannTerm(amrlev, a_rhs);
+
+    if (!m_inhomog_stress_f[amrlev]) return;
+
+    AMREX_ASSERT(a_rhs.is<MultiFab>());
+    MultiFab& rhs = a_rhs.get<MultiFab>();
+
+    const int mglev = 0;
+    const Box& domain = m_geom[amrlev][mglev].Domain();
+    auto const beta = getBScalar();
+
+    MFItInfo mfi_info;
+    if (Gpu::notInLaunchRegion()) mfi_info.SetDynamic(true);
+
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (Gpu::notInLaunchRegion())
+#endif
+    for (MFIter mfi(rhs, mfi_info); mfi.isValid(); ++mfi)
+    {
+        const Box& vbx = mfi.validbox();
+        auto const& rhsfab = rhs.array(mfi);
+        auto const& ffab = m_inhomog_stress_f[amrlev]->const_array(mfi);
+        for (OrientationIter oit; oit.isValid(); ++oit) {
+            Orientation face = oit();
+            int const dir = face.coordDir();
+            const Box& b = amrex::adjCell(vbx, face);
+            // We can use component 0 because they are the same in terms of
+            // whether the BC type is inhomogStress.
+            auto const bc = face.isLow() ? m_lobc_orig[0][dir]
+                                         : m_hibc_orig[0][dir];
+            if (bc == LinOpBCType::inhomogStress && !domain.contains(b)) {
+                IntVect oiv(0);
+                oiv[face.coordDir()] = face.isLow() ? 1 : -1;
+                Dim3 offset = oiv.dim3();
+                Real fac = face.isLow() ? -1._rt : 1._rt;
+                AMREX_HOST_DEVICE_PARALLEL_FOR_3D(b, i, j, k,
+                {
+                    rhsfab(i+offset.x,j+offset.y,k+offset.z,dir) += fac*beta*ffab(i,j,k);
+                });
+            }
+        }
+    }
+}
+
+void
+MLTensorOp::setInhomogStressBC (int amrlev, const MultiFab* isf)
+{
+    if (!hasInhomogStressBC() || isf == nullptr) return;
+
+    AMREX_ALWAYS_ASSERT(amrlev >= 0 && amrlev < m_num_amr_levels && isf->nComp() == 1);
+
+    m_inhomog_stress_f[amrlev] = std::make_unique<MultiFab>(m_grids[amrlev][0],
+                                                            m_dmap[amrlev][0],
+                                                            1, 1);
+    const Box& domain = m_geom[amrlev][0].Domain();
+    MFItInfo mfi_info;
+    if (Gpu::notInLaunchRegion()) mfi_info.SetDynamic(true);
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (Gpu::notInLaunchRegion())
+#endif
+    for (MFIter mfi(*m_inhomog_stress_f[amrlev], mfi_info); mfi.isValid(); ++mfi) {
+        Box const& vbx = mfi.validbox();
+        auto const& dfab = m_inhomog_stress_f[amrlev]->array(mfi);
+        auto const& sfab = isf->const_array(mfi);
+        for (OrientationIter oit; oit.isValid(); ++oit) {
+            Orientation face = oit();
+            const Box& b = amrex::adjCell(vbx, face);
+            auto const bc = face.isLow() ? m_lobc_orig[0][face.coordDir()]
+                                         : m_hibc_orig[0][face.coordDir()];
+            if (bc == LinOpBCType::inhomogStress && !domain.contains(b)) {
+                AMREX_HOST_DEVICE_PARALLEL_FOR_3D(b, i, j, k,
+                {
+                    dfab(i,j,k) = sfab(i,j,k);
+                });
+            }
+        }
+    }
 }
 
 }

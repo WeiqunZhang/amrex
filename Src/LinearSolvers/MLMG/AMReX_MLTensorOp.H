@@ -69,12 +69,16 @@ public:
     virtual bool isCrossStencil () const final override { return false; }
     virtual bool isTensorOp () const final override { return true; }
 
+    virtual bool supportInhomogStressBC () const noexcept final override { return true; }
+
     virtual bool needsUpdate () const final override {
         return (m_needs_update || MLABecLaplacian::needsUpdate());
     }
     virtual void update () final override {
         amrex::Abort("MLTensorOp: update TODO");
     }
+
+    virtual void applyInhomogNeumannTerm (int amrlev, Any& rhs) const final override;
 
     virtual void prepareForSolve () final override;
     virtual bool isSingular (int /*armlev*/) const final override { return false; }
@@ -89,12 +93,18 @@ public:
     void compVelGrad (int amrlev, const Array<MultiFab*,AMREX_SPACEDIM>& fluxes,
                       MultiFab& sol, Location loc) const;
 
+    // Only needed if there is inhomogeneous stress BC (tau dot n = f n).
+    // For homogeneous stress BC (tau dot n = 0), do not call or call with nullptr.
+    void setInhomogStressBC (int amrlev, const MultiFab* isf);
+
 protected:
 
     bool m_needs_update = true;
 
     bool m_has_kappa = false;
     Vector<Vector<Array<MultiFab,AMREX_SPACEDIM> > > m_kappa;
+
+    Vector<std::unique_ptr<MultiFab> > m_inhomog_stress_f; // tau dot n = f n
 
     void setBCoeffs (int amrlev, const Array<MultiFab const*,AMREX_SPACEDIM>& beta) = delete;
 
