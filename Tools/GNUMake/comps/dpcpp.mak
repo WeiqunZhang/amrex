@@ -132,6 +132,8 @@ endif
 CXXFLAGS += $(GENERIC_COMP_FLAGS) -pthread
 CFLAGS   += $(GENERIC_COMP_FLAGS)
 
+#CXXFLAGS += -v
+
 ifeq ($(USE_OMP),TRUE)
   CXXFLAGS +=
   CFLAGS   +=
