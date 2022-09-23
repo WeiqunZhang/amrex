@@ -39,6 +39,7 @@ target_sources(amrex
    MLMG/AMReX_MLNodeLaplacian.H
    MLMG/AMReX_MLNodeLaplacian.cpp
    MLMG/AMReX_MLNodeLaplacian_sync.cpp
+   MLMG/AMReX_MLNodeLaplacian_reflux.cpp
    MLMG/AMReX_MLNodeLaplacian_sten.cpp
    MLMG/AMReX_MLNodeLaplacian_misc.cpp
    MLMG/AMReX_MLNodeLap_K.H

@@ -49,6 +49,7 @@ endif
 CEXE_headers   += AMReX_MLNodeLaplacian.H
 CEXE_sources   += AMReX_MLNodeLaplacian.cpp
 CEXE_sources   += AMReX_MLNodeLaplacian_sync.cpp
+CEXE_sources   += AMReX_MLNodeLaplacian_reflux.cpp
 CEXE_sources   += AMReX_MLNodeLaplacian_sten.cpp
 CEXE_sources   += AMReX_MLNodeLaplacian_misc.cpp
 CEXE_headers   += AMReX_MLNodeLap_K.H AMReX_MLNodeLap_$(DIM)D_K.H
