@@ -78,7 +78,8 @@ public:
 #endif
 
     static int deviceId () noexcept;
-    static int numDevicesUsed () noexcept;
+    static int numDevicesVisible () noexcept;  //! Number of visible devices to this process.
+    static int numDevicesUsed () noexcept; //! Number of devices used in total.
 
     /**
      * Halt execution of code until GPU has finished processing all previously requested
@@ -168,6 +169,7 @@ private:
     static void initialize_gpu ();
 
     static AMREX_EXPORT int device_id;
+    static AMREX_EXPORT int num_devices_visible;
     static AMREX_EXPORT int num_devices_used;
     static AMREX_EXPORT int verbose;
     static AMREX_EXPORT int max_gpu_streams;

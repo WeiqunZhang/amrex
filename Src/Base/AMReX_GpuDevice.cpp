@@ -57,6 +57,7 @@ namespace amrex {
 namespace Gpu {
 
 int Device::device_id = 0;
+int Device::num_devices_visible = 0;
 int Device::num_devices_used = 0;
 int Device::verbose = 0;
 #ifdef AMREX_USE_GPU
@@ -166,6 +167,8 @@ Device::Initialize ()
         amrex::Abort("No GPU device found");
     }
 #endif
+
+    num_devices_visible = gpu_device_count;
 
     // Now, assign ranks to GPUs. If we only have one GPU,
     // or only one MPI rank, this is easy. Otherwise, we
@@ -543,6 +546,12 @@ int
 Device::deviceId () noexcept
 {
     return device_id;
+}
+
+int
+Device::numDevicesVisible () noexcept
+{
+    return num_devices_visible;
 }
 
 int

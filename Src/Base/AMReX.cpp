@@ -507,6 +507,8 @@ amrex::Initialize (int& argc, char**& argv, bool build_parm_parse,
     Arena::Initialize();
     amrex_mempool_init();
 
+    ParallelDescriptor::InitializeGpuAwareMpi();  // Need to do this after Arena is initialized.
+
     //
     // Initialize random seed after we're running in parallel.
     //

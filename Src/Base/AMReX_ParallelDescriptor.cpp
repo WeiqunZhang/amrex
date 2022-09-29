@@ -7,6 +7,7 @@
 #include <AMReX_Print.H>
 #include <AMReX_TypeTraits.H>
 #include <AMReX_Arena.H>
+#include <AMReX_GpuDevice.H>
 
 #ifdef BL_USE_MPI
 #include <AMReX_ccse-mpi.H>
@@ -1445,10 +1446,29 @@ void
 Initialize ()
 {
 #ifndef BL_AMRPROF
-    ParmParse pp("amrex");
-    pp.queryAdd("use_gpu_aware_mpi", use_gpu_aware_mpi);
-
     StartTeams();
+#endif
+}
+
+void
+InitializeGpuAwareMpi ()
+{
+#ifdef AMREX_USE_MPI
+    ParmParse pp("amrex");
+    if (pp.contains("use_gpu_aware_mpi")) {
+        pp.query("use_gpu_aware_mpi", use_gpu_aware_mpi); // Respect the user's choice
+    } else {
+#ifdef AMREX_USE_CUDA
+        // xxxxx TODO: Should we do this for HIP and DPCPP?  Should this be
+        // limited to certain MPI implementations?
+        //
+        // Note that Arena has been initialized.
+        if (Gpu::Device::numDevicesVisible() > 1 && The_Arena()->isDevice()) {
+            use_gpu_aware_mpi = 1;
+            pp.add("use_gpu_aware_mpi", use_gpu_aware_mpi);
+        }
+#endif
+    }
 #endif
 }
 
