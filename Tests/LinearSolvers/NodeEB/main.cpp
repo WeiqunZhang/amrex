@@ -23,12 +23,8 @@ int main (int argc, char* argv[])
             pp.add("max_iter", 15);
         }
 
-        amrex::Print() << "\nThis test will pass if line 582 of amrex/Src/EB/AMReX_algoim_K is uncommented.\n\n";
-
         MyTest mytest;
         mytest.solve();
-
-        amrex::Print() << "\nSUCCESS!\n\n";
     }
 
     amrex::Finalize();

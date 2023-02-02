@@ -22,7 +22,7 @@ private:
 
     int max_level = 0;
     int ref_ratio = 2;
-    int n_cell = 128;
+    int n_cell = 16;
     int max_grid_size = 128;
 
     std::string plot_file_name{"plot"};

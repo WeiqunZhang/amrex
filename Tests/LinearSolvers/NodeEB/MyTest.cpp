@@ -64,30 +64,22 @@ MyTest::solve ()
 
     mlndlap.compRHS(amrex::GetVecOfPtrs(rhs), amrex::GetVecOfPtrs(vel), {}, {});
 
-    MLMG mlmg(mlndlap);
-    mlmg.setVerbose(verbose);
-    mlmg.setBottomVerbose(bottom_verbose);
-    mlmg.setMaxIter(max_iter);
-    mlmg.setMaxFmgIter(max_fmg_iter);
+    Real rmin_expected = -1.2529400524147691;
+    Real rmax_expected = 1.3647459530083115;
 
-#ifdef AMREX_USE_HYPRE
-    if (use_hypre) mlmg.setBottomSolver(BottomSolver::hypre);
-#endif
+    auto rmin = rhs[0].min(0);
+    auto rmax = rhs[0].max(0);
 
-    Real mlmg_err = mlmg.solve(amrex::GetVecOfPtrs(phi), amrex::GetVecOfConstPtrs(rhs),
-                               1.e-11, 0.0);
-
-    mlndlap.updateVelocity(amrex::GetVecOfPtrs(vel), amrex::GetVecOfConstPtrs(phi));
-
-#if 0
-    mlndlap.compRHS(amrex::GetVecOfPtrs(rhs), amrex::GetVecOfPtrs(vel), {}, {});
-
-    for (int ilev = 0; ilev <= max_level; ++ilev) {
-        amrex::VisMF::Write(rhs[ilev], "rhs"+std::to_string(ilev));
-        amrex::Print() << "rhs.norm0() = " << rhs[ilev].norm0() << "\n";
-        amrex::Print() << "rhs.norm1()/npoints = " << rhs[ilev].norm1() / grids[0].d_numPts() << "\n";
+    if (std::abs(rmin-rmin_expected) < 1.e-10 &&
+        std::abs(rmax-rmax_expected) < 1.e-10) {
+        amrex::Print() << "\nSUCCSESS!\n\n";
+    } else {
+        amrex::Print() << "\nExpected values: " << rmin_expected << " " << rmax_expected
+                       << "\nObtained values: " << rmin          << " " << rmax << "\n";
+        amrex::Print() << "\nFAILED! This test will pass if line 582 of amrex/Src/EB/AMReX_algoim_K.H is uncommented.\n\n";
     }
-#endif
+
+    return;
 }
 
 void
