@@ -1,3 +1,5 @@
+USE_DPCPP = TRUE
+BL_NO_FORT = TRUE
 
 DEBUG = FALSE
 
@@ -6,7 +8,7 @@ USE_ASSERTION = TRUE
 
 USE_EB = TRUE
 
-USE_MPI  = TRUE
+USE_MPI  = FALSE
 USE_OMP  = FALSE
 
 USE_HYPRE  = FALSE
@@ -30,4 +32,3 @@ Ppack	+= $(foreach dir, $(Pdirs), $(AMREX_HOME)/Src/$(dir)/Make.package)
 include $(Ppack)
 
 include $(AMREX_HOME)/Tools/GNUMake/Make.rules
-

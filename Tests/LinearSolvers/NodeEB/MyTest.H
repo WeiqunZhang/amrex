@@ -23,13 +23,13 @@ private:
     int max_level = 0;
     int ref_ratio = 2;
     int n_cell = 128;
-    int max_grid_size = 64;
+    int max_grid_size = 128;
 
     std::string plot_file_name{"plot"};
 
     // For MLMG solver
     int verbose = 2;
-    int bottom_verbose = 2;
+    int bottom_verbose = 0;
     int max_iter = 100;
     int max_fmg_iter = 0;
     int max_coarsening_level = 30;

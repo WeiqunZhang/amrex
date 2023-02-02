@@ -579,7 +579,7 @@ struct ImplicitIntegral
                 // xxxxx DPCPP todo The only purpose of the following
                 // statement is to work around a compiler bug.  Nothing will
                 // actually be printed because &f == &f_.
-                AMREX_DEVICE_PRINTF("Work around compiler bug. %p %p\n", &f, &f_);
+//                AMREX_DEVICE_PRINTF("Work around compiler bug. %p %p\n", &f, &f_);
             }
         }
 #endif
