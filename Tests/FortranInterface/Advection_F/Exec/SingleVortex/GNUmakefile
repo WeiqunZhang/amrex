@@ -2,14 +2,14 @@
 DEBUG     = TRUE
 DEBUG     = FALSE
 
-USE_MPI   = TRUE
+USE_MPI   = FALSE
 USE_OMP   = FALSE
 USE_MPI3  = FALSE
 
 MEM_PROFILE  = FALSE
 TINY_PROFILE = FALSE
 
-COMP      = gnu
+COMP      = Intel
 
 DIM       = 2
 #DIM       = 3
