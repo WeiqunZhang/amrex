@@ -223,8 +223,10 @@ struct ParserStack
     constexpr double operator[] (int i) const { return m_data[i]; }
 };
 
-AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
-double parser_exe_eval (char* p, double const* x)
+template <typename T>
+AMREX_GPU_HOST_DEVICE AMREX_NO_INLINE
+std::enable_if_t<std::is_same_v<T,double>, double>
+parser_exe_eval (char* p, T const* x)
 {
     ParserStack<AMREX_PARSER_STACK_SIZE> pstack;
     while (*((parser_exe_t*)p) != PARSER_EXE_NULL) {

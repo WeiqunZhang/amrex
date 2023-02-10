@@ -22,9 +22,9 @@ struct ParserExecutor
     double operator() () const noexcept
     {
 #if AMREX_DEVICE_COMPILE
-        return parser_exe_eval(m_device_executor, nullptr);
+        return parser_exe_eval(m_device_executor, (double const*)nullptr);
 #else
-        return parser_exe_eval(m_host_executor, nullptr);
+        return parser_exe_eval(m_host_executor, (double const*)nullptr);
 #endif
     }
 
