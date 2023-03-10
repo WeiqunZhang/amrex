@@ -249,12 +249,12 @@ private:
     // In the global version, we don't know who we'll receive from, so we
     // need to do some collective communication first.
     //
-    static void doHandShakeGlobal (const Vector<Long>& Snds, Vector<Long>& Rcvs);
+    void doHandShakeGlobal (const Vector<Long>& Snds, Vector<Long>& Rcvs) const;
 
     //
     // Another version of the above that is implemented using MPI All-to-All
     //
-    static void doHandShakeAllToAll (const Vector<Long>& Snds, Vector<Long>& Rcvs);
+    void doHandShakeAllToAll (const Vector<Long>& Snds, Vector<Long>& Rcvs) const;
 
     bool m_local;
 };
