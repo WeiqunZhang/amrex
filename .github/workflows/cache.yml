@@ -1,0 +1,40 @@
+name: cuda
+
+on: [push, pull_request]
+
+concurrency:
+  group: ${{ github.ref }}-${{ github.head_ref }}-cache
+  cancel-in-progress: true
+
+jobs:
+  testing-ccache:
+    name: Testing ccache
+    runs-on: ubuntu-22.04
+    steps:
+    - uses: actions/checkout@v3
+    - name: Dependencies
+      run: |
+        .github/workflows/dependencies/dependencies.sh
+        .github/workflows/dependencies/dependencies_ccache.sh
+    - name: Use Cache
+      uses: actions/cache@v3
+      env:
+        # Is there a way to automatically set it to the job name, testing-ccache
+        cache-name: testing-ccache
+      with:
+        path: ~/.cache
+        key: ccache-${{ runner.os }}-${{ env.cache-name }}-${{ github.sha }}
+        restore-keys: |
+             ccache-${{ runner.os }}-${{ env.cache-name }}-
+    - name: Build & Install
+      run: |
+        export CCACHE_COMPRESS=1
+        export CCACHE_COMPRESSLEVEL=8
+        export CCACHE_MAXSIZE=1000M
+        ccache -z
+        mkdir build
+        cd build
+        cmake ..                                  \
+            -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
+        make -j 2
+        ccache -s
