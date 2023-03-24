@@ -26,14 +26,15 @@ jobs:
       run: |
         Invoke-WebRequest https://github.com/ccache/ccache/releases/download/v4.8/ccache-4.8-windows-x86_64.zip -OutFile ccache-4.8-windows-x86_64.zip
         Expand-Archive ccache-4.8-windows-x86_64.zip
-        ls ccache-4.8-windows-x86_64
-        $env:PATH
     - name: Build & Install
       run: |
+        $ccachepath = Join-Path $pwd "ccache-4.8-windows-x86_64"
+        $Env:PATH += ";$ccachepath"
+        $Env:PATH
         $Env:CCACHE_COMPRESS='1'
         $Env:CCACHE_COMPRESSLEVEL='10'
         $Env:CCACHE_MAXSIZE='125M'
-        #ccache -z
+        ccache -z
 
         cmake -S . -B build   `
               -DCMAKE_BUILD_TYPE=Debug      `
@@ -46,7 +47,7 @@ jobs:
               -DAMReX_PARTICLES=ON
         cmake --build build --config Debug -j 2
 
-        #ccache -s
+        ccache -s
 
   # Build libamrex and all test (static)
   test_msvc_static:
