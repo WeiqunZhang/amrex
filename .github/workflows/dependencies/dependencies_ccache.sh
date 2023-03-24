@@ -8,7 +8,7 @@ wget https://github.com/ccache/ccache/releases/download/v${1}/ccache-${1}-linux-
 
 tar xvf ccache-${1}-linux-x86_64.tar.xz
 
-sudo ln -s -f ccache-${1}-linux-x86_64/ccache /usr/local/bin/
+sudo cp -f ccache-${1}-linux-x86_64/ccache /usr/local/bin/
 
 which ccache
 
