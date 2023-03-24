@@ -22,6 +22,7 @@ jobs:
         key: ccache-windows.yml-${{ env.cache-name }}-git-${{ github.sha }}
         restore-keys: |
              ccache-windows.yml-${{ env.cache-name }}-git-
+    - name: Install Ccache
       run: |
         Invoke-WebReuest https://github.com/ccache/ccache/releases/download/v4.8/ccache-4.8-windows-x86_64.zip
         Expand-Archive ccache-4.8-windows-x86_64.zip
