@@ -130,6 +130,7 @@ jobs:
         $Env:CCACHE_MAXSIZE='200M'
         ccache -z
 
+        & 'C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\vc\Auxiliary\build\vcvarsall.bat' x64
         cmake -S . -B build   `
               -G "Ninja"      `
               -DCMAKE_C_COMPILER=clang-cl   `
