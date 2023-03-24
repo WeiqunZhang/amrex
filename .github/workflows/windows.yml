@@ -36,7 +36,7 @@ jobs:
         $Env:CCACHE_DIR
         $Env:CCACHE_COMPRESS='1'
         $Env:CCACHE_COMPRESSLEVEL='10'
-        $Env:CCACHE_MAXSIZE='100M'
+        $Env:CCACHE_MAXSIZE='200M'
         ccache -z
 
         cmake -S . -B build   `
@@ -82,7 +82,7 @@ jobs:
         $Env:CCACHE_DIR="$ccachecachedir"
         $Env:CCACHE_COMPRESS='1'
         $Env:CCACHE_COMPRESSLEVEL='10'
-        $Env:CCACHE_MAXSIZE='100M'
+        $Env:CCACHE_MAXSIZE='200M'
         ccache -z
 
         cmake -S . -B build   `
@@ -128,13 +128,12 @@ jobs:
         $Env:CCACHE_DIR="$ccachecachedir"
         $Env:CCACHE_COMPRESS='1'
         $Env:CCACHE_COMPRESSLEVEL='10'
-        $Env:CCACHE_MAXSIZE='100M'
+        $Env:CCACHE_MAXSIZE='200M'
         ccache -z
 
         call "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\vc\Auxiliary\build\vcvarsall.bat" x64
         cmake -S . -B build   ^
               -G "Ninja"      ^
-              -T "ClangCl"    ^
               -DCMAKE_C_COMPILER=clang-cl   ^
               -DCMAKE_CXX_COMPILER=clang-cl ^
               -DCMAKE_BUILD_TYPE=Release    ^
