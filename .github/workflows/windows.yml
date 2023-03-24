@@ -130,6 +130,7 @@ jobs:
         $Env:CCACHE_MAXSIZE='200M'
         ccache -z
 
+        ls 'C:\Program Files\Microsoft Visual Studio\2022\Enterprise\vc\Auxiliary\build\'
         & 'C:\Program Files\Microsoft Visual Studio\2022\Enterprise\vc\Auxiliary\build\vcvarsall.bat' x64
         cmake -S . -B build   `
               -G "Unix Makefiles"           `
