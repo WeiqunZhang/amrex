@@ -138,7 +138,7 @@ jobs:
         ls 'C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\vc\Auxiliary\'
         ls 'C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\vc\Auxiliary\build'
         pushd 'C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\vc\Auxiliary\build'
-        vcvarsall.bat x64
+        & vcvarsall.bat x64
         popd
         cmake -S . -B build   `
               -G "Ninja"      `
