@@ -4,9 +4,13 @@ set -eu -o pipefail
 
 echo $PWD
 
-wget https://github.com/ccache/ccache/releases/download/v${1}/ccache-${1}-linux-x86_64.tar.xz
+wget https://github.com/ccache/ccache/releases/download/v$1/ccache-$1-linux-x86_64.tar.xz
 
-tar xvf ccache-${1}-linux-x86_64.tar.xz
+tar xvf ccache-$1-linux-x86_64.tar.xz
+
+sudo ln -s -f ccache-$1-linux-x86_64/ccache /usr/local/bin/
+
+which ccache
 
 #sudo apt-get update
 #
