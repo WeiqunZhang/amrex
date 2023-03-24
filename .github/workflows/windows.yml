@@ -13,6 +13,7 @@ jobs:
     runs-on: windows-latest
     steps:
     - uses: actions/checkout@v3
+    - uses: seanmiddleditch/gha-setup-ninja@master
     - name: Set Up Cache
       uses: actions/cache@v3
       env:
@@ -39,6 +40,7 @@ jobs:
         ccache -z
 
         cmake -S . -B build   `
+              -G "Ninja"      `
               -DCMAKE_BUILD_TYPE=Debug      `
               -DBUILD_SHARED_LIBS=ON        `
               -DCMAKE_VERBOSE_MAKEFILE=ON   `
@@ -58,6 +60,7 @@ jobs:
     runs-on: windows-latest
     steps:
     - uses: actions/checkout@v3
+    - uses: seanmiddleditch/gha-setup-ninja@master
     - name: Set Up Cache
       uses: actions/cache@v3
       env:
@@ -83,6 +86,7 @@ jobs:
         ccache -z
 
         cmake -S . -B build   `
+              -G "Ninja"      `
               -DCMAKE_BUILD_TYPE=RelWithDebInfo `
               -DCMAKE_VERBOSE_MAKEFILE=ON   `
               -DAMReX_EB=ON                 `
@@ -129,6 +133,7 @@ jobs:
 
         call "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\vc\Auxiliary\build\vcvarsall.bat" x64
         cmake -S . -B build   ^
+              -G "Ninja"      ^
               -T "ClangCl"    ^
               -DCMAKE_BUILD_TYPE=Release    ^
               -DBUILD_SHARED_LIBS=ON        ^
