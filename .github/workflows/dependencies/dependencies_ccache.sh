@@ -2,7 +2,7 @@
 
 set -eu -o pipefail
 
-echo $pwd
+echo $PWD
 
 wget https://github.com/ccache/ccache/releases/download/v${1}/ccache-${1}-linux-x86_64.tar.xz
 
