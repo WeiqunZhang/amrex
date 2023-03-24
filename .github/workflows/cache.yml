@@ -15,7 +15,7 @@ jobs:
     - name: Dependencies
       run: |
         .github/workflows/dependencies/dependencies.sh
-        .github/workflows/dependencies/dependencies_ccache.sh
+        .github/workflows/dependencies/dependencies_ccache.sh 4.8
     - name: Use Cache
       uses: actions/cache@v3
       env:
