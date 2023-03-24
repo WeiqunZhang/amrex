@@ -132,7 +132,7 @@ jobs:
 
         & 'C:\Program Files\Microsoft Visual Studio\2022\Enterprise\vc\Auxiliary\build\vcvarsall.bat' x64
         cmake -S . -B build   `
-              -G "Unix"      `
+              -G "Unix Makefiles"           `
               -DCMAKE_C_COMPILER=clang-cl   `
               -DCMAKE_CXX_COMPILER=clang-cl `
               -DCMAKE_BUILD_TYPE=Release    `
