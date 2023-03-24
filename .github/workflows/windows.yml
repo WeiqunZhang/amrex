@@ -130,6 +130,13 @@ jobs:
         $Env:CCACHE_MAXSIZE='200M'
         ccache -z
 
+        ls 'C:\Program Files (x86)\'
+        ls 'C:\Program Files (x86)\Microsoft Visual Studio\'
+        ls 'C:\Program Files (x86)\Microsoft Visual Studio\2019\'
+        ls 'C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\'
+        ls 'C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\vc\'
+        ls 'C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\vc\Auxiliary\'
+        ls 'C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\vc\Auxiliary\build'
         pushd 'C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\vc\Auxiliary\build'
         vcvarsall.bat x64
         popd
