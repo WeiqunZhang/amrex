@@ -102,7 +102,7 @@ jobs:
   # Build libamrex and all tests
   tests_clang:
     name: Clang C++17 w/o Fortran w/o MPI
-    runs-on: windows-2019
+    runs-on: windows-2022
     steps:
     - uses: actions/checkout@v3
     - uses: seanmiddleditch/gha-setup-ninja@master
@@ -130,7 +130,7 @@ jobs:
         $Env:CCACHE_MAXSIZE='200M'
         ccache -z
 
-        & 'C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\vc\Auxiliary\build' x64
+        & 'C:\Program Files\Microsoft Visual Studio\2022\Enterprise\vc\Auxiliary\build\vcvarsall.bat' x64
         cmake -S . -B build   `
               -G "Ninja"      `
               -DCMAKE_C_COMPILER=clang-cl   `
