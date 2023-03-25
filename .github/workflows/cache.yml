@@ -1,40 +1,56 @@
-name: cuda
+name: intel
 
 on: [push, pull_request]
 
 concurrency:
-  group: ${{ github.ref }}-${{ github.head_ref }}-cache
+  group: ${{ github.ref }}-${{ github.head_ref }}-intel
   cancel-in-progress: true
 
 jobs:
-  testing-ccache:
-    name: Testing ccache
+  tests-oneapi-sycl:
+    name: oneAPI SYCL [tests]
     runs-on: ubuntu-20.04
+    # mkl/rng/device/detail/mrg32k3a_impl.hpp has a number of sign-compare error
     steps:
     - uses: actions/checkout@v3
     - name: Dependencies
       run: |
-        .github/workflows/dependencies/dependencies.sh
+        .github/workflows/dependencies/dependencies_dpcpp.sh
         .github/workflows/dependencies/dependencies_ccache.sh
-    - name: Use Cache
+    - name: Set Up Cache
+      # Ccache does not work with icpx
+      if: false
       uses: actions/cache@v3
       env:
-        # Is there a way to automatically set it to the job name, testing-ccache
-        cache-name: testing-ccache
+        cache-name: tests-oneapi-sycl
       with:
         path: ~/.cache
-        key: ccache-${{ runner.os }}-${{ env.cache-name }}-${{ github.sha }}
+        key: ccache-intel.yml-${{ env.cache-name }}-git-${{ github.sha }}
         restore-keys: |
-             ccache-${{ runner.os }}-${{ env.cache-name }}-
+             ccache-intel.yml-${{ env.cache-name }}-git-
     - name: Build & Install
+      env: {CXXFLAGS: "-fno-operator-names -Werror -Wall -Wextra -Wpedantic -Wnull-dereference -Wfloat-conversion -Wshadow -Woverloaded-virtual -Wextra-semi -Wunreachable-code -Wnon-virtual-dtor -Wno-sign-compare"}
       run: |
+        set +e
+        source /opt/intel/oneapi/setvars.sh
+        set -e
         export CCACHE_COMPRESS=1
-        export CCACHE_COMPRESSLEVEL=8
-        export CCACHE_MAXSIZE=1000M
+        export CCACHE_COMPRESSLEVEL=10
+        export CCACHE_MAXSIZE=125M
+        export CCACHE_COMPILERTYPE=clang
         ccache -z
-        mkdir build
-        cd build
-        cmake ..                                  \
+        cmake -S . -B build                                \
+            -DCMAKE_VERBOSE_MAKEFILE=ON                    \
+            -DAMReX_EB=OFF                                 \
+            -DAMReX_ENABLE_TESTS=ON                        \
+            -DAMReX_FORTRAN=ON                             \
+            -DAMReX_PARTICLES=ON                           \
+            -DAMReX_GPU_BACKEND=SYCL                       \
+            -DCMAKE_C_COMPILER=$(which icx)                \
+            -DCMAKE_CXX_COMPILER=$(which icpx)             \
+            -DCMAKE_Fortran_COMPILER=$(which ifx)          \
             -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
-        make -j 2
+        cmake --build build --parallel 2
+
         ccache -s
+
