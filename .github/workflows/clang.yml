@@ -61,10 +61,10 @@ jobs:
         make install
         make test_install
 
-        ../Tools/C_scripts/mmclt.py --input ../ccache.log.txt
+        ${{github.workspace}}/Tools/C_scripts/mmclt.py --input ${{github.workspace}}/ccache.log.txt
         make -j2 -f clang-tidy-ccache-misses.mak \
             CLANG_TIDY=clang-tidy-12 \
-            CLANG_TIDY_ARGS="--config-file=../.clang-tidy --warnings-as-errors=*"
+            CLANG_TIDY_ARGS="--config-file=${{github.workspace}}/.clang-tidy --warnings-as-errors=*"
 
         export PATH=/tmp/my-amrex/bin:$PATH
         which fcompare
@@ -121,10 +121,10 @@ jobs:
             -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
         make -j 2
 
-        ../Tools/C_scripts/mmclt.py --input ../ccache.log.txt
+        ${{github.workspace}}/Tools/C_scripts/mmclt.py --input ${{github.workspace}}/ccache.log.txt
         make -j2 -f clang-tidy-ccache-misses.mak \
             CLANG_TIDY=clang-tidy-14 \
-            CLANG_TIDY_ARGS="--config-file=../.clang-tidy --warnings-as-errors=*"
+            CLANG_TIDY_ARGS="--config-file=${{github.workspace}}/.clang-tidy --warnings-as-errors=*"
 
         ctest --output-on-failure -E GhostsAndVirtuals
 
@@ -164,9 +164,9 @@ jobs:
             CCACHE=ccache
         make install
 
-        Tools/C_scripts/mmclt.py
+        ${{github.workspace}}/Tools/C_scripts/mmclt.py --input ${{github.workspace}}/ccache.log.txt
         make -j2 -f clang-tidy-ccache-misses.mak \
             CLANG_TIDY=clang-tidy-14 \
-            CLANG_TIDY_ARGS="--config-file=.clang-tidy --warnings-as-errors=*"
+            CLANG_TIDY_ARGS="--config-file=${{github.workspace}}/.clang-tidy --warnings-as-errors=*"
 
         ccache -s

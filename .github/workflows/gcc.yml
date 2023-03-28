@@ -56,10 +56,10 @@ jobs:
         make install
         make test_install
 
-        ../Tools/C_scripts/mmclt.py --input ../ccache.log.txt
+        ${{github.workspace}}/Tools/C_scripts/mmclt.py --input ${{github.workspace}}/ccache.log.txt
         make -j2 -f clang-tidy-ccache-misses.mak \
             CLANG_TIDY=clang-tidy-12 \
-            CLANG_TIDY_ARGS="--config-file=../.clang-tidy --warnings-as-errors=*"
+            CLANG_TIDY_ARGS="--config-file=${{github.workspace}}/.clang-tidy --warnings-as-errors=*"
 
         export PATH=/tmp/my-amrex/bin:$PATH
         which fcompare
@@ -110,10 +110,10 @@ jobs:
             -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
         cmake --build build -j 2
 
-        Tools/C_scripts/mmclt.py
+        ${{github.workspace}}/Tools/C_scripts/mmclt.py --input ${{github.workspace}}/ccache.log.txt
         make -j2 -f clang-tidy-ccache-misses.mak \
             CLANG_TIDY=clang-tidy-12 \
-            CLANG_TIDY_ARGS="--config-file=.clang-tidy --warnings-as-errors=*"
+            CLANG_TIDY_ARGS="--config-file=${{github.workspace}}/.clang-tidy --warnings-as-errors=*"
 
         ctest --test-dir build --output-on-failure
 
@@ -160,10 +160,10 @@ jobs:
             -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
         cmake --build build -j 2
 
-        Tools/C_scripts/mmclt.py
+        ${{github.workspace}}/Tools/C_scripts/mmclt.py --input ${{github.workspace}}/ccache.log.txt
         make -j2 -f clang-tidy-ccache-misses.mak \
             CLANG_TIDY=clang-tidy-12 \
-            CLANG_TIDY_ARGS="--config-file=.clang-tidy --warnings-as-errors=*"
+            CLANG_TIDY_ARGS="--config-file=${{github.workspace}}/.clang-tidy --warnings-as-errors=*"
 
         ctest --test-dir build --output-on-failure
 
@@ -211,10 +211,10 @@ jobs:
             -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
         cmake --build build -j 2
 
-        Tools/C_scripts/mmclt.py
+        ${{github.workspace}}/Tools/C_scripts/mmclt.py --input ${{github.workspace}}/ccache.log.txt
         make -j2 -f clang-tidy-ccache-misses.mak \
             CLANG_TIDY=clang-tidy-12 \
-            CLANG_TIDY_ARGS="--config-file=.clang-tidy --warnings-as-errors=*"
+            CLANG_TIDY_ARGS="--config-file=${{github.workspace}}/.clang-tidy --warnings-as-errors=*"
 
         ctest --test-dir build --output-on-failure
 
@@ -271,10 +271,10 @@ jobs:
             # Cannot use C++20 yet -DAMReX_CLANG_TIDY_WERROR=ON
         make -j 2
 
-        ../Tools/C_scripts/mmclt.py --input ../ccache.log.txt
+        ${{github.workspace}}/Tools/C_scripts/mmclt.py --input ${{github.workspace}}/ccache.log.txt
         make -j2 -f clang-tidy-ccache-misses.mak \
             CLANG_TIDY=clang-tidy-12 \
-            CLANG_TIDY_ARGS="--config-file=../.clang-tidy --warnings-as-errors=*"
+            CLANG_TIDY_ARGS="--config-file=${{github.workspace}}/.clang-tidy --warnings-as-errors=*"
 
         ctest --output-on-failure
 
@@ -330,10 +330,10 @@ jobs:
             -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
         make -j 2
 
-        ../Tools/C_scripts/mmclt.py --input ../ccache.log.txt
+        ${{github.workspace}}/Tools/C_scripts/mmclt.py --input ${{github.workspace}}/ccache.log.txt
         make -j2 -f clang-tidy-ccache-misses.mak \
             CLANG_TIDY=clang-tidy-12 \
-            CLANG_TIDY_ARGS="--config-file=../.clang-tidy --warnings-as-errors=*"
+            CLANG_TIDY_ARGS="--config-file=${{github.workspace}}/.clang-tidy --warnings-as-errors=*"
 
         ctest --output-on-failure
 
@@ -396,10 +396,10 @@ jobs:
             -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
         make -j 2
 
-        ../Tools/C_scripts/mmclt.py --input ../ccache.log.txt
+        ${{github.workspace}}/Tools/C_scripts/mmclt.py --input ${{github.workspace}}/ccache.log.txt
         make -j2 -f clang-tidy-ccache-misses.mak \
             CLANG_TIDY=clang-tidy-14 \
-            CLANG_TIDY_ARGS="--config-file=../.clang-tidy --warnings-as-errors=*"
+            CLANG_TIDY_ARGS="--config-file=${{github.workspace}}/.clang-tidy --warnings-as-errors=*"
 
         ctest --output-on-failure
 
@@ -439,10 +439,10 @@ jobs:
             CCACHE=ccache
         make install
 
-        Tools/C_scripts/mmclt.py
+        ${{github.workspace}}/Tools/C_scripts/mmclt.py --input ${{github.workspace}}/ccache.log.txt
         make -j2 -f clang-tidy-ccache-misses.mak \
             CLANG_TIDY=clang-tidy-12 \
-            CLANG_TIDY_ARGS="--config-file=.clang-tidy --warnings-as-errors=*"
+            CLANG_TIDY_ARGS="--config-file=${{github.workspace}}/.clang-tidy --warnings-as-errors=*"
 
         ccache -s
 
@@ -480,10 +480,10 @@ jobs:
             CCACHE=ccache
         make install
 
-        Tools/C_scripts/mmclt.py
+        ${{github.workspace}}/Tools/C_scripts/mmclt.py --input ${{github.workspace}}/ccache.log.txt
         make -j2 -f clang-tidy-ccache-misses.mak \
             CLANG_TIDY=clang-tidy-12 \
-            CLANG_TIDY_ARGS="--config-file=.clang-tidy --warnings-as-errors=*"
+            CLANG_TIDY_ARGS="--config-file=${{github.workspace}}/.clang-tidy --warnings-as-errors=*"
 
         ccache -s
 
@@ -521,10 +521,10 @@ jobs:
             CCACHE=ccache
         make install
 
-        Tools/C_scripts/mmclt.py
+        ${{github.workspace}}/Tools/C_scripts/mmclt.py --input ${{github.workspace}}/ccache.log.txt
         make -j2 -f clang-tidy-ccache-misses.mak \
             CLANG_TIDY=clang-tidy-12 \
-            CLANG_TIDY_ARGS="--config-file=.clang-tidy --warnings-as-errors=*"
+            CLANG_TIDY_ARGS="--config-file=${{github.workspace}}/.clang-tidy --warnings-as-errors=*"
 
         ccache -s
 
@@ -562,10 +562,10 @@ jobs:
             CCACHE=ccache
         make install
 
-        Tools/C_scripts/mmclt.py
+        ${{github.workspace}}/Tools/C_scripts/mmclt.py --input ${{github.workspace}}/ccache.log.txt
         make -j2 -f clang-tidy-ccache-misses.mak \
             CLANG_TIDY=clang-tidy-12 \
-            CLANG_TIDY_ARGS="--config-file=.clang-tidy --warnings-as-errors=*"
+            CLANG_TIDY_ARGS="--config-file=${{github.workspace}}/.clang-tidy --warnings-as-errors=*"
 
         ccache -s
 
@@ -602,10 +602,10 @@ jobs:
         make -j2 USE_MPI=FALSE USE_OMP=FALSE WARN_ALL=TRUE WARN_ERROR=TRUE XTRA_CXXFLAGS=-fno-operator-names \
             CCACHE=ccache
 
-        ../../Tools/C_scripts/mmclt.py --input ../../ccache.log.txt
+        ${{github.workspace}}/Tools/C_scripts/mmclt.py --input ${{github.workspace}}/ccache.log.txt
         make -j2 -f clang-tidy-ccache-misses.mak \
             CLANG_TIDY=clang-tidy-12 \
-            CLANG_TIDY_ARGS="--config-file=../../.clang-tidy --warnings-as-errors=*"
+            CLANG_TIDY_ARGS="--config-file=${{github.workspace}}/.clang-tidy --warnings-as-errors=*"
 
         ccache -s
 
@@ -649,10 +649,10 @@ jobs:
             -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
         make -j 2
 
-        ../Tools/C_scripts/mmclt.py --input ../ccache.log.txt
+        ${{github.workspace}}/Tools/C_scripts/mmclt.py --input ${{github.workspace}}/ccache.log.txt
         make -j2 -f clang-tidy-ccache-misses.mak \
             CLANG_TIDY=clang-tidy-12 \
-            CLANG_TIDY_ARGS="--config-file=../.clang-tidy --warnings-as-errors=*"
+            CLANG_TIDY_ARGS="--config-file=${{github.workspace}}/.clang-tidy --warnings-as-errors=*"
 
         ccache -s
 
