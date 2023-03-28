@@ -8,6 +8,12 @@ ifneq ($(NO_CONFIG_CHECKING),TRUE)
   ifeq ($(HIP_PATH),)
     $(error hipconfig failed. Is the HIP toolkit available?)
   endif
+
+  ifeq ($(hipcc_major_version),5)
+    ifneq (,$(filter $(hipcc_minor_version),3 4))
+      $(warning *** There is a performance regression for some kernels in ROCm 5.3 and 5.4)
+    endif
+  endif
 endif
 
 CXX = $(HIP_PATH)/bin/hipcc
