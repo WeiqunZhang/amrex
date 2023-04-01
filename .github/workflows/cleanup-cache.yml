@@ -33,6 +33,9 @@ jobs:
           # Triggering workflow run name (e.g., LinuxClang)
           WORKFLOW_NAME=${{ github.event.workflow_run.name }}
 
+          echo ${{ toJSON(github.event.workflow_run) }}
+          echo ${{ github.ref }}
+
           if [[ $EVENT == "push" ]]; then
             BRANCH=${{ github.ref }}
           else
