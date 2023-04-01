@@ -35,6 +35,7 @@ jobs:
 
           echo ${{ toJSON(github.event.workflow_run) }}
           echo ${{ github.ref }}
+          echo ${{ github.head_ref }}
 
           if [[ $EVENT == "push" ]]; then
             BRANCH=${{ github.ref }}
