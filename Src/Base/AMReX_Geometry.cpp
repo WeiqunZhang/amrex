@@ -7,6 +7,7 @@
 #include <AMReX_Utility.H>
 #include <AMReX_SPACE.H>
 #include <AMReX_COORDSYS_C.H>
+#include <AMReX_Print.H>
 
 #include <AMReX_OpenMP.H>
 
@@ -518,6 +519,8 @@ Geometry::computeRoundoffDomain ()
         inv_dx[k] = 1.0_rt/dx[k];
     }
 
+    amrex::Print() << "xxxxx size of " << sizeof(Real) << " " << sizeof(ParticleReal) << std::endl;
+
     for (int idim = 0; idim < AMREX_SPACEDIM; ++idim)
     {
         int ilo = Domain().smallEnd(idim);
@@ -540,11 +543,13 @@ Geometry::computeRoundoffDomain ()
         int iters = 0;
         while (roundoff_lo[idim] < plo && iters < 20) {
             roundoff_lo[idim] = std::nextafter(roundoff_lo[idim], roundoff_hi[idim]);
+            amrex::Print().SetPrecision(17) << "xxxxx lo idim = " << idim << " iters = " << iters << ": " << roundoff_lo[idim] << " " << roundoff_hi[idim] << " " << plo << std::endl;
             iters++;
         }
         ParticleReal rhi = roundoff_hi[idim];
         while (iters < 20) {
             rhi = std::nextafter(rhi, roundoff_lo[idim]);
+            amrex::Print().SetPrecision(17) << "xxxxx hi idim = " << idim << " iters = " << iters << ": " << roundoff_lo[idim] << " " << roundoff_hi[idim] << " " << plo << std::endl;
             if (int(std::floor((rhi - plo)*dxinv)) >= ihi + 1 - ilo) {
                 roundoff_hi[idim] = rhi;
             } else {
@@ -552,6 +557,8 @@ Geometry::computeRoundoffDomain ()
             }
             iters++;
         }
+
+        amrex::Print() << "xxxxx final iters = " << iters << std::endl;
 
         // If iters is at the limit, then the grid is ill formed and reasonable values could not
         // be found for the round off domain extent
