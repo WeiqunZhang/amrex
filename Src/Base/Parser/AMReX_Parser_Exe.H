@@ -93,17 +93,17 @@ struct alignas(8) ParserExeNEG {
 
 struct alignas(8) ParserExeF1 {
     enum parser_exe_t type = PARSER_EXE_F1;
-    parser_f1_t ftype;
+    enum parser_f1_t ftype;
 };
 
 struct alignas(8) ParserExeF2_F {
     enum parser_exe_t type = PARSER_EXE_F2_F;
-    parser_f2_t ftype;
+    enum parser_f2_t ftype;
 };
 
 struct alignas(8) ParserExeF2_B {
     enum parser_exe_t type = PARSER_EXE_F2_B;
-    parser_f2_t ftype;
+    enum parser_f2_t ftype;
 };
 
 struct alignas(8) ParserExeADD_VP {

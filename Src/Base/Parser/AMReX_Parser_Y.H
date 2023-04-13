@@ -106,10 +106,10 @@ union parser_nvp {
 
 struct parser_node {
     enum parser_node_t type;
+    int rip;              // After optimization, this may store right      pointer offset.
     struct parser_node* l;
     struct parser_node* r;
     union parser_nvp lvp; // After optimization, this may store left value/pointer offset.
-    int rip;              //                     this may store right      pointer offset.
 };
 
 struct parser_number {
@@ -119,29 +119,29 @@ struct parser_number {
 
 struct parser_symbol {
     enum parser_node_t type;
-    char* name;
     int ip;
+    char* name;
 };
 
 struct parser_f1 {  /* Builtin functions with one argument */
     enum parser_node_t type;
-    struct parser_node* l;
     enum parser_f1_t ftype;
+    struct parser_node* l;
 };
 
 struct parser_f2 {  /* Builtin functions with two arguments */
     enum parser_node_t type;
+    enum parser_f2_t ftype;
     struct parser_node* l;
     struct parser_node* r;
-    enum parser_f2_t ftype;
 };
 
 struct parser_f3 { /* Builtin functions with three arguments */
     enum parser_node_t type;
+    enum parser_f3_t ftype;
     struct parser_node* n1;
     struct parser_node* n2;
     struct parser_node* n3;
-    enum parser_f3_t ftype;
 };
 
 struct parser_assign {
