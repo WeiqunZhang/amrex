@@ -28,9 +28,9 @@ int amrex_parserlex (void);
     struct amrex::parser_node* n;
     double d;
     struct amrex::parser_symbol* s;
-    enum amrex::parser_f1_t f1;
-    enum amrex::parser_f2_t f2;
-    enum amrex::parser_f3_t f3;
+    enum amrex::parser_f_t f1;
+    enum amrex::parser_f_t f2;
+    enum amrex::parser_f_t f3;
 }
 
 /* Define tokens.  They are used by flex too. */
@@ -87,22 +87,22 @@ input:
 exp:
   NUMBER                     { $$ = amrex::parser_newnumber($1); }
 | SYMBOL                     { $$ = amrex::parser_newsymbol($1); }
-| exp '+' exp                { $$ = amrex::parser_newnode(amrex::PARSER_ADD, $1, $3); }
-| exp '-' exp                { $$ = amrex::parser_newnode(amrex::PARSER_SUB, $1, $3); }
-| exp '*' exp                { $$ = amrex::parser_newnode(amrex::PARSER_MUL, $1, $3); }
-| exp '/' exp                { $$ = amrex::parser_newnode(amrex::PARSER_DIV, $1, $3); }
+| exp '+' exp                { $$ = amrex::parser_newf2(amrex::PARSER_F2_ADD, $1, $3); }
+| exp '-' exp                { $$ = amrex::parser_newf2(amrex::PARSER_F2_SUB, $1, $3); }
+| exp '*' exp                { $$ = amrex::parser_newf2(amrex::PARSER_F2_MUL, $1, $3); }
+| exp '/' exp                { $$ = amrex::parser_newf2(amrex::PARSER_F2_DIV, $1, $3); }
 | '(' exp ')'                { $$ = $2; }
-| exp '<' exp                { $$ = amrex::parser_newf2(amrex::PARSER_LT, $1, $3); }
-| exp '>' exp                { $$ = amrex::parser_newf2(amrex::PARSER_GT, $1, $3); }
-| exp LEQ exp                { $$ = amrex::parser_newf2(amrex::PARSER_LEQ, $1, $3); }
-| exp GEQ exp                { $$ = amrex::parser_newf2(amrex::PARSER_GEQ, $1, $3); }
-| exp EQ exp                 { $$ = amrex::parser_newf2(amrex::PARSER_EQ, $1, $3); }
-| exp NEQ exp                { $$ = amrex::parser_newf2(amrex::PARSER_NEQ, $1, $3); }
-| exp AND exp                { $$ = amrex::parser_newf2(amrex::PARSER_AND, $1, $3); }
-| exp OR exp                 { $$ = amrex::parser_newf2(amrex::PARSER_OR, $1, $3); }
-| '-'exp %prec NEG           { $$ = amrex::parser_newnode(amrex::PARSER_NEG, $2, nullptr); }
+| exp '<' exp                { $$ = amrex::parser_newf2(amrex::PARSER_F2_LT, $1, $3); }
+| exp '>' exp                { $$ = amrex::parser_newf2(amrex::PARSER_F2_GT, $1, $3); }
+| exp LEQ exp                { $$ = amrex::parser_newf2(amrex::PARSER_F2_LEQ, $1, $3); }
+| exp GEQ exp                { $$ = amrex::parser_newf2(amrex::PARSER_F2_GEQ, $1, $3); }
+| exp EQ exp                 { $$ = amrex::parser_newf2(amrex::PARSER_F2_EQ, $1, $3); }
+| exp NEQ exp                { $$ = amrex::parser_newf2(amrex::PARSER_F2_NEQ, $1, $3); }
+| exp AND exp                { $$ = amrex::parser_newf2(amrex::PARSER_F2_AND, $1, $3); }
+| exp OR exp                 { $$ = amrex::parser_newf2(amrex::PARSER_F2_OR, $1, $3); }
+| '-'exp %prec NEG           { $$ = amrex::parser_newf1(amrex::PARSER_F1_NEG, $2); }
 | '+'exp %prec UPLUS         { $$ = $2; }
-| exp POW exp                { $$ = amrex::parser_newf2(amrex::PARSER_POW, $1, $3); }
+| exp POW exp                { $$ = amrex::parser_newf2(amrex::PARSER_F2_POW, $1, $3); }
 | F1 '(' exp ')'             { $$ = amrex::parser_newf1($1, $3); }
 | F2 '(' exp ',' exp ')'     { $$ = amrex::parser_newf2($1, $3, $5); }
 | F3 '(' exp ',' exp ',' exp ')' { $$ = amrex::parser_newf3($1, $3, $5, $7); }

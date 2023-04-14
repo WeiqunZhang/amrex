@@ -39,16 +39,6 @@ parser_makesymbol (char* name)
 }
 
 struct parser_node*
-parser_newnode (enum parser_node_t type, struct parser_node* l, struct parser_node* r)
-{
-    auto *tmp = (struct parser_node*) std::malloc(sizeof(struct parser_node));
-    tmp->type = type;
-    tmp->l = l;
-    tmp->r = r;
-    return tmp;
-}
-
-struct parser_node*
 parser_newnumber (double d)
 {
     auto *r = (struct parser_number*) std::malloc(sizeof(struct parser_number));
@@ -66,22 +56,23 @@ parser_newsymbol (struct parser_symbol* symbol)
 struct parser_node*
 parser_newf1 (enum parser_f_t ftype, struct parser_node* l)
 {
-    auto *tmp = (struct parser_f1*) std::malloc(sizeof(struct parser_f1));
+    auto *tmp = (struct parser_node*) std::malloc(sizeof(struct parser_node));
     tmp->type = PARSER_F1;
-    tmp->l = l;
     tmp->ftype = ftype;
-    return (struct parser_node*) tmp;
+    tmp->l = l;
+    tmp->r = nullptr;
+    return tmp;
 }
 
 struct parser_node*
 parser_newf2 (enum parser_f_t ftype, struct parser_node* l, struct parser_node* r)
 {
-    auto *tmp = (struct parser_f2*) std::malloc(sizeof(struct parser_f2));
+    auto *tmp = (struct parser_node*) std::malloc(sizeof(struct parser_node));
     tmp->type = PARSER_F2;
+    tmp->ftype = ftype;
     tmp->l = l;
     tmp->r = r;
-    tmp->ftype = ftype;
-    return (struct parser_node*) tmp;
+    return tmp;
 }
 
 struct parser_node*
@@ -90,10 +81,10 @@ parser_newf3 (enum parser_f_t ftype, struct parser_node* n1, struct parser_node*
 {
     auto *tmp = (struct parser_f3*) std::malloc(sizeof(struct parser_f3));
     tmp->type = PARSER_F3;
+    tmp->ftype = ftype;
     tmp->n1 = n1;
     tmp->n2 = n2;
     tmp->n3 = n3;
-    tmp->ftype = ftype;
     return (struct parser_node*) tmp;
 }
 

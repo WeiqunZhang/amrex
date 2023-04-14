@@ -12,8 +12,8 @@
 %option noinput
 %option prefix="amrex_parser"
 
- /* Tokens NUMBER, SYMBOL, F1, POW, F2, etc. are defined in amrex_parser.y. */
- /* Types PARSER_F1_SQRT, PARSER_F1_EXP, etc. are defined in AMReX_Parser_y.H. */
+ /* Tokens NUMBER, SYMBOL, POW, etc. are defined in amrex_parser.y. */
+ /* Types PARSER_F1_SQRT, PARSER_F1_EXP, etc. are defined in AMReX_Parser_Y.H. */
 
  /* Used later to define NUMBER */
 EXP	([Ee][-+]?[0-9]+)
