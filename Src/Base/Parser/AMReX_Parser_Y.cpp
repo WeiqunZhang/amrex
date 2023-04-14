@@ -228,51 +228,48 @@ parser_ast_size (struct parser_node* node)
             + parser_ast_size((struct parser_node*)(((struct parser_assign*)node)->s))
             + parser_ast_size(((struct parser_assign*)node)->v);
         break;
-    case PARSER_F1_V:
-        result += parser_aligned_size(sizeof(struct parser_f1_v));
-        break;
     case PARSER_F1_P:
         result += parser_aligned_size(sizeof(struct parser_f1_p))
-            +               parser_ast_size((struct parser_f1_p*)->l);
+            +              parser_ast_size(((struct parser_f1_p*)node)->l));
         break;
     case PARSER_F2_NV:
         result += parser_aligned_size(sizeof(struct parser_f2_nv))
-            +               parser_ast_size((struct parser_f2_nv*)->l);
+            +              parser_ast_size(((struct parser_f2_nv*)node)->l);
         break;
     case PARSER_F2_NP:
         result += parser_aligned_size(sizeof(struct parser_f2_np))
-            +               parser_ast_size((struct parser_f2_np*)->l)
-            +               parser_ast_size((struct parser_f2_np*)->r);
+            +              parser_ast_size(((struct parser_f2_np*)node)->l)
+            +              parser_ast_size(((struct parser_f2_np*)node)->r);
         break;
     case PARSER_F2_VN:
         result += parser_aligned_size(sizeof(struct parser_f2_vn))
-            +               parser_ast_size((struct parser_f2_vn*)->r);
+            +              parser_ast_size(((struct parser_f2_vn*)node)->r);
         break;
     case PARSER_F2_PN:
         result += parser_aligned_size(sizeof(struct parser_f2_pn))
-            +               parser_ast_size((struct parser_f2_pn*)->l)
-            +               parser_ast_size((struct parser_f2_pn*)->r);
+            +              parser_ast_size(((struct parser_f2_pn*)node)->l)
+            +              parser_ast_size(((struct parser_f2_pn*)node)->r);
         break;
     case PARSER_F2_PV:
         result += parser_aligned_size(sizeof(struct parser_f2_pv))
-            +               parser_ast_size((struct parser_f2_pn*)->l);
+            +              parser_ast_size(((struct parser_f2_pv*)node)->l);
         break;
     case PARSER_F2_PP:
         result += parser_aligned_size(sizeof(struct parser_f2_pp))
-            +               parser_ast_size((struct parser_f2_pp*)->l)
-            +               parser_ast_size((struct parser_f2_pp*)->r);
+            +              parser_ast_size(((struct parser_f2_pp*)node)->l)
+            +              parser_ast_size(((struct parser_f2_pp*)node)->r);
         break;
     case PARSER_F2_VP:
         result += parser_aligned_size(sizeof(struct parser_f2_vp))
-            +               parser_ast_size((struct parser_f2_vp*)->r);
+            +              parser_ast_size(((struct parser_f2_vp*)node)->r);
         break;
     case PARSER_F2_NI:
         result += parser_aligned_size(sizeof(struct parser_f2_ni))
-            +               parser_ast_size((struct parser_f2_ni*)->l);
+            +              parser_ast_size(((struct parser_f2_ni*)node)->l);
         break;
     case PARSER_F2_PI:
         result += parser_aligned_size(sizeof(struct parser_f2_pi))
-            +               parser_ast_size((struct parser_f2_pi*)->l);
+            +              parser_ast_size(((struct parser_f2_pi*)node)->l);
         break;
     default:
         amrex::Abort("parser_ast_size: unknown node type " + std::to_string(node->type));
@@ -352,10 +349,6 @@ parser_ast_dup (struct amrex_parser* my_parser, struct parser_node* node, int mo
         ((struct parser_assign*)result)->v = parser_ast_dup(my_parser,
                                                  ((struct parser_assign*)node)->v, move);
         break;
-    case PARSER_F1_V:
-        result = parser_allocate(my_parser, sizeof(struct parser_f1_v));
-        std::memcpy(result, node          , sizeof(struct parser_f1_v));
-        break;
     case PARSER_F1_P:
         result = parser_allocate(my_parser, sizeof(struct parser_f1_p));
         std::memcpy(result, node          , sizeof(struct parser_f1_p));
@@ -391,8 +384,8 @@ parser_ast_dup (struct amrex_parser* my_parser, struct parser_node* node, int mo
                                                  ((struct parser_f2_pn*)node)->r, move);
         break;
     case PARSER_F2_PV:
-        result = parser_allocate(my_parser, sizeof(struct parser_f2_pn));
-        std::memcpy(result, node          , sizeof(struct parser_f2_pn));
+        result = parser_allocate(my_parser, sizeof(struct parser_f2_pv));
+        std::memcpy(result, node          , sizeof(struct parser_f2_pv));
         ((struct parser_f2_pv*)result)->l = parser_ast_dup(my_parser,
                                                  ((struct parser_f2_pv*)node)->l, move);
         break;
@@ -438,30 +431,11 @@ parser_ast_dup (struct amrex_parser* my_parser, struct parser_node* node, int mo
     return (struct parser_node*)result;
 }
 
-// xxxxx do we still need these?
-#define PARSER_MOVEUP_R(node, v) \
-    struct parser_node* n = (node)->r->r; \
-    int ip = (node)->r->rip; \
-    (node)->r = n; \
-    (node)->lvp.v = v; \
-    (node)->rip   = ip;
-#define PARSER_MOVEUP_L(node, v) \
-    struct parser_node* n = (node)->l->r; \
-    int ip = (node)->l->rip; \
-    (node)->r = n; \
-    (node)->lvp.v = v; \
-    (node)->rip   = ip;
-#define PARSER_EVAL_R(node) (node)->r->lvp.v
-#define PARSER_EVAL_L(node) (node)->l->lvp.v
-
-#define PARSER_NEG_MOVEUP(node) \
-    (node)->r = (node)->l->r; \
-    (node)->lvp.v = -(node)->l->lvp.v; \
-    (node)->rip = (node)->l->rip;
-
 void
 parser_ast_optimize (struct parser_node* node)
 {
+#if 0
+xxxxx
     /* No need to free memory because we only call this on ASTs in
      * amrex_parser that are allocated from the memory pool.
      */
@@ -1199,6 +1173,7 @@ parser_ast_optimize (struct parser_node* node)
     default:
         amrex::Abort("parser_ast_optimize: unknown node type " + std::to_string(node->type));
     }
+#endif
 }
 
 static
@@ -1207,28 +1182,28 @@ parser_ast_print_f1 (struct parser_f1* f1, std::string const& space, AllPrint& p
 {
     printer << space;
     switch (f1->ftype) {
-    case PARSER_F1_SQRT:        printer << "SQRT\n";        break;
-    case PARSER_F1_EXP:         printer << "EXP\n";         break;
-    case PARSER_F1_LOG:         printer << "LOG\n";         break;
-    case PARSER_F1_LOG10:       printer << "LOG10\n";       break;
-    case PARSER_F1_SIN:         printer << "SIN\n";         break;
-    case PARSER_F1_COS:         printer << "COS\n";         break;
-    case PARSER_F1_TAN:         printer << "TAN\n";         break;
-    case PARSER_F1_ASIN:        printer << "ASIN\n";        break;
-    case PARSER_F1_ACOS:        printer << "ACOS\n";        break;
-    case PARSER_F1_ATAN:        printer << "ATAN\n";        break;
-    case PARSER_F1_SINH:        printer << "SINH\n";        break;
-    case PARSER_F1_COSH:        printer << "COSH\n";        break;
-    case PARSER_F1_TANH:        printer << "TANH\n";        break;
-    case PARSER_F1_ABS:         printer << "ABS\n";         break;
-    case PARSER_F1_FLOOR:       printer << "FLOOR\n";       break;
-    case PARSER_F1_CEIL:        printer << "CEIL\n";        break;
-    case PARSER_F1_POW_M3:      printer << "POW(,-3)\n";    break;
-    case PARSER_F1_POW_M2:      printer << "POW(,-2)\n";    break;
-    case PARSER_F1_POW_M1:      printer << "POW(,-1)\n";    break;
-    case PARSER_F1_POW_P1:      printer << "POW(,1)\n";     break;
-    case PARSER_F1_POW_P2:      printer << "POW(,2)\n";     break;
-    case PARSER_F1_POW_P3:      printer << "POW(,3)\n";     break;
+    case PARSER_F1_NEG:           printer << "NEG\n";           break;
+    case PARSER_F1_INV:           printer << "INV\n";           break;
+    case PARSER_F1_SQRT:          printer << "SQRT\n";          break;
+    case PARSER_F1_EXP:           printer << "EXP\n";           break;
+    case PARSER_F1_LOG:           printer << "LOG\n";           break;
+    case PARSER_F1_LOG10:         printer << "LOG10\n";         break;
+    case PARSER_F1_SIN:           printer << "SIN\n";           break;
+    case PARSER_F1_COS:           printer << "COS\n";           break;
+    case PARSER_F1_TAN:           printer << "TAN\n";           break;
+    case PARSER_F1_ASIN:          printer << "ASIN\n";          break;
+    case PARSER_F1_ACOS:          printer << "ACOS\n";          break;
+    case PARSER_F1_ATAN:          printer << "ATAN\n";          break;
+    case PARSER_F1_SINH:          printer << "SINH\n";          break;
+    case PARSER_F1_COSH:          printer << "COSH\n";          break;
+    case PARSER_F1_TANH:          printer << "TANH\n";          break;
+    case PARSER_F1_ABS:           printer << "ABS\n";           break;
+    case PARSER_F1_FLOOR:         printer << "FLOOR\n";         break;
+    case PARSER_F1_CEIL:          printer << "CEIL\n";          break;
+    case PARSER_F1_POW_M3:        printer << "POW(,-3)\n";      break;
+    case PARSER_F1_POW_M2:        printer << "POW(,-2)\n";      break;
+    case PARSER_F1_POW_P2:        printer << "POW(,2)\n";       break;
+    case PARSER_F1_POW_P3:        printer << "POW(,3)\n";       break;
     case PARSER_F1_COMP_ELLINT_1: printer << "COMP_ELLINT_1\n"; break;
     case PARSER_F1_COMP_ELLINT_2: printer << "COMP_ELLINT_2\n"; break;
     default:
@@ -1243,20 +1218,24 @@ parser_ast_print_f2 (struct parser_f2* f2, std::string const& space, AllPrint& p
 {
     printer << space;
     switch (f2->ftype) {
-    case PARSER_POW:       printer << "POW\n";       break;
-    case PARSER_GT:        printer << "GT\n";        break;
-    case PARSER_LT:        printer << "LT\n";        break;
-    case PARSER_GEQ:       printer << "GEQ\n";       break;
-    case PARSER_LEQ:       printer << "LEQ\n";       break;
-    case PARSER_EQ:        printer << "EQ\n";        break;
-    case PARSER_NEQ:       printer << "NEQ\n";       break;
-    case PARSER_AND:       printer << "AND\n";       break;
-    case PARSER_OR:        printer << "OR\n";        break;
-    case PARSER_HEAVISIDE: printer << "HEAVISIDE\n"; break;
-    case PARSER_JN:        printer << "JN\n";        break;
-    case PARSER_MIN:       printer << "MIN\n";       break;
-    case PARSER_MAX:       printer << "MAX\n";       break;
-    case PARSER_FMOD:      printer << "FMOD\n";      break;
+    case PARSER_F2_ADD:       printer << "ADD\n";       break;
+    case PARSER_F2_SUB:       printer << "SUB\n";       break;
+    case PARSER_F2_MUL:       printer << "MUL\n";       break;
+    case PARSER_F2_DIV:       printer << "DIV\n";       break;
+    case PARSER_F2_POW:       printer << "POW\n";       break;
+    case PARSER_F2_GT:        printer << "GT\n";        break;
+    case PARSER_F2_LT:        printer << "LT\n";        break;
+    case PARSER_F2_GEQ:       printer << "GEQ\n";       break;
+    case PARSER_F2_LEQ:       printer << "LEQ\n";       break;
+    case PARSER_F2_EQ:        printer << "EQ\n";        break;
+    case PARSER_F2_NEQ:       printer << "NEQ\n";       break;
+    case PARSER_F2_AND:       printer << "AND\n";       break;
+    case PARSER_F2_OR:        printer << "OR\n";        break;
+    case PARSER_F2_HEAVISIDE: printer << "HEAVISIDE\n"; break;
+    case PARSER_F2_JN:        printer << "JN\n";        break;
+    case PARSER_F2_MIN:       printer << "MIN\n";       break;
+    case PARSER_F2_MAX:       printer << "MAX\n";       break;
+    case PARSER_F2_FMOD:      printer << "FMOD\n";      break;
     default:
         amrex::AllPrint() << "parser_ast_print_f2: Unknown function " << f2->ftype << "\n";
     }
@@ -1277,6 +1256,320 @@ parser_ast_print_f3 (struct parser_f3* f3, std::string const& space, AllPrint& p
     parser_ast_print(f3->n1, more_space, printer);
     parser_ast_print(f3->n2, more_space, printer);
     parser_ast_print(f3->n3, more_space, printer);
+}
+
+static
+void
+parser_ast_print_f1_p (struct parser_f1_p* node, std::string const& space, AllPrint& printer)
+{
+    printer << space;
+    switch (node->ftype) {
+    case PARSER_F1_NEG:           printer << "NEG: ";           break;
+    case PARSER_F1_INV:           printer << "INV: ";           break;
+    case PARSER_F1_SQRT:          printer << "SQRT: ";          break;
+    case PARSER_F1_EXP:           printer << "EXP: ";           break;
+    case PARSER_F1_LOG:           printer << "LOG: ";           break;
+    case PARSER_F1_LOG10:         printer << "LOG10: ";         break;
+    case PARSER_F1_SIN:           printer << "SIN: ";           break;
+    case PARSER_F1_COS:           printer << "COS: ";           break;
+    case PARSER_F1_TAN:           printer << "TAN: ";           break;
+    case PARSER_F1_ASIN:          printer << "ASIN: ";          break;
+    case PARSER_F1_ACOS:          printer << "ACOS: ";          break;
+    case PARSER_F1_ATAN:          printer << "ATAN: ";          break;
+    case PARSER_F1_SINH:          printer << "SINH: ";          break;
+    case PARSER_F1_COSH:          printer << "COSH: ";          break;
+    case PARSER_F1_TANH:          printer << "TANH: ";          break;
+    case PARSER_F1_ABS:           printer << "ABS: ";           break;
+    case PARSER_F1_FLOOR:         printer << "FLOOR: ";         break;
+    case PARSER_F1_CEIL:          printer << "CEIL: ";          break;
+    case PARSER_F1_POW_M3:        printer << "POW(,-3): ";      break;
+    case PARSER_F1_POW_M2:        printer << "POW(,-2): ";      break;
+    case PARSER_F1_POW_P2:        printer << "POW(,2): ";       break;
+    case PARSER_F1_POW_P3:        printer << "POW(,3): ";       break;
+    case PARSER_F1_COMP_ELLINT_1: printer << "COMP_ELLINT_1: "; break;
+    case PARSER_F1_COMP_ELLINT_2: printer << "COMP_ELLINT_2: "; break;
+    default:
+        amrex::AllPrint() << "parser_ast_print_f1_p: Unknown function " << node->ftype << "\n";
+    }
+    printer << ((struct parser_symbol*)(node->l))->name << "\n";
+}
+
+static
+void
+parser_ast_print_f2_nv (struct parser_f2_nv* node, std::string const& space, AllPrint& printer)
+{
+    printer << space;
+    switch (node->ftype) {
+    case PARSER_F2_ADD:       printer << "ADD: ";       break;
+    case PARSER_F2_SUB:       printer << "SUB: ";       break;
+    case PARSER_F2_MUL:       printer << "MUL: ";       break;
+    case PARSER_F2_DIV:       printer << "DIV: ";       break;
+    case PARSER_F2_POW:       printer << "POW: ";       break;
+    case PARSER_F2_GT:        printer << "GT: ";        break;
+    case PARSER_F2_LT:        printer << "LT: ";        break;
+    case PARSER_F2_GEQ:       printer << "GEQ: ";       break;
+    case PARSER_F2_LEQ:       printer << "LEQ: ";       break;
+    case PARSER_F2_EQ:        printer << "EQ: ";        break;
+    case PARSER_F2_NEQ:       printer << "NEQ: ";       break;
+    case PARSER_F2_AND:       printer << "AND: ";       break;
+    case PARSER_F2_OR:        printer << "OR: ";        break;
+    case PARSER_F2_HEAVISIDE: printer << "HEAVISIDE: "; break;
+    case PARSER_F2_JN:        printer << "JN: ";        break;
+    case PARSER_F2_MIN:       printer << "MIN: ";       break;
+    case PARSER_F2_MAX:       printer << "MAX: ";       break;
+    case PARSER_F2_FMOD:      printer << "FMOD: ";      break;
+    default:
+        amrex::AllPrint() << "parser_ast_print_f2_nv: Unknown function " << node->ftype << "\n";
+    }
+    printer << "(?, " << node->v << ")\n";
+    parser_ast_print(node->l, space+"  ", printer);
+}
+
+static
+void
+parser_ast_print_f2_np (struct parser_f2_np* node, std::string const& space, AllPrint& printer)
+{
+    printer << space;
+    switch (node->ftype) {
+    case PARSER_F2_ADD:       printer << "ADD: ";       break;
+    case PARSER_F2_SUB:       printer << "SUB: ";       break;
+    case PARSER_F2_MUL:       printer << "MUL: ";       break;
+    case PARSER_F2_DIV:       printer << "DIV: ";       break;
+    case PARSER_F2_POW:       printer << "POW: ";       break;
+    case PARSER_F2_GT:        printer << "GT: ";        break;
+    case PARSER_F2_LT:        printer << "LT: ";        break;
+    case PARSER_F2_GEQ:       printer << "GEQ: ";       break;
+    case PARSER_F2_LEQ:       printer << "LEQ: ";       break;
+    case PARSER_F2_EQ:        printer << "EQ: ";        break;
+    case PARSER_F2_NEQ:       printer << "NEQ: ";       break;
+    case PARSER_F2_AND:       printer << "AND: ";       break;
+    case PARSER_F2_OR:        printer << "OR: ";        break;
+    case PARSER_F2_HEAVISIDE: printer << "HEAVISIDE: "; break;
+    case PARSER_F2_JN:        printer << "JN: ";        break;
+    case PARSER_F2_MIN:       printer << "MIN: ";       break;
+    case PARSER_F2_MAX:       printer << "MAX: ";       break;
+    case PARSER_F2_FMOD:      printer << "FMOD: ";      break;
+    default:
+        amrex::AllPrint() << "parser_ast_print_f2_np: Unknown function " << node->ftype << "\n";
+    }
+    printer << "(?, " << ((struct parser_symbol*)(node->r))->name << ")\n";
+    parser_ast_print(node->l, space+"  ", printer);
+}
+
+static
+void
+parser_ast_print_f2_vn (struct parser_f2_vn* node, std::string const& space, AllPrint& printer)
+{
+    printer << space;
+    switch (node->ftype) {
+    case PARSER_F2_ADD:       printer << "ADD: ";       break;
+    case PARSER_F2_SUB:       printer << "SUB: ";       break;
+    case PARSER_F2_MUL:       printer << "MUL: ";       break;
+    case PARSER_F2_DIV:       printer << "DIV: ";       break;
+    case PARSER_F2_POW:       printer << "POW: ";       break;
+    case PARSER_F2_GT:        printer << "GT: ";        break;
+    case PARSER_F2_LT:        printer << "LT: ";        break;
+    case PARSER_F2_GEQ:       printer << "GEQ: ";       break;
+    case PARSER_F2_LEQ:       printer << "LEQ: ";       break;
+    case PARSER_F2_EQ:        printer << "EQ: ";        break;
+    case PARSER_F2_NEQ:       printer << "NEQ: ";       break;
+    case PARSER_F2_AND:       printer << "AND: ";       break;
+    case PARSER_F2_OR:        printer << "OR: ";        break;
+    case PARSER_F2_HEAVISIDE: printer << "HEAVISIDE: "; break;
+    case PARSER_F2_JN:        printer << "JN: ";        break;
+    case PARSER_F2_MIN:       printer << "MIN: ";       break;
+    case PARSER_F2_MAX:       printer << "MAX: ";       break;
+    case PARSER_F2_FMOD:      printer << "FMOD: ";      break;
+    default:
+        amrex::AllPrint() << "parser_ast_print_f2_nv: Unknown function " << node->ftype << "\n";
+    }
+    printer << "(" << node->v << ", ?)\n";
+    parser_ast_print(node->r, space+"  ", printer);
+}
+
+static
+void
+parser_ast_print_f2_pn (struct parser_f2_pn* node, std::string const& space, AllPrint& printer)
+{
+    printer << space;
+    switch (node->ftype) {
+    case PARSER_F2_ADD:       printer << "ADD: ";       break;
+    case PARSER_F2_SUB:       printer << "SUB: ";       break;
+    case PARSER_F2_MUL:       printer << "MUL: ";       break;
+    case PARSER_F2_DIV:       printer << "DIV: ";       break;
+    case PARSER_F2_POW:       printer << "POW: ";       break;
+    case PARSER_F2_GT:        printer << "GT: ";        break;
+    case PARSER_F2_LT:        printer << "LT: ";        break;
+    case PARSER_F2_GEQ:       printer << "GEQ: ";       break;
+    case PARSER_F2_LEQ:       printer << "LEQ: ";       break;
+    case PARSER_F2_EQ:        printer << "EQ: ";        break;
+    case PARSER_F2_NEQ:       printer << "NEQ: ";       break;
+    case PARSER_F2_AND:       printer << "AND: ";       break;
+    case PARSER_F2_OR:        printer << "OR: ";        break;
+    case PARSER_F2_HEAVISIDE: printer << "HEAVISIDE: "; break;
+    case PARSER_F2_JN:        printer << "JN: ";        break;
+    case PARSER_F2_MIN:       printer << "MIN: ";       break;
+    case PARSER_F2_MAX:       printer << "MAX: ";       break;
+    case PARSER_F2_FMOD:      printer << "FMOD: ";      break;
+    default:
+        amrex::AllPrint() << "parser_ast_print_f2_pn: Unknown function " << node->ftype << "\n";
+    }
+    printer << "(" << ((struct parser_symbol*)(node->l))->name << ", ?)\n";
+    parser_ast_print(node->r, space+"  ", printer);
+}
+
+static
+void
+parser_ast_print_f2_pv (struct parser_f2_pv* node, std::string const& space, AllPrint& printer)
+{
+    printer << space;
+    switch (node->ftype) {
+    case PARSER_F2_ADD:       printer << "ADD: ";       break;
+    case PARSER_F2_SUB:       printer << "SUB: ";       break;
+    case PARSER_F2_MUL:       printer << "MUL: ";       break;
+    case PARSER_F2_DIV:       printer << "DIV: ";       break;
+    case PARSER_F2_POW:       printer << "POW: ";       break;
+    case PARSER_F2_GT:        printer << "GT: ";        break;
+    case PARSER_F2_LT:        printer << "LT: ";        break;
+    case PARSER_F2_GEQ:       printer << "GEQ: ";       break;
+    case PARSER_F2_LEQ:       printer << "LEQ: ";       break;
+    case PARSER_F2_EQ:        printer << "EQ: ";        break;
+    case PARSER_F2_NEQ:       printer << "NEQ: ";       break;
+    case PARSER_F2_AND:       printer << "AND: ";       break;
+    case PARSER_F2_OR:        printer << "OR: ";        break;
+    case PARSER_F2_HEAVISIDE: printer << "HEAVISIDE: "; break;
+    case PARSER_F2_JN:        printer << "JN: ";        break;
+    case PARSER_F2_MIN:       printer << "MIN: ";       break;
+    case PARSER_F2_MAX:       printer << "MAX: ";       break;
+    case PARSER_F2_FMOD:      printer << "FMOD: ";      break;
+    default:
+        amrex::AllPrint() << "parser_ast_print_f2_pv: Unknown function " << node->ftype << "\n";
+    }
+    printer << "(" << ((struct parser_symbol*)(node->l))->name << ", "
+            << node.v << ")\n";
+}
+
+static
+void
+parser_ast_print_f2_pp (struct parser_f2_pp* node, std::string const& space, AllPrint& printer)
+{
+    printer << space;
+    switch (node->ftype) {
+    case PARSER_F2_ADD:       printer << "ADD: ";       break;
+    case PARSER_F2_SUB:       printer << "SUB: ";       break;
+    case PARSER_F2_MUL:       printer << "MUL: ";       break;
+    case PARSER_F2_DIV:       printer << "DIV: ";       break;
+    case PARSER_F2_POW:       printer << "POW: ";       break;
+    case PARSER_F2_GT:        printer << "GT: ";        break;
+    case PARSER_F2_LT:        printer << "LT: ";        break;
+    case PARSER_F2_GEQ:       printer << "GEQ: ";       break;
+    case PARSER_F2_LEQ:       printer << "LEQ: ";       break;
+    case PARSER_F2_EQ:        printer << "EQ: ";        break;
+    case PARSER_F2_NEQ:       printer << "NEQ: ";       break;
+    case PARSER_F2_AND:       printer << "AND: ";       break;
+    case PARSER_F2_OR:        printer << "OR: ";        break;
+    case PARSER_F2_HEAVISIDE: printer << "HEAVISIDE: "; break;
+    case PARSER_F2_JN:        printer << "JN: ";        break;
+    case PARSER_F2_MIN:       printer << "MIN: ";       break;
+    case PARSER_F2_MAX:       printer << "MAX: ";       break;
+    case PARSER_F2_FMOD:      printer << "FMOD: ";      break;
+    default:
+        amrex::AllPrint() << "parser_ast_print_f2_pp: Unknown function " << node->ftype << "\n";
+    }
+    printer << "(" << ((struct parser_symbol*)(node->l))->name
+            << ", " << ((struct parser_symbol*)(node->r))->name << ")\n";
+}
+
+static
+void
+parser_ast_print_f2_vp (struct parser_f2_vp* node, std::string const& space, AllPrint& printer)
+{
+    printer << space;
+    switch (node->ftype) {
+    case PARSER_F2_ADD:       printer << "ADD: ";       break;
+    case PARSER_F2_SUB:       printer << "SUB: ";       break;
+    case PARSER_F2_MUL:       printer << "MUL: ";       break;
+    case PARSER_F2_DIV:       printer << "DIV: ";       break;
+    case PARSER_F2_POW:       printer << "POW: ";       break;
+    case PARSER_F2_GT:        printer << "GT: ";        break;
+    case PARSER_F2_LT:        printer << "LT: ";        break;
+    case PARSER_F2_GEQ:       printer << "GEQ: ";       break;
+    case PARSER_F2_LEQ:       printer << "LEQ: ";       break;
+    case PARSER_F2_EQ:        printer << "EQ: ";        break;
+    case PARSER_F2_NEQ:       printer << "NEQ: ";       break;
+    case PARSER_F2_AND:       printer << "AND: ";       break;
+    case PARSER_F2_OR:        printer << "OR: ";        break;
+    case PARSER_F2_HEAVISIDE: printer << "HEAVISIDE: "; break;
+    case PARSER_F2_JN:        printer << "JN: ";        break;
+    case PARSER_F2_MIN:       printer << "MIN: ";       break;
+    case PARSER_F2_MAX:       printer << "MAX: ";       break;
+    case PARSER_F2_FMOD:      printer << "FMOD: ";      break;
+    default:
+        amrex::AllPrint() << "parser_ast_print_f2_vp: Unknown function " << node->ftype << "\n";
+    }
+    printer << "(" << node.v << ", " << ((struct parser_symbol*)(node->r))->name << ")\n";
+}
+
+static
+void
+parser_ast_print_f2_ni (struct parser_f2_ni* node, std::string const& space, AllPrint& printer)
+{
+    printer << space;
+    switch (node->ftype) {
+    case PARSER_F2_ADD:       printer << "ADD: ";       break;
+    case PARSER_F2_SUB:       printer << "SUB: ";       break;
+    case PARSER_F2_MUL:       printer << "MUL: ";       break;
+    case PARSER_F2_DIV:       printer << "DIV: ";       break;
+    case PARSER_F2_POW:       printer << "POW: ";       break;
+    case PARSER_F2_GT:        printer << "GT: ";        break;
+    case PARSER_F2_LT:        printer << "LT: ";        break;
+    case PARSER_F2_GEQ:       printer << "GEQ: ";       break;
+    case PARSER_F2_LEQ:       printer << "LEQ: ";       break;
+    case PARSER_F2_EQ:        printer << "EQ: ";        break;
+    case PARSER_F2_NEQ:       printer << "NEQ: ";       break;
+    case PARSER_F2_AND:       printer << "AND: ";       break;
+    case PARSER_F2_OR:        printer << "OR: ";        break;
+    case PARSER_F2_HEAVISIDE: printer << "HEAVISIDE: "; break;
+    case PARSER_F2_JN:        printer << "JN: ";        break;
+    case PARSER_F2_MIN:       printer << "MIN: ";       break;
+    case PARSER_F2_MAX:       printer << "MAX: ";       break;
+    case PARSER_F2_FMOD:      printer << "FMOD: ";      break;
+    default:
+        amrex::AllPrint() << "parser_ast_print_f2_ni: Unknown function " << node->ftype << "\n";
+    }
+    printer << "(?, " << node->i << ")\n";
+    parser_ast_print(node->l, space+"  ", printer);
+}
+
+static
+void
+parser_ast_print_f2_pi (struct parser_f2_pi* node, std::string const& space, AllPrint& printer)
+{
+    printer << space;
+    switch (node->ftype) {
+    case PARSER_F2_ADD:       printer << "ADD: ";       break;
+    case PARSER_F2_SUB:       printer << "SUB: ";       break;
+    case PARSER_F2_MUL:       printer << "MUL: ";       break;
+    case PARSER_F2_DIV:       printer << "DIV: ";       break;
+    case PARSER_F2_POW:       printer << "POW: ";       break;
+    case PARSER_F2_GT:        printer << "GT: ";        break;
+    case PARSER_F2_LT:        printer << "LT: ";        break;
+    case PARSER_F2_GEQ:       printer << "GEQ: ";       break;
+    case PARSER_F2_LEQ:       printer << "LEQ: ";       break;
+    case PARSER_F2_EQ:        printer << "EQ: ";        break;
+    case PARSER_F2_NEQ:       printer << "NEQ: ";       break;
+    case PARSER_F2_AND:       printer << "AND: ";       break;
+    case PARSER_F2_OR:        printer << "OR: ";        break;
+    case PARSER_F2_HEAVISIDE: printer << "HEAVISIDE: "; break;
+    case PARSER_F2_JN:        printer << "JN: ";        break;
+    case PARSER_F2_MIN:       printer << "MIN: ";       break;
+    case PARSER_F2_MAX:       printer << "MAX: ";       break;
+    case PARSER_F2_FMOD:      printer << "FMOD: ";      break;
+    default:
+        amrex::AllPrint() << "parser_ast_print_f2_pi: Unknown function " << node->ftype << "\n";
+    }
+    printer << "(" << ((struct parser_symbol*)(node->l))->name << ", "
+            << node.i << ")\n";
 }
 
 void
@@ -1333,40 +1626,35 @@ parser_ast_print (struct parser_node* node, std::string const& space, AllPrint& 
         parser_ast_print(node->l, more_space, printer);
         parser_ast_print(node->r, more_space, printer);
         break;
-    case PARSER_ADD_VP:
-        printer << space << "ADD: " << node->lvp.v << " "
-                << ((struct parser_symbol*)(node->r))->name << "\n";
+    case PARSER_F1_P:
+        parser_ast_print_f1_p(((struct parser_f1_p*)node, space, printer);
         break;
-    case PARSER_SUB_VP:
-        printer << space << "SUB: " << node->lvp.v << " "
-                << ((struct parser_symbol*)(node->r))->name << "\n";
+    case PARSER_F2_NV:
+        parser_ast_print_f2_nv(((struct parser_f2_nv*)node, space, printer);
         break;
-    case PARSER_MUL_VP:
-        printer << space << "MUL: " << node->lvp.v << " "
-                << ((struct parser_symbol*)(node->r))->name << "\n";
+    case PARSER_F2_NP:
+        parser_ast_print_f2_np(((struct parser_f2_np*)node, space, printer);
         break;
-    case PARSER_DIV_VP:
-        printer << space << "DIV: " << node->lvp.v << " "
-                << ((struct parser_symbol*)(node->r))->name << "\n";
+    case PARSER_F2_VN:
+        parser_ast_print_f2_vn(((struct parser_f2_vn*)node, space, printer);
         break;
-    case PARSER_NEG_P:
-        printer << space << "NEG: " << ((struct parser_symbol*)(node->l))->name << "\n";
+    case PARSER_F2_PN:
+        parser_ast_print_f2_pn(((struct parser_f2_pn*)node, space, printer);
         break;
-    case PARSER_ADD_PP:
-        printer << space << "ADD: " << ((struct parser_symbol*)(node->l))->name
-                << "  "             << ((struct parser_symbol*)(node->r))->name << "\n";
+    case PARSER_F2_PV:
+        parser_ast_print_f2_pv(((struct parser_f2_pv*)node, space, printer);
         break;
-    case PARSER_SUB_PP:
-        printer << space << "SUB: " << ((struct parser_symbol*)(node->l))->name
-                << "  "             << ((struct parser_symbol*)(node->r))->name << "\n";
+    case PARSER_F2_PP:
+        parser_ast_print_f2_pp(((struct parser_f2_pp*)node, space, printer);
         break;
-    case PARSER_MUL_PP:
-        printer << space << "MUL: " << ((struct parser_symbol*)(node->l))->name
-                << "  "             << ((struct parser_symbol*)(node->r))->name << "\n";
+    case PARSER_F2_VP:
+        parser_ast_print_f2_vp(((struct parser_f2_vp*)node, space, printer);
         break;
-    case PARSER_DIV_PP:
-        printer << space << "DIV: " << ((struct parser_symbol*)(node->l))->name
-                << "  "             << ((struct parser_symbol*)(node->r))->name << "\n";
+    case PARSER_F2_NI:
+        parser_ast_print_f2_ni(((struct parser_f2_ni*)node, space, printer);
+        break;
+    case PARSER_F2_PI:
+        parser_ast_print_f2_pi(((struct parser_f2_pi*)node, space, printer);
         break;
     default:
         amrex::Abort("parser_ast_print: unknown node type " + std::to_string(node->type));
@@ -1413,16 +1701,22 @@ parser_ast_depth (struct parser_node* node)
         int d = parser_ast_depth(((struct parser_assign*)node)->v);
         return d+1;
     }
-    case PARSER_ADD_VP:
-    case PARSER_SUB_VP:
-    case PARSER_MUL_VP:
-    case PARSER_DIV_VP:
-    case PARSER_NEG_P:
-    case PARSER_ADD_PP:
-    case PARSER_SUB_PP:
-    case PARSER_MUL_PP:
-    case PARSER_DIV_PP:
+    case PARSER_F1_P:
+    case PARSER_F2_PV:
+    case PARSER_F2_PP:
+    case PARSER_F2_VP:
+    case PARSER_F2_PI:
         return 1;
+    case PARSER_F2_NV:
+        return pareser_ast_depth(((struct parser_f2_nv*)node)->l) + 1;
+    case PARSER_F2_NP:
+        return pareser_ast_depth(((struct parser_f2_np*)node)->l) + 1;
+    case PARSER_F2_VN:
+        return pareser_ast_depth(((struct parser_f2_vn*)node)->r) + 1;
+    case PARSER_F2_PN:
+        return pareser_ast_depth(((struct parser_f2_pn*)node)->r) + 1;
+    case PARSER_F2_NI:
+        return pareser_ast_depth(((struct parser_f2_ni*)node)->l) + 1;
     default:
         amrex::Abort("parser_ast_print: unknown node type " + std::to_string(node->type));
         return 0;
@@ -1467,25 +1761,54 @@ parser_ast_regvar (struct parser_node* node, char const* name, int i)
     case PARSER_ASSIGN:
         parser_ast_regvar(((struct parser_assign*)node)->v, name, i);
         break;
-    case PARSER_ADD_VP:
-    case PARSER_SUB_VP:
-    case PARSER_MUL_VP:
-    case PARSER_DIV_VP:
-        parser_ast_regvar(node->r, name, i);
-        node->rip = ((struct parser_symbol*)(node->r))->ip;
+    case PARSER_F1_P:
+        parser_ast_regvar(((struct parser_f1_p*))->l, name, i);
+        ((struct parser_f1_p*)node)->ip = ((struct parser_symbol*)
+            ((struct parser_f1_p*)node)->l)->ip;
         break;
-    case PARSER_NEG_P:
-        parser_ast_regvar(node->l, name, i);
-        node->lvp.ip = ((struct parser_symbol*)(node->l))->ip;
+    case PARSER_F2_NV:
+        parser_ast_regvar(((struct parser_f2_nv*))->l, name, i);
         break;
-    case PARSER_ADD_PP:
-    case PARSER_SUB_PP:
-    case PARSER_MUL_PP:
-    case PARSER_DIV_PP:
-        parser_ast_regvar(node->l, name, i);
-        parser_ast_regvar(node->r, name, i);
-        node->lvp.ip = ((struct parser_symbol*)(node->l))->ip;
-        node->rip = ((struct parser_symbol*)(node->r))->ip;
+    case PARSER_F2_NP:
+        parser_ast_regvar(((struct parser_f2_np*))->l, name, i);
+        parser_ast_regvar(((struct parser_f2_np*))->r, name, i);
+        ((struct parser_f2_np*)node)->rip = ((struct parser_symbol*)
+            ((struct parser_f2_np*)node)->r)->ip;
+        break;
+    case PARSER_F2_VN:
+        parser_ast_regvar(((struct parser_f2_vn*))->r, name, i);
+        break;
+    case PARSER_F2_PN:
+        parser_ast_regvar(((struct parser_f2_pn*))->l, name, i);
+        parser_ast_regvar(((struct parser_f2_pn*))->r, name, i);
+        ((struct parser_f2_pn*)node)->lip = ((struct parser_symbol*)
+            ((struct parser_f2_pn*)node)->l)->ip;
+        break;
+    case PARSER_F2_PV:
+        parser_ast_regvar(((struct parser_f2_pv*))->l, name, i);
+        ((struct parser_f2_pv*)node)->lip = ((struct parser_symbol*)
+            ((struct parser_f2_pv*)node)->l)->ip;
+        break;
+    case PARSER_F2_PP:
+        parser_ast_regvar(((struct parser_f2_pp*))->l, name, i);
+        parser_ast_regvar(((struct parser_f2_pp*))->r, name, i);
+        ((struct parser_f2_pp*)node)->lip = ((struct parser_symbol*)
+            ((struct parser_f2_pp*)node)->l)->ip;
+        ((struct parser_f2_pp*)node)->rip = ((struct parser_symbol*)
+            ((struct parser_f2_pp*)node)->r)->ip;
+        break;
+    case PARSER_F2_VP:
+        parser_ast_regvar(((struct parser_f2_vp*))->r, name, i);
+        ((struct parser_f2_vp*)node)->rip = ((struct parser_symbol*)
+            ((struct parser_f2_vp*)node)->r)->ip;
+        break;
+    case PARSER_F2_NI:
+        parser_ast_regvar(((struct parser_f2_ni*))->l, name, i);
+        break;
+    case PARSER_F2_PI:
+        parser_ast_regvar(((struct parser_f2_pi*))->l, name, i);
+        ((struct parser_f2_pi*)node)->lip = ((struct parser_symbol*)
+            ((struct parser_f2_pi*)node)->l)->ip;
         break;
     default:
         amrex::AllPrint() << "parser_ast_regvar: unknown node type " << node->type << "\n";
@@ -1509,16 +1832,11 @@ void parser_ast_setconst (struct parser_node* node, char const* name, double c)
     case PARSER_SUB:
     case PARSER_MUL:
     case PARSER_DIV:
-    case PARSER_ADD_PP:
-    case PARSER_SUB_PP:
-    case PARSER_MUL_PP:
-    case PARSER_DIV_PP:
     case PARSER_LIST:
         parser_ast_setconst(node->l, name, c);
         parser_ast_setconst(node->r, name, c);
         break;
     case PARSER_NEG:
-    case PARSER_NEG_P:
         parser_ast_setconst(node->l, name, c);
         break;
     case PARSER_F1:
@@ -1536,11 +1854,38 @@ void parser_ast_setconst (struct parser_node* node, char const* name, double c)
     case PARSER_ASSIGN:
         parser_ast_setconst(((struct parser_assign*)node)->v, name, c);
         break;
-    case PARSER_ADD_VP:
-    case PARSER_SUB_VP:
-    case PARSER_MUL_VP:
-    case PARSER_DIV_VP:
-        parser_ast_setconst(node->r, name, c);
+    case PARSER_F1_P:
+        parser_ast_setconst(((struct parser_f1_p*))->l, name, c);
+        break;
+    case PARSER_F2_NV:
+        parser_ast_setconst(((struct parser_f2_nv*))->l, name, c);
+        break;
+    case PARSER_F2_NP:
+        parser_ast_setconst(((struct parser_f2_np*))->l, name, c);
+        parser_ast_setconst(((struct parser_f2_np*))->r, name, c);
+        break;
+    case PARSER_F2_VN:
+        parser_ast_setconst(((struct parser_f2_vn*))->r, name, c);
+        break;
+    case PARSER_F2_PN:
+        parser_ast_setconst(((struct parser_f2_pn*))->l, name, c);
+        parser_ast_setconst(((struct parser_f2_pn*))->r, name, c);
+        break;
+    case PARSER_F2_PV:
+        parser_ast_setconst(((struct parser_f2_pv*))->l, name, c);
+        break;
+    case PARSER_F2_PP:
+        parser_ast_setconst(((struct parser_f2_pp*))->l, name, c);
+        parser_ast_setconst(((struct parser_f2_pp*))->r, name, c);
+        break;
+    case PARSER_F2_VP:
+        parser_ast_setconst(((struct parser_f2_vp*))->r, name, c);
+        break;
+    case PARSER_F2_NI:
+        parser_ast_setconst(((struct parser_f2_ni*))->l, name, c);
+        break;
+    case PARSER_F2_PI:
+        parser_ast_setconst(((struct parser_f2_pi*))->l, name, c);
         break;
     default:
         amrex::Abort("parser_ast_setconst: unknown node type " + std::to_string(node->type));
@@ -1561,16 +1906,11 @@ void parser_ast_get_symbols (struct parser_node* node, std::set<std::string>& sy
     case PARSER_SUB:
     case PARSER_MUL:
     case PARSER_DIV:
-    case PARSER_ADD_PP:
-    case PARSER_SUB_PP:
-    case PARSER_MUL_PP:
-    case PARSER_DIV_PP:
     case PARSER_LIST:
         parser_ast_get_symbols(node->l, symbols, local_symbols);
         parser_ast_get_symbols(node->r, symbols, local_symbols);
         break;
     case PARSER_NEG:
-    case PARSER_NEG_P:
         parser_ast_get_symbols(node->l, symbols, local_symbols);
         break;
     case PARSER_F1:
@@ -1589,11 +1929,38 @@ void parser_ast_get_symbols (struct parser_node* node, std::set<std::string>& sy
         local_symbols.emplace(((struct parser_assign*)node)->s->name);
         parser_ast_get_symbols(((struct parser_assign*)node)->v, symbols, local_symbols);
         break;
-    case PARSER_ADD_VP:
-    case PARSER_SUB_VP:
-    case PARSER_MUL_VP:
-    case PARSER_DIV_VP:
-        parser_ast_get_symbols(node->r, symbols, local_symbols);
+    case PARSER_F1_P:
+        parser_ast_get_symbols(((struct parser_f1_p*))->l, symbols, local_symbols);
+        break;
+    case PARSER_F2_NV:
+        parser_ast_get_symbols(((struct parser_f2_nv*))->l, symbols, local_symbols);
+        break;
+    case PARSER_F2_NP:
+        parser_ast_get_symbols(((struct parser_f2_np*))->l, symbols, local_symbols);
+        parser_ast_get_symbols(((struct parser_f2_np*))->r, symbols, local_symbols);
+        break;
+    case PARSER_F2_VN:
+        parser_ast_get_symbols(((struct parser_f2_vn*))->r, symbols, local_symbols);
+        break;
+    case PARSER_F2_PN:
+        parser_ast_get_symbols(((struct parser_f2_pn*))->l, symbols, local_symbols);
+        parser_ast_get_symbols(((struct parser_f2_pn*))->r, symbols, local_symbols);
+        break;
+    case PARSER_F2_PV:
+        parser_ast_get_symbols(((struct parser_f2_pv*))->l, symbols, local_symbols);
+        break;
+    case PARSER_F2_PP:
+        parser_ast_get_symbols(((struct parser_f2_pp*))->l, symbols, local_symbols);
+        parser_ast_get_symbols(((struct parser_f2_pp*))->r, symbols, local_symbols);
+        break;
+    case PARSER_F2_VP:
+        parser_ast_get_symbols(((struct parser_f2_vp*))->r, symbols, local_symbols);
+        break;
+    case PARSER_F2_NI:
+        parser_ast_get_symbols(((struct parser_f2_ni*))->l, symbols, local_symbols);
+        break;
+    case PARSER_F2_PI:
+        parser_ast_get_symbols(((struct parser_f2_pi*))->l, symbols, local_symbols);
         break;
     default:
         amrex::Abort("parser_ast_get_symbols: unknown node type " + std::to_string(node->type));
