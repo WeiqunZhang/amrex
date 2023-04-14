@@ -64,7 +64,7 @@ parser_newsymbol (struct parser_symbol* symbol)
 }
 
 struct parser_node*
-parser_newf1 (enum parser_f1_t ftype, struct parser_node* l)
+parser_newf1 (enum parser_f_t ftype, struct parser_node* l)
 {
     auto *tmp = (struct parser_f1*) std::malloc(sizeof(struct parser_f1));
     tmp->type = PARSER_F1;
@@ -74,7 +74,7 @@ parser_newf1 (enum parser_f1_t ftype, struct parser_node* l)
 }
 
 struct parser_node*
-parser_newf2 (enum parser_f2_t ftype, struct parser_node* l, struct parser_node* r)
+parser_newf2 (enum parser_f_t ftype, struct parser_node* l, struct parser_node* r)
 {
     auto *tmp = (struct parser_f2*) std::malloc(sizeof(struct parser_f2));
     tmp->type = PARSER_F2;
@@ -85,7 +85,7 @@ parser_newf2 (enum parser_f2_t ftype, struct parser_node* l, struct parser_node*
 }
 
 struct parser_node*
-parser_newf3 (enum parser_f3_t ftype, struct parser_node* n1, struct parser_node* n2,
+parser_newf3 (enum parser_f_t ftype, struct parser_node* n1, struct parser_node* n2,
               struct parser_node* n3)
 {
     auto *tmp = (struct parser_f3*) std::malloc(sizeof(struct parser_f3));
@@ -200,10 +200,6 @@ parser_ast_size (struct parser_node* node)
     case PARSER_SUB:
     case PARSER_MUL:
     case PARSER_DIV:
-    case PARSER_ADD_PP:
-    case PARSER_SUB_PP:
-    case PARSER_MUL_PP:
-    case PARSER_DIV_PP:
     case PARSER_LIST:
         result = parser_aligned_size(sizeof(struct parser_node))
             + parser_ast_size(node->l) + parser_ast_size(node->r);
@@ -232,16 +228,51 @@ parser_ast_size (struct parser_node* node)
             + parser_ast_size((struct parser_node*)(((struct parser_assign*)node)->s))
             + parser_ast_size(((struct parser_assign*)node)->v);
         break;
-    case PARSER_ADD_VP:
-    case PARSER_SUB_VP:
-    case PARSER_MUL_VP:
-    case PARSER_DIV_VP:
-        result = parser_aligned_size(sizeof(struct parser_node))
-            + parser_ast_size(node->r);
+    case PARSER_F1_V:
+        result += parser_aligned_size(sizeof(struct parser_f1_v));
         break;
-    case PARSER_NEG_P:
-        result = parser_aligned_size(sizeof(struct parser_node))
-            + parser_ast_size(node->l);
+    case PARSER_F1_P:
+        result += parser_aligned_size(sizeof(struct parser_f1_p))
+            +               parser_ast_size((struct parser_f1_p*)->l);
+        break;
+    case PARSER_F2_NV:
+        result += parser_aligned_size(sizeof(struct parser_f2_nv))
+            +               parser_ast_size((struct parser_f2_nv*)->l);
+        break;
+    case PARSER_F2_NP:
+        result += parser_aligned_size(sizeof(struct parser_f2_np))
+            +               parser_ast_size((struct parser_f2_np*)->l)
+            +               parser_ast_size((struct parser_f2_np*)->r);
+        break;
+    case PARSER_F2_VN:
+        result += parser_aligned_size(sizeof(struct parser_f2_vn))
+            +               parser_ast_size((struct parser_f2_vn*)->r);
+        break;
+    case PARSER_F2_PN:
+        result += parser_aligned_size(sizeof(struct parser_f2_pn))
+            +               parser_ast_size((struct parser_f2_pn*)->l)
+            +               parser_ast_size((struct parser_f2_pn*)->r);
+        break;
+    case PARSER_F2_PV:
+        result += parser_aligned_size(sizeof(struct parser_f2_pv))
+            +               parser_ast_size((struct parser_f2_pn*)->l);
+        break;
+    case PARSER_F2_PP:
+        result += parser_aligned_size(sizeof(struct parser_f2_pp))
+            +               parser_ast_size((struct parser_f2_pp*)->l)
+            +               parser_ast_size((struct parser_f2_pp*)->r);
+        break;
+    case PARSER_F2_VP:
+        result += parser_aligned_size(sizeof(struct parser_f2_vp))
+            +               parser_ast_size((struct parser_f2_vp*)->r);
+        break;
+    case PARSER_F2_NI:
+        result += parser_aligned_size(sizeof(struct parser_f2_ni))
+            +               parser_ast_size((struct parser_f2_ni*)->l);
+        break;
+    case PARSER_F2_PI:
+        result += parser_aligned_size(sizeof(struct parser_f2_pi))
+            +               parser_ast_size((struct parser_f2_pi*)->l);
         break;
     default:
         amrex::Abort("parser_ast_size: unknown node type " + std::to_string(node->type));
@@ -276,10 +307,6 @@ parser_ast_dup (struct amrex_parser* my_parser, struct parser_node* node, int mo
     case PARSER_SUB:
     case PARSER_MUL:
     case PARSER_DIV:
-    case PARSER_ADD_PP:
-    case PARSER_SUB_PP:
-    case PARSER_MUL_PP:
-    case PARSER_DIV_PP:
     case PARSER_LIST:
         result = parser_allocate(my_parser, sizeof(struct parser_node));
         std::memcpy(result, node          , sizeof(struct parser_node));
@@ -325,18 +352,75 @@ parser_ast_dup (struct amrex_parser* my_parser, struct parser_node* node, int mo
         ((struct parser_assign*)result)->v = parser_ast_dup(my_parser,
                                                  ((struct parser_assign*)node)->v, move);
         break;
-    case PARSER_ADD_VP:
-    case PARSER_SUB_VP:
-    case PARSER_MUL_VP:
-    case PARSER_DIV_VP:
-        result = parser_allocate(my_parser, sizeof(struct parser_node));
-        std::memcpy(result, node          , sizeof(struct parser_node));
-        ((struct parser_node*)result)->r = parser_ast_dup(my_parser, node->r, move);
+    case PARSER_F1_V:
+        result = parser_allocate(my_parser, sizeof(struct parser_f1_v));
+        std::memcpy(result, node          , sizeof(struct parser_f1_v));
         break;
-    case PARSER_NEG_P:
-        result = parser_allocate(my_parser, sizeof(struct parser_node));
-        std::memcpy(result, node          , sizeof(struct parser_node));
-        ((struct parser_node*)result)->l = parser_ast_dup(my_parser, node->l, move);
+    case PARSER_F1_P:
+        result = parser_allocate(my_parser, sizeof(struct parser_f1_p));
+        std::memcpy(result, node          , sizeof(struct parser_f1_p));
+        ((struct parser_f1_p*)result)->l = parser_ast_dup(my_parser,
+                                                 ((struct parser_f1_p*)node)->l, move);
+        break;
+    case PARSER_F2_NV:
+        result = parser_allocate(my_parser, sizeof(struct parser_f2_nv));
+        std::memcpy(result, node          , sizeof(struct parser_f2_nv));
+        ((struct parser_f2_p*)result)->l = parser_ast_dup(my_parser,
+                                                 ((struct parser_f2_nv*)node)->l, move);
+        break;
+    case PARSER_F2_NP:
+        result = parser_allocate(my_parser, sizeof(struct parser_f2_np));
+        std::memcpy(result, node          , sizeof(struct parser_f2_np));
+        ((struct parser_f2_np*)result)->l = parser_ast_dup(my_parser,
+                                                 ((struct parser_f2_np*)node)->l, move);
+        ((struct parser_f2_np*)result)->r = parser_ast_dup(my_parser,
+                                                 ((struct parser_f2_np*)node)->r, move);
+        break;
+    case PARSER_F2_VN:
+        result = parser_allocate(my_parser, sizeof(struct parser_f2_vn));
+        std::memcpy(result, node          , sizeof(struct parser_f2_vn));
+        ((struct parser_f2_vn*)result)->r = parser_ast_dup(my_parser,
+                                                 ((struct parser_f2_vn*)node)->r, move);
+        break;
+    case PARSER_F2_PN:
+        result = parser_allocate(my_parser, sizeof(struct parser_f2_pn));
+        std::memcpy(result, node          , sizeof(struct parser_f2_pn));
+        ((struct parser_f2_pn*)result)->l = parser_ast_dup(my_parser,
+                                                 ((struct parser_f2_pn*)node)->l, move);
+        ((struct parser_f2_pn*)result)->r = parser_ast_dup(my_parser,
+                                                 ((struct parser_f2_pn*)node)->r, move);
+        break;
+    case PARSER_F2_PV:
+        result = parser_allocate(my_parser, sizeof(struct parser_f2_pn));
+        std::memcpy(result, node          , sizeof(struct parser_f2_pn));
+        ((struct parser_f2_pv*)result)->l = parser_ast_dup(my_parser,
+                                                 ((struct parser_f2_pv*)node)->l, move);
+        break;
+    case PARSER_F2_PP:
+        result = parser_allocate(my_parser, sizeof(struct parser_f2_pp));
+        std::memcpy(result, node          , sizeof(struct parser_f2_pp));
+        ((struct parser_f2_pp*)result)->l = parser_ast_dup(my_parser,
+                                                 ((struct parser_f2_pp*)node)->l, move);
+        ((struct parser_f2_pp*)result)->r = parser_ast_dup(my_parser,
+                                                 ((struct parser_f2_pp*)node)->r, move);
+        break;
+    case PARSER_F2_VP:
+        result = parser_allocate(my_parser, sizeof(struct parser_f2_vp));
+        std::memcpy(result, node          , sizeof(struct parser_f2_vp));
+        ((struct parser_f2_vp*)result)->r = parser_ast_dup(my_parser,
+                                                 ((struct parser_f2_vp*)node)->r, move);
+        break;
+    case PARSER_F2_NI:
+        result = parser_allocate(my_parser, sizeof(struct parser_f2_ni));
+        std::memcpy(result, node          , sizeof(struct parser_f2_ni));
+        ((struct parser_f2_ni*)result)->l = parser_ast_dup(my_parser,
+                                                 ((struct parser_f2_ni*)node)->l, move);
+        break;
+    case PARSER_F2_PI:
+        result = parser_allocate(my_parser, sizeof(struct parser_f2_pi));
+        std::memcpy(result, node          , sizeof(struct parser_f2_pi));
+        ((struct parser_f2_pi*)result)->l = parser_ast_dup(my_parser,
+                                                 ((struct parser_f2_pi*)node)->l, move);
         break;
     default:
         amrex::Abort("parser_ast_dup: unknown node type " + std::to_string(node->type));
@@ -354,6 +438,7 @@ parser_ast_dup (struct amrex_parser* my_parser, struct parser_node* node, int mo
     return (struct parser_node*)result;
 }
 
+// xxxxx do we still need these?
 #define PARSER_MOVEUP_R(node, v) \
     struct parser_node* n = (node)->r->r; \
     int ip = (node)->r->rip; \
@@ -386,7 +471,6 @@ parser_ast_optimize (struct parser_node* node)
     case PARSER_SYMBOL:
         break;
     case PARSER_ADD:
-    case PARSER_ADD_PP:
         parser_ast_optimize(node->l);
         parser_ast_optimize(node->r);
         if (node->l->type == PARSER_NUMBER &&
@@ -400,131 +484,67 @@ parser_ast_optimize (struct parser_node* node)
         else if (node->l->type == PARSER_NUMBER &&
                  node->r->type == PARSER_SYMBOL)
         {
-            node->lvp.v = ((struct parser_number*)(node->l))->value;
-            node->rip   = ((struct parser_symbol*)(node->r))->ip;
-            node->type = PARSER_ADD_VP;
+            struct parser_node* r = node->r;
+            double v = ((struct parser_number*)(node->l))->value;
+            int p    = ((struct parser_symbol*)(node->r))->ip;
+            ((struct parser_f2_vp*)node)->type = PARSER_F2_VP;
+            ((struct parser_f2_vp*)node)->ftype = PARSER_F_ADD;
+            ((struct parser_f2_vp*)node)->r = r;
+            ((struct parser_f2_vp*)node)->v = v;
+            ((struct parser_f2_vp*)node)->p = p;
         }
         else if (node->l->type == PARSER_SYMBOL &&
                  node->r->type == PARSER_NUMBER)
         {
-            node->lvp.v = ((struct parser_number*)(node->r))->value;
-            node->rip   = ((struct parser_symbol*)(node->l))->ip;
-            node->r = node->l;
-            node->type = PARSER_ADD_VP;
+            struct parser_node* l = node->l;
+            int p    = ((struct parser_symbol*)(node->l))->ip;
+            double v = ((struct parser_number*)(node->r))->value;
+            ((struct parser_f2_pv*)node)->type = PARSER_F2_PV;
+            ((struct parser_f2_pv*)node)->ftype = PARSER_F_ADD;
+            ((struct parser_f2_pv*)node)->l = l;
+            ((struct parser_f2_pv*)node)->p = p;
+            ((struct parser_f2_pv*)node)->v = v;
         }
         else if (node->l->type == PARSER_SYMBOL &&
                  node->r->type == PARSER_SYMBOL)
         {
-            node->lvp.ip = ((struct parser_symbol*)(node->l))->ip;
-            node->rip    = ((struct parser_symbol*)(node->r))->ip;
-            node->type = PARSER_ADD_PP; // For *_PP, the names are stored in the l and r nodes.
+            struct parser_node* l = node->l;
+            struct parser_node* r = node->r;
+            int lp = ((struct parser_symbol*)(node->l))->ip;
+            int rp = ((struct parser_symbol*)(node->r))->ip;
+            ((struct parser_f2_pp*)node)->type = PARSER_F2_PP;
+            ((struct parser_f2_pp*)node)->ftype = PARSER_F_ADD;
+            ((struct parser_f2_pp*)node)->l = l;
+            ((struct parser_f2_pp*)node)->r = r;
+            ((struct parser_f2_pp*)node)->lp = lp;
+            ((struct parser_f2_pp*)node)->rp = rp;
         }
         else if (node->l->type == PARSER_NUMBER &&
-                 node->r->type == PARSER_ADD_VP)
+                 node->r->type == PARSER_F2_VN)
         {
-            double v = ((struct parser_number*)(node->l))->value + PARSER_EVAL_R(node);
-            PARSER_MOVEUP_R(node, v);
-            node->type = PARSER_ADD_VP;
+            if (((struct parser_f2_vn*)node)->ftype ==
         }
         else if (node->l->type == PARSER_NUMBER &&
-                 node->r->type == PARSER_SUB_VP)
+                 node->r->type == PARSER_F2_VP)
         {
-            double v = ((struct parser_number*)(node->l))->value + PARSER_EVAL_R(node);
-            PARSER_MOVEUP_R(node, v);
-            node->type = PARSER_SUB_VP;
-        }
-        else if (node->l->type == PARSER_ADD_VP &&
-                 node->r->type == PARSER_NUMBER)
-        {
-            double v = PARSER_EVAL_L(node) + ((struct parser_number*)(node->r))->value;
-            PARSER_MOVEUP_L(node, v);
-            node->type = PARSER_ADD_VP;
-        }
-        else if (node->l->type == PARSER_SUB_VP &&
-                 node->r->type == PARSER_NUMBER)
-        {
-            double v = PARSER_EVAL_L(node) + ((struct parser_number*)(node->r))->value;
-            PARSER_MOVEUP_L(node, v);
-            node->type = PARSER_SUB_VP;
+
         }
         else if (node->l->type == PARSER_NUMBER &&
-                 node->r->type == PARSER_ADD)
+                 node->r->type == PARSER_F2_NV)
         {
-            if (node->r->l->type == PARSER_NUMBER)
-            { // #l + (#rl + node_rr) -> (#l + #rl) + node_rr, same type
-                double v = ((struct parser_number*)(node->l))->value
-                    + ((struct parser_number*)(node->r->l))->value;
-                node->r = node->r->r;
-                ((struct parser_number*)(node->l))->value = v;
-            }
-            else if (node->r->r->type == PARSER_NUMBER)
-            { // #l + (node_rl + #rr) -> (#l + #rr) + node_rl, same type
-                double v = ((struct parser_number*)(node->l))->value
-                    + ((struct parser_number*)(node->r->r))->value;
-                node->r = node->r->l;
-                ((struct parser_number*)(node->l))->value = v;
-            }
+
         }
         else if (node->l->type == PARSER_NUMBER &&
-                 node->r->type == PARSER_SUB)
+                 node->r->type == PARSER_F2_NP)
         {
-            if (node->r->l->type == PARSER_NUMBER)
-            { // #l + (#rl - node_rr) -> (#l + #rl) - node_rr, type change
-                double v = ((struct parser_number*)(node->l))->value
-                    + ((struct parser_number*)(node->r->l))->value;
-                node->r = node->r->r;
-                ((struct parser_number*)(node->l))->value = v;
-                node->type = PARSER_SUB;
-            }
-            else if (node->r->r->type == PARSER_NUMBER)
-            { // #l + (node_rl - #rr) -> (#l - #rr) + node_rl, same type
-                double v = ((struct parser_number*)(node->l))->value
-                    - ((struct parser_number*)(node->r->r))->value;
-                node->r = node->r->l;
-                ((struct parser_number*)(node->l))->value = v;
-            }
+
         }
-        else if (node->l->type == PARSER_ADD &&
-                 node->r->type == PARSER_NUMBER)
-        {
-            if (node->l->l->type == PARSER_NUMBER)
-            { // (#ll + node_lr) + #r -> nodel_lr + (#ll + #r), same type
-                double v = ((struct parser_number*)(node->l->l))->value
-                    + ((struct parser_number*)(node->r))->value;
-                node->l = node->l->r;
-                ((struct parser_number*)(node->r))->value = v;
-            }
-            else if (node->l->r->type == PARSER_NUMBER)
-            { // (node_ll + #lr) + #r -> node_ll + (#lr + #r), same type
-                double v = ((struct parser_number*)(node->l->r))->value
-                    + ((struct parser_number*)(node->r))->value;
-                node->l = node->l->l;
-                ((struct parser_number*)(node->r))->value = v;
-            }
-        }
-        else if (node->l->type == PARSER_SUB &&
-                 node->r->type == PARSER_NUMBER)
-        {
-            if (node->l->l->type == PARSER_NUMBER)
-            { // (#ll - node_lr) + #r -> (#ll + #r) - node_lr, type change
-                double v = ((struct parser_number*)(node->l->l))->value
-                    + ((struct parser_number*)(node->r))->value;
-                node->r = node->l->r;
-                ((struct parser_number*)(node->l))->type = PARSER_NUMBER;
-                ((struct parser_number*)(node->l))->value = v;
-                node->type = PARSER_SUB;
-            }
-            else if (node->l->r->type == PARSER_NUMBER)
-            { // (node_ll - #lr) + #r -> node_ll + (#r - #lr), same type
-                double v = ((struct parser_number*)(node->r))->value
-                    - ((struct parser_number*)(node->l->r))->value;
-                node->l = node->l->l;
-                ((struct parser_number*)(node->r))->value = v;
-            }
-        }
+
+
+
+
         break;
     case PARSER_SUB:
-    case PARSER_SUB_PP:
         parser_ast_optimize(node->l);
         parser_ast_optimize(node->r);
         if (node->l->type == PARSER_NUMBER &&
@@ -1187,30 +1207,30 @@ parser_ast_print_f1 (struct parser_f1* f1, std::string const& space, AllPrint& p
 {
     printer << space;
     switch (f1->ftype) {
-    case PARSER_SQRT:        printer << "SQRT\n";        break;
-    case PARSER_EXP:         printer << "EXP\n";         break;
-    case PARSER_LOG:         printer << "LOG\n";         break;
-    case PARSER_LOG10:       printer << "LOG10\n";       break;
-    case PARSER_SIN:         printer << "SIN\n";         break;
-    case PARSER_COS:         printer << "COS\n";         break;
-    case PARSER_TAN:         printer << "TAN\n";         break;
-    case PARSER_ASIN:        printer << "ASIN\n";        break;
-    case PARSER_ACOS:        printer << "ACOS\n";        break;
-    case PARSER_ATAN:        printer << "ATAN\n";        break;
-    case PARSER_SINH:        printer << "SINH\n";        break;
-    case PARSER_COSH:        printer << "COSH\n";        break;
-    case PARSER_TANH:        printer << "TANH\n";        break;
-    case PARSER_ABS:         printer << "ABS\n";         break;
-    case PARSER_FLOOR:       printer << "FLOOR\n";       break;
-    case PARSER_CEIL:        printer << "CEIL\n";        break;
-    case PARSER_POW_M3:      printer << "POW(,-3)\n";    break;
-    case PARSER_POW_M2:      printer << "POW(,-2)\n";    break;
-    case PARSER_POW_M1:      printer << "POW(,-1)\n";    break;
-    case PARSER_POW_P1:      printer << "POW(,1)\n";     break;
-    case PARSER_POW_P2:      printer << "POW(,2)\n";     break;
-    case PARSER_POW_P3:      printer << "POW(,3)\n";     break;
-    case PARSER_COMP_ELLINT_1: printer << "COMP_ELLINT_1\n"; break;
-    case PARSER_COMP_ELLINT_2: printer << "COMP_ELLINT_2\n"; break;
+    case PARSER_F1_SQRT:        printer << "SQRT\n";        break;
+    case PARSER_F1_EXP:         printer << "EXP\n";         break;
+    case PARSER_F1_LOG:         printer << "LOG\n";         break;
+    case PARSER_F1_LOG10:       printer << "LOG10\n";       break;
+    case PARSER_F1_SIN:         printer << "SIN\n";         break;
+    case PARSER_F1_COS:         printer << "COS\n";         break;
+    case PARSER_F1_TAN:         printer << "TAN\n";         break;
+    case PARSER_F1_ASIN:        printer << "ASIN\n";        break;
+    case PARSER_F1_ACOS:        printer << "ACOS\n";        break;
+    case PARSER_F1_ATAN:        printer << "ATAN\n";        break;
+    case PARSER_F1_SINH:        printer << "SINH\n";        break;
+    case PARSER_F1_COSH:        printer << "COSH\n";        break;
+    case PARSER_F1_TANH:        printer << "TANH\n";        break;
+    case PARSER_F1_ABS:         printer << "ABS\n";         break;
+    case PARSER_F1_FLOOR:       printer << "FLOOR\n";       break;
+    case PARSER_F1_CEIL:        printer << "CEIL\n";        break;
+    case PARSER_F1_POW_M3:      printer << "POW(,-3)\n";    break;
+    case PARSER_F1_POW_M2:      printer << "POW(,-2)\n";    break;
+    case PARSER_F1_POW_M1:      printer << "POW(,-1)\n";    break;
+    case PARSER_F1_POW_P1:      printer << "POW(,1)\n";     break;
+    case PARSER_F1_POW_P2:      printer << "POW(,2)\n";     break;
+    case PARSER_F1_POW_P3:      printer << "POW(,3)\n";     break;
+    case PARSER_F1_COMP_ELLINT_1: printer << "COMP_ELLINT_1\n"; break;
+    case PARSER_F1_COMP_ELLINT_2: printer << "COMP_ELLINT_2\n"; break;
     default:
         amrex::AllPrint() << "parser_ast_print_f1: Unknown function " << f1->ftype << "\n";
     }
@@ -1223,48 +1243,20 @@ parser_ast_print_f2 (struct parser_f2* f2, std::string const& space, AllPrint& p
 {
     printer << space;
     switch (f2->ftype) {
-    case PARSER_POW:
-        printer << "POW\n";
-        break;
-    case PARSER_GT:
-        printer << "GT\n";
-        break;
-    case PARSER_LT:
-        printer << "LT\n";
-        break;
-    case PARSER_GEQ:
-        printer << "GEQ\n";
-        break;
-    case PARSER_LEQ:
-        printer << "LEQ\n";
-        break;
-    case PARSER_EQ:
-        printer << "EQ\n";
-        break;
-    case PARSER_NEQ:
-        printer << "NEQ\n";
-        break;
-    case PARSER_AND:
-        printer << "AND\n";
-        break;
-    case PARSER_OR:
-        printer << "OR\n";
-        break;
-    case PARSER_HEAVISIDE:
-        printer << "HEAVISIDE\n";
-        break;
-    case PARSER_JN:
-        printer << "JN\n";
-        break;
-    case PARSER_MIN:
-        printer << "MIN\n";
-        break;
-    case PARSER_MAX:
-        printer << "MAX\n";
-        break;
-    case PARSER_FMOD:
-        printer << "FMOD\n";
-        break;
+    case PARSER_POW:       printer << "POW\n";       break;
+    case PARSER_GT:        printer << "GT\n";        break;
+    case PARSER_LT:        printer << "LT\n";        break;
+    case PARSER_GEQ:       printer << "GEQ\n";       break;
+    case PARSER_LEQ:       printer << "LEQ\n";       break;
+    case PARSER_EQ:        printer << "EQ\n";        break;
+    case PARSER_NEQ:       printer << "NEQ\n";       break;
+    case PARSER_AND:       printer << "AND\n";       break;
+    case PARSER_OR:        printer << "OR\n";        break;
+    case PARSER_HEAVISIDE: printer << "HEAVISIDE\n"; break;
+    case PARSER_JN:        printer << "JN\n";        break;
+    case PARSER_MIN:       printer << "MIN\n";       break;
+    case PARSER_MAX:       printer << "MAX\n";       break;
+    case PARSER_FMOD:      printer << "FMOD\n";      break;
     default:
         amrex::AllPrint() << "parser_ast_print_f2: Unknown function " << f2->ftype << "\n";
     }
@@ -1278,9 +1270,7 @@ parser_ast_print_f3 (struct parser_f3* f3, std::string const& space, AllPrint& p
 {
     std::string const& more_space = space + "  ";
     switch (f3->ftype) {
-    case PARSER_IF:
-        printer << space << "IF\n";
-        break;
+    case PARSER_IF:  printer << space << "IF\n";  break;
     default:
         amrex::AllPrint() << "parser_ast_print_f3: Unknown function " << f3->ftype << "\n";
     }
