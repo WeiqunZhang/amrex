@@ -799,8 +799,8 @@ char *yytext;
 #define YY_NO_UNISTD_H
 #endif
 #define YY_NO_INPUT 1
- /* Tokens NUMBER, SYMBOL, F1, POW, F2, etc. are defined in amrex_parser.y. */
- /* Types PARSER_F1_SQRT, PARSER_F1_EXP, etc. are defined in AMReX_Parser_y.H. */
+ /* Tokens NUMBER, SYMBOL, POW, etc. are defined in amrex_parser.y. */
+ /* Types PARSER_F1_SQRT, PARSER_F1_EXP, etc. are defined in AMReX_Parser_Y.H. */
  /* Used later to define NUMBER */
 
 #define INITIAL 0

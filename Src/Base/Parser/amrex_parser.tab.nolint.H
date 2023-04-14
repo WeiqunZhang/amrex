@@ -1189,19 +1189,19 @@ yyreduce:
     break;
 
   case 6: /* exp: exp '+' exp  */
-                             { (yyval.n) = amrex::parser_newnode(amrex::PARSER_ADD, (yyvsp[-2].n), (yyvsp[0].n)); }
+                             { (yyval.n) = amrex::parser_newf2(amrex::PARSER_F2_ADD, (yyvsp[-2].n), (yyvsp[0].n)); }
     break;
 
   case 7: /* exp: exp '-' exp  */
-                             { (yyval.n) = amrex::parser_newnode(amrex::PARSER_SUB, (yyvsp[-2].n), (yyvsp[0].n)); }
+                             { (yyval.n) = amrex::parser_newf2(amrex::PARSER_F2_SUB, (yyvsp[-2].n), (yyvsp[0].n)); }
     break;
 
   case 8: /* exp: exp '*' exp  */
-                             { (yyval.n) = amrex::parser_newnode(amrex::PARSER_MUL, (yyvsp[-2].n), (yyvsp[0].n)); }
+                             { (yyval.n) = amrex::parser_newf2(amrex::PARSER_F2_MUL, (yyvsp[-2].n), (yyvsp[0].n)); }
     break;
 
   case 9: /* exp: exp '/' exp  */
-                             { (yyval.n) = amrex::parser_newnode(amrex::PARSER_DIV, (yyvsp[-2].n), (yyvsp[0].n)); }
+                             { (yyval.n) = amrex::parser_newf2(amrex::PARSER_F2_DIV, (yyvsp[-2].n), (yyvsp[0].n)); }
     break;
 
   case 10: /* exp: '(' exp ')'  */
@@ -1209,39 +1209,39 @@ yyreduce:
     break;
 
   case 11: /* exp: exp '<' exp  */
-                             { (yyval.n) = amrex::parser_newf2(amrex::PARSER_LT, (yyvsp[-2].n), (yyvsp[0].n)); }
+                             { (yyval.n) = amrex::parser_newf2(amrex::PARSER_F2_LT, (yyvsp[-2].n), (yyvsp[0].n)); }
     break;
 
   case 12: /* exp: exp '>' exp  */
-                             { (yyval.n) = amrex::parser_newf2(amrex::PARSER_GT, (yyvsp[-2].n), (yyvsp[0].n)); }
+                             { (yyval.n) = amrex::parser_newf2(amrex::PARSER_F2_GT, (yyvsp[-2].n), (yyvsp[0].n)); }
     break;
 
   case 13: /* exp: exp "<=" exp  */
-                             { (yyval.n) = amrex::parser_newf2(amrex::PARSER_LEQ, (yyvsp[-2].n), (yyvsp[0].n)); }
+                             { (yyval.n) = amrex::parser_newf2(amrex::PARSER_F2_LEQ, (yyvsp[-2].n), (yyvsp[0].n)); }
     break;
 
   case 14: /* exp: exp ">=" exp  */
-                             { (yyval.n) = amrex::parser_newf2(amrex::PARSER_GEQ, (yyvsp[-2].n), (yyvsp[0].n)); }
+                             { (yyval.n) = amrex::parser_newf2(amrex::PARSER_F2_GEQ, (yyvsp[-2].n), (yyvsp[0].n)); }
     break;
 
   case 15: /* exp: exp "==" exp  */
-                             { (yyval.n) = amrex::parser_newf2(amrex::PARSER_EQ, (yyvsp[-2].n), (yyvsp[0].n)); }
+                             { (yyval.n) = amrex::parser_newf2(amrex::PARSER_F2_EQ, (yyvsp[-2].n), (yyvsp[0].n)); }
     break;
 
   case 16: /* exp: exp "!=" exp  */
-                             { (yyval.n) = amrex::parser_newf2(amrex::PARSER_NEQ, (yyvsp[-2].n), (yyvsp[0].n)); }
+                             { (yyval.n) = amrex::parser_newf2(amrex::PARSER_F2_NEQ, (yyvsp[-2].n), (yyvsp[0].n)); }
     break;
 
   case 17: /* exp: exp "and" exp  */
-                             { (yyval.n) = amrex::parser_newf2(amrex::PARSER_AND, (yyvsp[-2].n), (yyvsp[0].n)); }
+                             { (yyval.n) = amrex::parser_newf2(amrex::PARSER_F2_AND, (yyvsp[-2].n), (yyvsp[0].n)); }
     break;
 
   case 18: /* exp: exp "or" exp  */
-                             { (yyval.n) = amrex::parser_newf2(amrex::PARSER_OR, (yyvsp[-2].n), (yyvsp[0].n)); }
+                             { (yyval.n) = amrex::parser_newf2(amrex::PARSER_F2_OR, (yyvsp[-2].n), (yyvsp[0].n)); }
     break;
 
   case 19: /* exp: '-' exp  */
-                             { (yyval.n) = amrex::parser_newnode(amrex::PARSER_NEG, (yyvsp[0].n), nullptr); }
+                             { (yyval.n) = amrex::parser_newf1(amrex::PARSER_F1_NEG, (yyvsp[0].n)); }
     break;
 
   case 20: /* exp: '+' exp  */
@@ -1249,7 +1249,7 @@ yyreduce:
     break;
 
   case 21: /* exp: exp "**" exp  */
-                             { (yyval.n) = amrex::parser_newf2(amrex::PARSER_POW, (yyvsp[-2].n), (yyvsp[0].n)); }
+                             { (yyval.n) = amrex::parser_newf2(amrex::PARSER_F2_POW, (yyvsp[-2].n), (yyvsp[0].n)); }
     break;
 
   case 22: /* exp: F1 '(' exp ')'  */
