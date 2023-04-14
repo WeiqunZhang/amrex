@@ -303,7 +303,6 @@ typedef int16_t flex_int16_t;
 typedef uint16_t flex_uint16_t;
 typedef int32_t flex_int32_t;
 typedef uint32_t flex_uint32_t;
-typedef uint64_t flex_uint64_t;
 #else
 typedef signed char flex_int8_t;
 typedef short int flex_int16_t;
@@ -412,7 +411,7 @@ typedef struct yy_buffer_state *YY_BUFFER_STATE;
 typedef size_t yy_size_t;
 #endif
 
-extern yy_size_t yyleng;
+extern int yyleng;
 
 extern FILE *yyin, *yyout;
 
@@ -455,7 +454,7 @@ struct yy_buffer_state
 	/* Number of characters read into yy_ch_buf, not including EOB
 	 * characters.
 	 */
-	yy_size_t yy_n_chars;
+	int yy_n_chars;
 
 	/* Whether we "own" the buffer - i.e., we know we created it,
 	 * and can realloc() it to grow it, and should free() it to
@@ -524,8 +523,8 @@ static YY_BUFFER_STATE * yy_buffer_stack = NULL; /**< Stack as an array. */
 
 /* yy_hold_char holds the character lost when yytext is formed. */
 static char yy_hold_char;
-static yy_size_t yy_n_chars;		/* number of characters read into yy_ch_buf */
-yy_size_t yyleng;
+static int yy_n_chars;		/* number of characters read into yy_ch_buf */
+int yyleng;
 
 /* Points to current character in buffer. */
 static char *yy_c_buf_p = NULL;
@@ -552,7 +551,7 @@ static void yy_init_buffer ( YY_BUFFER_STATE b, FILE *file  );
 
 YY_BUFFER_STATE yy_scan_buffer ( char *base, yy_size_t size  );
 YY_BUFFER_STATE yy_scan_string ( const char *yy_str  );
-YY_BUFFER_STATE yy_scan_bytes ( const char *bytes, yy_size_t len  );
+YY_BUFFER_STATE yy_scan_bytes ( const char *bytes, int len  );
 
 void *yyalloc ( yy_size_t  );
 void *yyrealloc ( void *, yy_size_t  );
@@ -608,7 +607,7 @@ static void yynoreturn yy_fatal_error ( const char* msg  );
  */
 #define YY_DO_BEFORE_ACTION \
 	(yytext_ptr) = yy_bp; \
-	yyleng = (yy_size_t) (yy_cp - yy_bp); \
+	yyleng = (int) (yy_cp - yy_bp); \
 	(yy_hold_char) = *yy_cp; \
 	*yy_cp = '\0'; \
 	(yy_c_buf_p) = yy_cp;
@@ -801,7 +800,7 @@ char *yytext;
 #endif
 #define YY_NO_INPUT 1
  /* Tokens NUMBER, SYMBOL, F1, POW, F2, etc. are defined in amrex_parser.y. */
- /* Types PARSER_SQRT, PARSER_EXP, etc. are defined in AMReX_Parser_y.H. */
+ /* Types PARSER_F1_SQRT, PARSER_F1_EXP, etc. are defined in AMReX_Parser_y.H. */
  /* Used later to define NUMBER */
 
 #define INITIAL 0
@@ -841,7 +840,7 @@ FILE *yyget_out ( void );
 
 void yyset_out  ( FILE * _out_str  );
 
-			yy_size_t yyget_leng ( void );
+			int yyget_leng ( void );
 
 char *yyget_text ( void );
 
@@ -908,7 +907,7 @@ static int input ( void );
 	if ( YY_CURRENT_BUFFER_LVALUE->yy_is_interactive ) \
 		{ \
 		int c = '*'; \
-		yy_size_t n; \
+		int n; \
 		for ( n = 0; n < max_size && \
 			     (c = getc( yyin )) != EOF && c != '\n'; ++n ) \
 			buf[n] = (char) c; \
@@ -1087,139 +1086,139 @@ YY_RULE_SETUP
   * by bison with amrex_parser.y */
 case 12:
 YY_RULE_SETUP
-{ amrex_parserlval.f1 = amrex::PARSER_SQRT;      return F1; }
+{ amrex_parserlval.f1 = amrex::PARSER_F1_SQRT;      return F1; }
 	YY_BREAK
 case 13:
 YY_RULE_SETUP
-{ amrex_parserlval.f1 = amrex::PARSER_EXP;       return F1; }
+{ amrex_parserlval.f1 = amrex::PARSER_F1_EXP;       return F1; }
 	YY_BREAK
 case 14:
 YY_RULE_SETUP
-{ amrex_parserlval.f1 = amrex::PARSER_LOG;       return F1; }
+{ amrex_parserlval.f1 = amrex::PARSER_F1_LOG;       return F1; }
 	YY_BREAK
 case 15:
 YY_RULE_SETUP
-{ amrex_parserlval.f1 = amrex::PARSER_LOG10;     return F1; }
+{ amrex_parserlval.f1 = amrex::PARSER_F1_LOG10;     return F1; }
 	YY_BREAK
 case 16:
 YY_RULE_SETUP
-{ amrex_parserlval.f1 = amrex::PARSER_SIN;       return F1; }
+{ amrex_parserlval.f1 = amrex::PARSER_F1_SIN;       return F1; }
 	YY_BREAK
 case 17:
 YY_RULE_SETUP
-{ amrex_parserlval.f1 = amrex::PARSER_COS;       return F1; }
+{ amrex_parserlval.f1 = amrex::PARSER_F1_COS;       return F1; }
 	YY_BREAK
 case 18:
 YY_RULE_SETUP
-{ amrex_parserlval.f1 = amrex::PARSER_TAN;       return F1; }
+{ amrex_parserlval.f1 = amrex::PARSER_F1_TAN;       return F1; }
 	YY_BREAK
 case 19:
 YY_RULE_SETUP
-{ amrex_parserlval.f1 = amrex::PARSER_ASIN;      return F1; }
+{ amrex_parserlval.f1 = amrex::PARSER_F1_ASIN;      return F1; }
 	YY_BREAK
 case 20:
 YY_RULE_SETUP
-{ amrex_parserlval.f1 = amrex::PARSER_ACOS;      return F1; }
+{ amrex_parserlval.f1 = amrex::PARSER_F1_ACOS;      return F1; }
 	YY_BREAK
 case 21:
 YY_RULE_SETUP
-{ amrex_parserlval.f1 = amrex::PARSER_ATAN;      return F1; }
+{ amrex_parserlval.f1 = amrex::PARSER_F1_ATAN;      return F1; }
 	YY_BREAK
 case 22:
 YY_RULE_SETUP
-{ amrex_parserlval.f1 = amrex::PARSER_SINH;      return F1; }
+{ amrex_parserlval.f1 = amrex::PARSER_F1_SINH;      return F1; }
 	YY_BREAK
 case 23:
 YY_RULE_SETUP
-{ amrex_parserlval.f1 = amrex::PARSER_COSH;      return F1; }
+{ amrex_parserlval.f1 = amrex::PARSER_F1_COSH;      return F1; }
 	YY_BREAK
 case 24:
 YY_RULE_SETUP
-{ amrex_parserlval.f1 = amrex::PARSER_TANH;      return F1; }
+{ amrex_parserlval.f1 = amrex::PARSER_F1_TANH;      return F1; }
 	YY_BREAK
 case 25:
 YY_RULE_SETUP
-{ amrex_parserlval.f1 = amrex::PARSER_ABS;       return F1; }
+{ amrex_parserlval.f1 = amrex::PARSER_F1_ABS;       return F1; }
 	YY_BREAK
 case 26:
 YY_RULE_SETUP
-{ amrex_parserlval.f1 = amrex::PARSER_ABS;       return F1; }
+{ amrex_parserlval.f1 = amrex::PARSER_F1_ABS;       return F1; }
 	YY_BREAK
 case 27:
 YY_RULE_SETUP
-{ amrex_parserlval.f1 = amrex::PARSER_FLOOR;     return F1; }
+{ amrex_parserlval.f1 = amrex::PARSER_F1_FLOOR;     return F1; }
 	YY_BREAK
 case 28:
 YY_RULE_SETUP
-{ amrex_parserlval.f1 = amrex::PARSER_CEIL;      return F1; }
+{ amrex_parserlval.f1 = amrex::PARSER_F1_CEIL;      return F1; }
 	YY_BREAK
 case 29:
 YY_RULE_SETUP
-{ amrex_parserlval.f1 = amrex::PARSER_COMP_ELLINT_1; return F1; }
+{ amrex_parserlval.f1 = amrex::PARSER_F1_COMP_ELLINT_1; return F1; }
 	YY_BREAK
 case 30:
 YY_RULE_SETUP
-{ amrex_parserlval.f1 = amrex::PARSER_COMP_ELLINT_2; return F1; }
+{ amrex_parserlval.f1 = amrex::PARSER_F1_COMP_ELLINT_2; return F1; }
 	YY_BREAK
 case 31:
 YY_RULE_SETUP
-{ amrex_parserlval.f2 = amrex::PARSER_POW;       return POW;}
+{ amrex_parserlval.f2 = amrex::PARSER_F2_POW;       return POW;}
 	YY_BREAK
 case 32:
 YY_RULE_SETUP
-{ amrex_parserlval.f2 = amrex::PARSER_POW;       return POW;}
+{ amrex_parserlval.f2 = amrex::PARSER_F2_POW;       return POW;}
 	YY_BREAK
 case 33:
 YY_RULE_SETUP
-{ amrex_parserlval.f2 = amrex::PARSER_GEQ;       return GEQ;}
+{ amrex_parserlval.f2 = amrex::PARSER_F2_GEQ;       return GEQ;}
 	YY_BREAK
 case 34:
 YY_RULE_SETUP
-{ amrex_parserlval.f2 = amrex::PARSER_LEQ;       return LEQ;}
+{ amrex_parserlval.f2 = amrex::PARSER_F2_LEQ;       return LEQ;}
 	YY_BREAK
 case 35:
 YY_RULE_SETUP
-{ amrex_parserlval.f2 = amrex::PARSER_EQ;        return EQ;}
+{ amrex_parserlval.f2 = amrex::PARSER_F2_EQ;        return EQ;}
 	YY_BREAK
 case 36:
 YY_RULE_SETUP
-{ amrex_parserlval.f2 = amrex::PARSER_NEQ;       return NEQ;}
+{ amrex_parserlval.f2 = amrex::PARSER_F2_NEQ;       return NEQ;}
 	YY_BREAK
 case 37:
 YY_RULE_SETUP
-{ amrex_parserlval.f2 = amrex::PARSER_AND;       return AND;}
+{ amrex_parserlval.f2 = amrex::PARSER_F2_AND;       return AND;}
 	YY_BREAK
 case 38:
 YY_RULE_SETUP
-{ amrex_parserlval.f2 = amrex::PARSER_OR;        return OR;}
+{ amrex_parserlval.f2 = amrex::PARSER_F2_OR;        return OR;}
 	YY_BREAK
 case 39:
 YY_RULE_SETUP
-{ amrex_parserlval.f2 = amrex::PARSER_POW;       return F2; }
+{ amrex_parserlval.f2 = amrex::PARSER_F2_POW;       return F2; }
 	YY_BREAK
 case 40:
 YY_RULE_SETUP
-{ amrex_parserlval.f2 = amrex::PARSER_HEAVISIDE; return F2; }
+{ amrex_parserlval.f2 = amrex::PARSER_F2_HEAVISIDE; return F2; }
 	YY_BREAK
 case 41:
 YY_RULE_SETUP
-{ amrex_parserlval.f2 = amrex::PARSER_JN;        return F2; }
+{ amrex_parserlval.f2 = amrex::PARSER_F2_JN;        return F2; }
 	YY_BREAK
 case 42:
 YY_RULE_SETUP
-{ amrex_parserlval.f2 = amrex::PARSER_MIN;       return F2; }
+{ amrex_parserlval.f2 = amrex::PARSER_F2_MIN;       return F2; }
 	YY_BREAK
 case 43:
 YY_RULE_SETUP
-{ amrex_parserlval.f2 = amrex::PARSER_MAX;       return F2; }
+{ amrex_parserlval.f2 = amrex::PARSER_F2_MAX;       return F2; }
 	YY_BREAK
 case 44:
 YY_RULE_SETUP
-{ amrex_parserlval.f2 = amrex::PARSER_FMOD;      return F2; }
+{ amrex_parserlval.f2 = amrex::PARSER_F2_FMOD;      return F2; }
 	YY_BREAK
 case 45:
 YY_RULE_SETUP
-{ amrex_parserlval.f3 = amrex::PARSER_IF;        return F3; }
+{ amrex_parserlval.f3 = amrex::PARSER_F3_IF;        return F3; }
 	YY_BREAK
 /* We use SYMBOL to hold variables and constants */
 case 46:
@@ -1447,7 +1446,7 @@ static int yy_get_next_buffer (void)
 
 	else
 		{
-			yy_size_t num_to_read =
+			int num_to_read =
 			YY_CURRENT_BUFFER_LVALUE->yy_buf_size - number_to_move - 1;
 
 		while ( num_to_read <= 0 )
@@ -1461,7 +1460,7 @@ static int yy_get_next_buffer (void)
 
 			if ( b->yy_is_our_buffer )
 				{
-				yy_size_t new_size = b->yy_buf_size * 2;
+				int new_size = b->yy_buf_size * 2;
 
 				if ( new_size <= 0 )
 					b->yy_buf_size += b->yy_buf_size / 8;
@@ -1519,7 +1518,7 @@ static int yy_get_next_buffer (void)
 
 	if (((yy_n_chars) + number_to_move) > YY_CURRENT_BUFFER_LVALUE->yy_buf_size) {
 		/* Extend the array by 50%, plus the number we really need. */
-		yy_size_t new_size = (yy_n_chars) + number_to_move + ((yy_n_chars) >> 1);
+		int new_size = (yy_n_chars) + number_to_move + ((yy_n_chars) >> 1);
 		YY_CURRENT_BUFFER_LVALUE->yy_ch_buf = (char *) yyrealloc(
 			(void *) YY_CURRENT_BUFFER_LVALUE->yy_ch_buf, (yy_size_t) new_size  );
 		if ( ! YY_CURRENT_BUFFER_LVALUE->yy_ch_buf )
@@ -1622,7 +1621,7 @@ static int yy_get_next_buffer (void)
 
 		else
 			{ /* need more input */
-			yy_size_t offset = (yy_c_buf_p) - (yytext_ptr);
+			int offset = (int) ((yy_c_buf_p) - (yytext_ptr));
 			++(yy_c_buf_p);
 
 			switch ( yy_get_next_buffer(  ) )
@@ -1991,12 +1990,12 @@ YY_BUFFER_STATE yy_scan_string (const char * yystr )
  * 
  * @return the newly allocated buffer state object.
  */
-YY_BUFFER_STATE yy_scan_bytes  (const char * yybytes, yy_size_t  _yybytes_len )
+YY_BUFFER_STATE yy_scan_bytes  (const char * yybytes, int  _yybytes_len )
 {
 	YY_BUFFER_STATE b;
 	char *buf;
 	yy_size_t n;
-	yy_size_t i;
+	int i;
     
 	/* Get memory for full buffer, including space for trailing EOB's. */
 	n = (yy_size_t) (_yybytes_len + 2);
@@ -2038,7 +2037,7 @@ static void yynoreturn yy_fatal_error (const char* msg )
 	do \
 		{ \
 		/* Undo effects of setting up yytext. */ \
-        yy_size_t yyless_macro_arg = (n); \
+        int yyless_macro_arg = (n); \
         YY_LESS_LINENO(yyless_macro_arg);\
 		yytext[yyleng] = (yy_hold_char); \
 		(yy_c_buf_p) = yytext + yyless_macro_arg; \
@@ -2078,7 +2077,7 @@ FILE *yyget_out  (void)
 /** Get the length of the current token.
  * 
  */
-yy_size_t yyget_leng  (void)
+int yyget_leng  (void)
 {
         return yyleng;
 }
