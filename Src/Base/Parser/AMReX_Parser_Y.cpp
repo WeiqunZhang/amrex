@@ -431,11 +431,574 @@ parser_ast_dup (struct amrex_parser* my_parser, struct parser_node* node, int mo
     return (struct parser_node*)result;
 }
 
+static
+void
+parser_ast_optimize_node (struct parser_node* node)
+{
+    if (node->l->type == PARSER_NUMBER)
+    {
+        if (node->r->type == PARSER_NUMBER)
+        {
+        }
+        else if (node->r->type == PARSER_SYMBOL)
+        {
+        }
+        else if (node->r->type == PARSER_F1_P)
+        {
+        }
+        else if (node->r->type == PARSER_F2_NV)
+        {
+        }
+        else if (node->r->type == PARSER_F2_NV)
+        {
+        }
+        else if (node->r->type == PARSER_F2_NV)
+        {
+        }
+        else if (node->r->type == PARSER_F2_NV)
+        {
+        }
+        else if (node->r->type == PARSER_F2_NV)
+        {
+        }
+        else if (node->r->type == PARSER_F2_NV)
+        {
+        }
+        else if (node->r->type == PARSER_F2_NV)
+        {
+        }
+        else if (node->r->type == PARSER_F2_NV)
+        {
+        }
+        else if (node->r->type == PARSER_F2_NV)
+        {
+        }
+        else
+        {
+
+        }
+    }
+    else if (node->l->type == PARSER_SYMBOL)
+    {
+        if (node->r->type == PARSER_NUMBER)
+        {
+        }
+        else if (node->r->type == PARSER_SYMBOL)
+        {
+        }
+        else if (node->r->type == PARSER_F1_P)
+        {
+        }
+        else if (node->r->type == PARSER_F2_NV)
+        {
+        }
+        else if (node->r->type == PARSER_F2_NV)
+        {
+        }
+        else if (node->r->type == PARSER_F2_NV)
+        {
+        }
+        else if (node->r->type == PARSER_F2_NV)
+        {
+        }
+        else if (node->r->type == PARSER_F2_NV)
+        {
+        }
+        else if (node->r->type == PARSER_F2_NV)
+        {
+        }
+        else if (node->r->type == PARSER_F2_NV)
+        {
+        }
+        else if (node->r->type == PARSER_F2_NV)
+        {
+        }
+        else if (node->r->type == PARSER_F2_NV)
+        {
+        }
+        else
+        {
+
+        }
+    }
+    else if (node->l->type == PARSER_F1_P)
+    {
+        if (node->r->type == PARSER_NUMBER)
+        {
+        }
+        else if (node->r->type == PARSER_SYMBOL)
+        {
+        }
+        else if (node->r->type == PARSER_F1_P)
+        {
+        }
+        else if (node->r->type == PARSER_F2_NV)
+        {
+        }
+        else if (node->r->type == PARSER_F2_NV)
+        {
+        }
+        else if (node->r->type == PARSER_F2_NV)
+        {
+        }
+        else if (node->r->type == PARSER_F2_NV)
+        {
+        }
+        else if (node->r->type == PARSER_F2_NV)
+        {
+        }
+        else if (node->r->type == PARSER_F2_NV)
+        {
+        }
+        else if (node->r->type == PARSER_F2_NV)
+        {
+        }
+        else if (node->r->type == PARSER_F2_NV)
+        {
+        }
+        else if (node->r->type == PARSER_F2_NV)
+        {
+        }
+        else
+        {
+
+        }
+    }
+    else if (node->l->type == PARSER_F2_NV)
+    {
+        if (node->r->type == PARSER_NUMBER)
+        {
+        }
+        else if (node->r->type == PARSER_SYMBOL)
+        {
+        }
+        else if (node->r->type == PARSER_F1_P)
+        {
+        }
+        else if (node->r->type == PARSER_F2_NV)
+        {
+        }
+        else if (node->r->type == PARSER_F2_NV)
+        {
+        }
+        else if (node->r->type == PARSER_F2_NV)
+        {
+        }
+        else if (node->r->type == PARSER_F2_NV)
+        {
+        }
+        else if (node->r->type == PARSER_F2_NV)
+        {
+        }
+        else if (node->r->type == PARSER_F2_NV)
+        {
+        }
+        else if (node->r->type == PARSER_F2_NV)
+        {
+        }
+        else if (node->r->type == PARSER_F2_NV)
+        {
+        }
+        else if (node->r->type == PARSER_F2_NV)
+        {
+        }
+        else
+        {
+
+        }
+    }
+    else if (node->l->type == PARSER_F2_NV)
+    {
+        if (node->r->type == PARSER_NUMBER)
+        {
+        }
+        else if (node->r->type == PARSER_SYMBOL)
+        {
+        }
+        else if (node->r->type == PARSER_F1_P)
+        {
+        }
+        else if (node->r->type == PARSER_F2_NV)
+        {
+        }
+        else if (node->r->type == PARSER_F2_NV)
+        {
+        }
+        else if (node->r->type == PARSER_F2_NV)
+        {
+        }
+        else if (node->r->type == PARSER_F2_NV)
+        {
+        }
+        else if (node->r->type == PARSER_F2_NV)
+        {
+        }
+        else if (node->r->type == PARSER_F2_NV)
+        {
+        }
+        else if (node->r->type == PARSER_F2_NV)
+        {
+        }
+        else if (node->r->type == PARSER_F2_NV)
+        {
+        }
+        else if (node->r->type == PARSER_F2_NV)
+        {
+        }
+        else
+        {
+
+        }
+    }
+    else if (node->l->type == PARSER_F2_NV)
+    {
+        if (node->r->type == PARSER_NUMBER)
+        {
+        }
+        else if (node->r->type == PARSER_SYMBOL)
+        {
+        }
+        else if (node->r->type == PARSER_F1_P)
+        {
+        }
+        else if (node->r->type == PARSER_F2_NV)
+        {
+        }
+        else if (node->r->type == PARSER_F2_NV)
+        {
+        }
+        else if (node->r->type == PARSER_F2_NV)
+        {
+        }
+        else if (node->r->type == PARSER_F2_NV)
+        {
+        }
+        else if (node->r->type == PARSER_F2_NV)
+        {
+        }
+        else if (node->r->type == PARSER_F2_NV)
+        {
+        }
+        else if (node->r->type == PARSER_F2_NV)
+        {
+        }
+        else if (node->r->type == PARSER_F2_NV)
+        {
+        }
+        else if (node->r->type == PARSER_F2_NV)
+        {
+        }
+        else
+        {
+
+        }
+    }
+    else if (node->l->type == PARSER_F2_NV)
+    {
+        if (node->r->type == PARSER_NUMBER)
+        {
+        }
+        else if (node->r->type == PARSER_SYMBOL)
+        {
+        }
+        else if (node->r->type == PARSER_F1_P)
+        {
+        }
+        else if (node->r->type == PARSER_F2_NV)
+        {
+        }
+        else if (node->r->type == PARSER_F2_NV)
+        {
+        }
+        else if (node->r->type == PARSER_F2_NV)
+        {
+        }
+        else if (node->r->type == PARSER_F2_NV)
+        {
+        }
+        else if (node->r->type == PARSER_F2_NV)
+        {
+        }
+        else if (node->r->type == PARSER_F2_NV)
+        {
+        }
+        else if (node->r->type == PARSER_F2_NV)
+        {
+        }
+        else if (node->r->type == PARSER_F2_NV)
+        {
+        }
+        else if (node->r->type == PARSER_F2_NV)
+        {
+        }
+        else
+        {
+
+        }
+    }
+    else if (node->l->type == PARSER_F2_NV)
+    {
+        if (node->r->type == PARSER_NUMBER)
+        {
+        }
+        else if (node->r->type == PARSER_SYMBOL)
+        {
+        }
+        else if (node->r->type == PARSER_F1_P)
+        {
+        }
+        else if (node->r->type == PARSER_F2_NV)
+        {
+        }
+        else if (node->r->type == PARSER_F2_NV)
+        {
+        }
+        else if (node->r->type == PARSER_F2_NV)
+        {
+        }
+        else if (node->r->type == PARSER_F2_NV)
+        {
+        }
+        else if (node->r->type == PARSER_F2_NV)
+        {
+        }
+        else if (node->r->type == PARSER_F2_NV)
+        {
+        }
+        else if (node->r->type == PARSER_F2_NV)
+        {
+        }
+        else if (node->r->type == PARSER_F2_NV)
+        {
+        }
+        else if (node->r->type == PARSER_F2_NV)
+        {
+        }
+        else
+        {
+
+        }
+    }
+    else if (node->l->type == PARSER_F2_NV)
+    {
+        if (node->r->type == PARSER_NUMBER)
+        {
+        }
+        else if (node->r->type == PARSER_SYMBOL)
+        {
+        }
+        else if (node->r->type == PARSER_F1_P)
+        {
+        }
+        else if (node->r->type == PARSER_F2_NV)
+        {
+        }
+        else if (node->r->type == PARSER_F2_NV)
+        {
+        }
+        else if (node->r->type == PARSER_F2_NV)
+        {
+        }
+        else if (node->r->type == PARSER_F2_NV)
+        {
+        }
+        else if (node->r->type == PARSER_F2_NV)
+        {
+        }
+        else if (node->r->type == PARSER_F2_NV)
+        {
+        }
+        else if (node->r->type == PARSER_F2_NV)
+        {
+        }
+        else if (node->r->type == PARSER_F2_NV)
+        {
+        }
+        else if (node->r->type == PARSER_F2_NV)
+        {
+        }
+        else
+        {
+
+        }
+    }
+    else if (node->l->type == PARSER_F2_NV)
+    {
+        if (node->r->type == PARSER_NUMBER)
+        {
+        }
+        else if (node->r->type == PARSER_SYMBOL)
+        {
+        }
+        else if (node->r->type == PARSER_F1_P)
+        {
+        }
+        else if (node->r->type == PARSER_F2_NV)
+        {
+        }
+        else if (node->r->type == PARSER_F2_NV)
+        {
+        }
+        else if (node->r->type == PARSER_F2_NV)
+        {
+        }
+        else if (node->r->type == PARSER_F2_NV)
+        {
+        }
+        else if (node->r->type == PARSER_F2_NV)
+        {
+        }
+        else if (node->r->type == PARSER_F2_NV)
+        {
+        }
+        else if (node->r->type == PARSER_F2_NV)
+        {
+        }
+        else if (node->r->type == PARSER_F2_NV)
+        {
+        }
+        else if (node->r->type == PARSER_F2_NV)
+        {
+        }
+        else
+        {
+
+        }
+    }
+    else if (node->l->type == PARSER_F2_NV)
+    {
+        if (node->r->type == PARSER_NUMBER)
+        {
+        }
+        else if (node->r->type == PARSER_SYMBOL)
+        {
+        }
+        else if (node->r->type == PARSER_F1_P)
+        {
+        }
+        else if (node->r->type == PARSER_F2_NV)
+        {
+        }
+        else if (node->r->type == PARSER_F2_NV)
+        {
+        }
+        else if (node->r->type == PARSER_F2_NV)
+        {
+        }
+        else if (node->r->type == PARSER_F2_NV)
+        {
+        }
+        else if (node->r->type == PARSER_F2_NV)
+        {
+        }
+        else if (node->r->type == PARSER_F2_NV)
+        {
+        }
+        else if (node->r->type == PARSER_F2_NV)
+        {
+        }
+        else if (node->r->type == PARSER_F2_NV)
+        {
+        }
+        else if (node->r->type == PARSER_F2_NV)
+        {
+        }
+        else
+        {
+
+        }
+    }
+    else if (node->l->type == PARSER_F2_NV)
+    {
+        if (node->r->type == PARSER_NUMBER)
+        {
+        }
+        else if (node->r->type == PARSER_SYMBOL)
+        {
+        }
+        else if (node->r->type == PARSER_F1_P)
+        {
+        }
+        else if (node->r->type == PARSER_F2_NV)
+        {
+        }
+        else if (node->r->type == PARSER_F2_NV)
+        {
+        }
+        else if (node->r->type == PARSER_F2_NV)
+        {
+        }
+        else if (node->r->type == PARSER_F2_NV)
+        {
+        }
+        else if (node->r->type == PARSER_F2_NV)
+        {
+        }
+        else if (node->r->type == PARSER_F2_NV)
+        {
+        }
+        else if (node->r->type == PARSER_F2_NV)
+        {
+        }
+        else if (node->r->type == PARSER_F2_NV)
+        {
+        }
+        else if (node->r->type == PARSER_F2_NV)
+        {
+        }
+        else
+        {
+
+        }
+    }
+    else
+    {
+        if (node->r->type == PARSER_NUMBER)
+        {
+        }
+        else if (node->r->type == PARSER_SYMBOL)
+        {
+        }
+        else if (node->r->type == PARSER_F1_P)
+        {
+        }
+        else if (node->r->type == PARSER_F2_NV)
+        {
+        }
+        else if (node->r->type == PARSER_F2_NV)
+        {
+        }
+        else if (node->r->type == PARSER_F2_NV)
+        {
+        }
+        else if (node->r->type == PARSER_F2_NV)
+        {
+        }
+        else if (node->r->type == PARSER_F2_NV)
+        {
+        }
+        else if (node->r->type == PARSER_F2_NV)
+        {
+        }
+        else if (node->r->type == PARSER_F2_NV)
+        {
+        }
+        else if (node->r->type == PARSER_F2_NV)
+        {
+        }
+        else if (node->r->type == PARSER_F2_NV)
+        {
+        }
+        else
+        {
+
+        }
+    }
+}
+
 void
 parser_ast_optimize (struct parser_node* node)
 {
-#if 0
-xxxxx
     /* No need to free memory because we only call this on ASTs in
      * amrex_parser that are allocated from the memory pool.
      */
@@ -447,6 +1010,10 @@ xxxxx
     case PARSER_ADD:
         parser_ast_optimize(node->l);
         parser_ast_optimize(node->r);
+        parser_ast_optimize_node(node);
+
+
+
         if (node->l->type == PARSER_NUMBER &&
             node->r->type == PARSER_NUMBER)
         {
@@ -460,23 +1027,23 @@ xxxxx
         {
             struct parser_node* r = node->r;
             double v = ((struct parser_number*)(node->l))->value;
-            int p    = ((struct parser_symbol*)(node->r))->ip;
+            int rip  = ((struct parser_symbol*)(node->r))->ip;
             ((struct parser_f2_vp*)node)->type = PARSER_F2_VP;
             ((struct parser_f2_vp*)node)->ftype = PARSER_F_ADD;
             ((struct parser_f2_vp*)node)->r = r;
             ((struct parser_f2_vp*)node)->v = v;
-            ((struct parser_f2_vp*)node)->p = p;
+            ((struct parser_f2_vp*)node)->rip = lip;
         }
         else if (node->l->type == PARSER_SYMBOL &&
                  node->r->type == PARSER_NUMBER)
         {
             struct parser_node* l = node->l;
-            int p    = ((struct parser_symbol*)(node->l))->ip;
+            int lip  = ((struct parser_symbol*)(node->l))->ip;
             double v = ((struct parser_number*)(node->r))->value;
             ((struct parser_f2_pv*)node)->type = PARSER_F2_PV;
             ((struct parser_f2_pv*)node)->ftype = PARSER_F_ADD;
             ((struct parser_f2_pv*)node)->l = l;
-            ((struct parser_f2_pv*)node)->p = p;
+            ((struct parser_f2_pv*)node)->lip = lip;
             ((struct parser_f2_pv*)node)->v = v;
         }
         else if (node->l->type == PARSER_SYMBOL &&
@@ -484,19 +1051,33 @@ xxxxx
         {
             struct parser_node* l = node->l;
             struct parser_node* r = node->r;
-            int lp = ((struct parser_symbol*)(node->l))->ip;
-            int rp = ((struct parser_symbol*)(node->r))->ip;
+            int lip = ((struct parser_symbol*)(node->l))->ip;
+            int rip = ((struct parser_symbol*)(node->r))->ip;
             ((struct parser_f2_pp*)node)->type = PARSER_F2_PP;
             ((struct parser_f2_pp*)node)->ftype = PARSER_F_ADD;
             ((struct parser_f2_pp*)node)->l = l;
             ((struct parser_f2_pp*)node)->r = r;
-            ((struct parser_f2_pp*)node)->lp = lp;
-            ((struct parser_f2_pp*)node)->rp = rp;
+            ((struct parser_f2_pp*)node)->lip = lip;
+            ((struct parser_f2_pp*)node)->rip = rip;
+        }
+        else if (node->l->type == PARSER_NUMBER &&
+                 node->r->type == PARSER_F1_P)
+        {
+            if (((struct parser_f1_p*)(node->r))->ftype == PARSER_F1_NEG)
+            {
+                struct parser_node* r = ((struct parser_f1_p*)(node->r))->l;
+                int rip = ((struct parser_f1_p*)(node->r))->ip;
+                ((struct parser_f2_np
+            }
         }
         else if (node->l->type == PARSER_NUMBER &&
                  node->r->type == PARSER_F2_VN)
         {
-            if (((struct parser_f2_vn*)node)->ftype ==
+            if (((struct parser_f2_vn*)node)->ftype == PARSER_F2_ADD)
+            {
+            }
+            else if (((struct parser_f2_vn*)node)->ftype == PARSER_F2
+
         }
         else if (node->l->type == PARSER_NUMBER &&
                  node->r->type == PARSER_F2_VP)

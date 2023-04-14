@@ -97,7 +97,8 @@ enum parser_node_t {
     PARSER_F2_PP,
     PARSER_F2_VP,
     PARSER_F2_NI,
-    PARSER_F2_PI
+    PARSER_F2_PI,
+    PARSER_NUM_TYPES
 };
 
 /* In C, the address of the first member of a struct is the same as
