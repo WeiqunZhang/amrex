@@ -637,7 +637,7 @@ TinyProfiler::PrintStats (std::map<std::string,Stats>& regstats, double dt_max)
                            << std::setw(wt+2) << "Excl. Min"
                            << std::setw(wt+2) << "Excl. Med"
                            << std::setw(wt+2) << "Excl. Max"
-                           << std::setw(wp+2)  << "Max %"
+                           << std::setw(wp+2)  << "Med %"
                            << "\n" << hline << "\n";
         for (const auto & allprocstat : allprocstats)
         {
@@ -656,7 +656,7 @@ TinyProfiler::PrintStats (std::map<std::string,Stats>& regstats, double dt_max)
                                << std::setw(wt+2) << allprocstat.dtexmed
                                << std::setw(wt+2) << allprocstat.dtexmax
                                << std::setprecision(2) << std::setw(wp+1) << std::fixed
-                               << allprocstat.dtexmax*(100.0/dt_max) << "%";
+                               << allprocstat.dtexmed*(100.0/dt_max) << "%";
             amrex::OutStream().unsetf(std::ios_base::fixed);
             amrex::OutStream() << "\n";
 #ifdef AMREX_USE_CUPTI
@@ -688,7 +688,7 @@ TinyProfiler::PrintStats (std::map<std::string,Stats>& regstats, double dt_max)
                            << std::setw(wt+2) << "Incl. Min"
                            << std::setw(wt+2) << "Incl. Med"
                            << std::setw(wt+2) << "Incl. Max"
-                           << std::setw(wp+2)  << "Max %"
+                           << std::setw(wp+2)  << "Med %"
                            << "\n" << hline << "\n";
         for (const auto & allprocstat : allprocstats)
         {
@@ -706,7 +706,7 @@ TinyProfiler::PrintStats (std::map<std::string,Stats>& regstats, double dt_max)
                                << std::setw(wt+2) << allprocstat.dtinmed
                                << std::setw(wt+2) << allprocstat.dtinmax
                                << std::setprecision(2) << std::setw(wp+1) << std::fixed
-                               << allprocstat.dtinmax*(100.0/dt_max) << "%";
+                               << allprocstat.dtinmed*(100.0/dt_max) << "%";
             amrex::OutStream().unsetf(std::ios_base::fixed);
             amrex::OutStream() << "\n";
 #ifdef AMREX_USE_CUPTI
