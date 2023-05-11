@@ -574,22 +574,34 @@ TinyProfiler::PrintStats (std::map<std::string,Stats>& regstats, double dt_max)
             ParallelDescriptor::Gather(dts, 2, &dtdt[0], 2, ioproc);
         }
 
+        std::vector<double> dtin(nprocs);
+        std::vector<double> dtex(nprocs);
         if (ParallelDescriptor::IOProcessor()) {
             ProcStats pst;
             for (int i = 0; i < nprocs; ++i) {
+                dtin[i] = dtdt[2*i];
+                dtex[i] = dtdt[2*i+1];
                 pst.nmin  = std::min(pst.nmin, ncalls[i]);
-                pst.navg +=                    ncalls[i];
                 pst.nmax  = std::max(pst.nmax, ncalls[i]);
                 pst.dtinmin  = std::min(pst.dtinmin, dtdt[2*i]);
-                pst.dtinavg +=                       dtdt[2*i];
                 pst.dtinmax  = std::max(pst.dtinmax, dtdt[2*i]);
                 pst.dtexmin  = std::min(pst.dtexmin, dtdt[2*i+1]);
-                pst.dtexavg +=                       dtdt[2*i+1];
                 pst.dtexmax  = std::max(pst.dtexmax, dtdt[2*i+1]);
             }
-            pst.navg /= nprocs;
-            pst.dtinavg /= nprocs;
-            pst.dtexavg /= nprocs;
+
+            std::sort(ncalls.begin(), ncalls.end());
+            std::sort(dtin.begin(), dtin.end());
+            std::sort(dtex.begin(), dtex.end());
+            if (nprocs %2 == 0) {
+                pst.nmed    = (ncalls[nprocs/2] + ncalls[nprocs/2-1]) / 2;
+                pst.dtinmed = (  dtin[nprocs/2] +   dtin[nprocs/2-1]) * 0.5;
+                pst.dtexmed = (  dtex[nprocs/2] +   dtex[nprocs/2-1]) * 0.5;
+            } else {
+                pst.nmed    = ncalls[nprocs/2];
+                pst.dtinmed =   dtin[nprocs/2];
+                pst.dtexmed =   dtex[nprocs/2];
+            }
+
             pst.fname = regstat.first;
 #ifdef AMREX_USE_CUPTI
             pst.usesCUPTI = it->second.usesCUPTI;
@@ -609,7 +621,7 @@ TinyProfiler::PrintStats (std::map<std::string,Stats>& regstats, double dt_max)
         wnc = std::max(wnc, int(std::string("NCalls").size()));
         wt  = std::max(wt,  int(std::string("Excl. Min").size()));
         int wp = 6;
-        wp  = std::max(wp,  int(std::string("Max %").size()));
+        wp  = std::max(wp,  int(std::string("Med %").size()));
 
         const std::string hline(maxfnamelen+wnc+2+(wt+2)*3+wp+2,'-');
 #ifdef AMREX_USE_CUPTI
@@ -623,7 +635,7 @@ TinyProfiler::PrintStats (std::map<std::string,Stats>& regstats, double dt_max)
                            << std::right
                            << std::setw(wnc+2) << "NCalls"
                            << std::setw(wt+2) << "Excl. Min"
-                           << std::setw(wt+2) << "Excl. Avg"
+                           << std::setw(wt+2) << "Excl. Med"
                            << std::setw(wt+2) << "Excl. Max"
                            << std::setw(wp+2)  << "Max %"
                            << "\n" << hline << "\n";
@@ -639,9 +651,9 @@ TinyProfiler::PrintStats (std::map<std::string,Stats>& regstats, double dt_max)
             amrex::OutStream() << std::setprecision(4) << std::left
                                << std::setw(maxfnamelen) << allprocstat.fname
                                << std::right
-                               << std::setw(wnc+2) << allprocstat.navg
+                               << std::setw(wnc+2) << allprocstat.nmed
                                << std::setw(wt+2) << allprocstat.dtexmin
-                               << std::setw(wt+2) << allprocstat.dtexavg
+                               << std::setw(wt+2) << allprocstat.dtexmed
                                << std::setw(wt+2) << allprocstat.dtexmax
                                << std::setprecision(2) << std::setw(wp+1) << std::fixed
                                << allprocstat.dtexmax*(100.0/dt_max) << "%";
@@ -653,9 +665,9 @@ TinyProfiler::PrintStats (std::map<std::string,Stats>& regstats, double dt_max)
                 amrex::OutStream() << std::setprecision(4) << std::left
                                    << std::setw(maxfnamelen) // it->fname
                                    << std::right
-                                   << std::setw(wnc+2) // it->navg
+                                   << std::setw(wnc+2) // it->nmed
                                    << std::setw(wt+2) // it->dtexmin
-                                   << std::setw(wt+2) // it->dtexavg
+                                   << std::setw(wt+2) // it->dtexmed
                                    << std::setw(wt+2) // it->dtexmax
                                    << std::setprecision(2) << std::setw(wp+1) << std::fixed; // it->dtexmax*(100.0/dt_max)
                 amrex::OutStream().unsetf(std::ios_base::fixed);
@@ -674,7 +686,7 @@ TinyProfiler::PrintStats (std::map<std::string,Stats>& regstats, double dt_max)
                            << std::right
                            << std::setw(wnc+2) << "NCalls"
                            << std::setw(wt+2) << "Incl. Min"
-                           << std::setw(wt+2) << "Incl. Avg"
+                           << std::setw(wt+2) << "Incl. Med"
                            << std::setw(wt+2) << "Incl. Max"
                            << std::setw(wp+2)  << "Max %"
                            << "\n" << hline << "\n";
@@ -689,9 +701,9 @@ TinyProfiler::PrintStats (std::map<std::string,Stats>& regstats, double dt_max)
             amrex::OutStream() << std::setprecision(4) << std::left
                                << std::setw(maxfnamelen) << allprocstat.fname
                                << std::right
-                               << std::setw(wnc+2) << allprocstat.navg
+                               << std::setw(wnc+2) << allprocstat.nmed
                                << std::setw(wt+2) << allprocstat.dtinmin
-                               << std::setw(wt+2) << allprocstat.dtinavg
+                               << std::setw(wt+2) << allprocstat.dtinmed
                                << std::setw(wt+2) << allprocstat.dtinmax
                                << std::setprecision(2) << std::setw(wp+1) << std::fixed
                                << allprocstat.dtinmax*(100.0/dt_max) << "%";
@@ -703,10 +715,10 @@ TinyProfiler::PrintStats (std::map<std::string,Stats>& regstats, double dt_max)
                 amrex::OutStream() << std::setprecision(4) << std::left
                                    << std::setw(maxfnamelen) // it->fname
                                    << std::right
-                                   << std::setw(wnc+2) // it->navg
-                                   << std::setw(wt+2) // it->dtexmin
-                                   << std::setw(wt+2) // it->dtexavg
-                                   << std::setw(wt+2) // it->dtexmax
+                                   << std::setw(wnc+2) // it->nmed
+                                   << std::setw(wt+2) // it->dtinmin
+                                   << std::setw(wt+2) // it->dtinmed
+                                   << std::setw(wt+2) // it->dtinmed
                                    << std::setprecision(2) << std::setw(wp+1) << std::fixed; // it->dtexmax*(100.0/dt_max)
                 amrex::OutStream().unsetf(std::ios_base::fixed);
                 amrex::OutStream();

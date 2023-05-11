@@ -96,18 +96,18 @@ private:
     {
 
         Long nmin{std::numeric_limits<Long>::max()};
-        Long navg{0L}, nmax{0L};
+        Long nmed{0L}, nmax{0L};
         double dtinmin{std::numeric_limits<double>::max()};
-        double dtinavg{0.0}, dtinmax{0.0};
+        double dtinmed{0.0}, dtinmax{0.0};
         double dtexmin{std::numeric_limits<double>::max()};
-        double dtexavg{0.0}, dtexmax{0.0};
+        double dtexmed{0.0}, dtexmax{0.0};
         bool usesCUPTI{false};
         std::string fname;
         static bool compex (const ProcStats& lhs, const ProcStats& rhs) {
-            return lhs.dtexmax > rhs.dtexmax;
+            return lhs.dtexmed > rhs.dtexmed;
         }
         static bool compin (const ProcStats& lhs, const ProcStats& rhs) {
-            return lhs.dtinmax > rhs.dtinmax;
+            return lhs.dtinmed > rhs.dtinmed;
         }
     };
 
