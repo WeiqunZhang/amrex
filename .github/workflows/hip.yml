@@ -65,7 +65,6 @@ jobs:
             -DCMAKE_C_COMPILER=$(which clang)             \
             -DCMAKE_CXX_COMPILER=$(which clang++)         \
             -DCMAKE_Fortran_COMPILER=$(which flang)       \
-            -DCMAKE_CXX_STANDARD=17                       \
             -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
         cmake --build build -j 2
 
@@ -128,7 +127,6 @@ jobs:
             -DCMAKE_C_COMPILER=$(which clang)             \
             -DCMAKE_CXX_COMPILER=$(which hipcc)           \
             -DCMAKE_Fortran_COMPILER=$(which gfortran)    \
-            -DCMAKE_CXX_STANDARD=17                       \
             -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
         cmake --build build_full_legacywrapper -j 2
 
