@@ -102,6 +102,55 @@ jobs:
         ccache -s
         du -hs ~/.cache/ccache
 
+  tests-oneapi-sycl-amd:
+    name: oneAPI SYCL for AMD GPUs [tests]
+    runs-on: ubuntu-20.04
+    steps:
+    - uses: actions/checkout@v3
+    - name: Dependencies
+      run: |
+        .github/workflows/dependencies/dependencies_hip.sh
+        .github/workflows/dependencies/dependencies_dpcpp.sh
+        .github/workflows/dependencies/dependencies_ccache.sh
+        sudo .github/workflows/dependencies/codeplay/oneapi-for-amd-gpus-2023.1.0-rocm-5.4.3-linux.sh --yes
+    - name: Set Up Cache
+      uses: actions/cache@v3
+      with:
+        path: ~/.cache/ccache
+        key: ccache-${{ github.workflow }}-${{ github.job }}-git-${{ github.sha }}
+        restore-keys: |
+             ccache-${{ github.workflow }}-${{ github.job }}-git-
+    - name: Build & Install
+      # mkl/rng/device/detail/mrg32k3a_impl.hpp has a number of sign-compare error
+      # mkl/rng/device/detail/mrg32k3a_impl.hpp has missing braces in array-array initalization
+      env: {CXXFLAGS: "-fsycl -fsycl-targets=amdgcn-amd-amdhsa -fno-operator-names -Werror -Wall -Wextra -Wpedantic -Wnull-dereference -Wfloat-conversion -Wshadow -Woverloaded-virtual -Wextra-semi -Wunreachable-code -Wnon-virtual-dtor -Wno-sign-compare -Wno-missing-braces"}
+      run: |
+        export CCACHE_COMPRESS=1
+        export CCACHE_COMPRESSLEVEL=10
+        export CCACHE_MAXSIZE=100M
+        export CCACHE_DEPEND=1
+        ccache -z
+
+        set +e
+        source /opt/intel/oneapi/setvars.sh --include-intel-llvm
+        set -e
+        cmake -S . -B build                                \
+            -DCMAKE_VERBOSE_MAKEFILE=ON                    \
+            -DAMReX_EB=OFF                                 \
+            -DAMReX_ENABLE_TESTS=ON                        \
+            -DAMReX_FORTRAN=ON                             \
+            -DAMReX_PARTICLES=ON                           \
+            -DAMReX_GPU_BACKEND=SYCL                       \
+            -DAMReX_SYCL_SUB_GROUP_SIZE=64                 \
+            -DCMAKE_C_COMPILER=$(which icx)                \
+            -DCMAKE_CXX_COMPILER=$(which clang++)          \
+            -DCMAKE_Fortran_COMPILER=$(which ifx)          \
+            -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
+        cmake --build build --parallel 2
+
+        ccache -s
+        du -hs ~/.cache/ccache
+
   tests-oneapi-sycl-eb:
     name: oneAPI SYCL [tests w/ EB]
     runs-on: ubuntu-20.04
