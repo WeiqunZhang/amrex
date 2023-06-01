@@ -51,6 +51,10 @@ function (configure_amrex AMREX_TARGET)
       target_compile_features(${AMREX_TARGET} PUBLIC cuda_std_17)
    endif()
 
+   if (AMReX_HIP)
+      target_compile_features(${AMREX_TARGET} PUBLIC hip_std_17)
+   endif()
+
    #
    # Special flags for MSVC compiler
    #
