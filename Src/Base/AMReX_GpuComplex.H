@@ -329,7 +329,7 @@ template <typename T>
 AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
 GpuComplex<T> exp (const GpuComplex<T>& a_z) noexcept
 {
-    return polar<T>(std::exp(a_z.real()), a_z.imag());
+    return polar<T>(amrex::Math::exp(a_z.real()), a_z.imag());
 }
 
 /**
@@ -418,7 +418,7 @@ GpuComplex<T> pow (const GpuComplex<T>& a_z, const T& a_y) noexcept
         return std::pow(a_z.real(), a_y);
 
     GpuComplex<T> t = amrex::log(a_z);
-    return amrex::polar<T>(std::exp(a_y * t.real()), a_y * t.imag());
+    return amrex::polar<T>(amrex::Math::exp(a_y * t.real()), a_y * t.imag());
 }
 
 namespace detail

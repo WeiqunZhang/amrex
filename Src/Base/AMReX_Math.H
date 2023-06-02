@@ -48,6 +48,7 @@ using sycl::tan;
 using sycl::sinh;
 using sycl::cosh;
 using sycl::tanh;
+using sycl::exp;
 
 #else
 
@@ -62,6 +63,7 @@ using std::tan;
 using std::sinh;
 using std::cosh;
 using std::tanh;
+using std::exp;
 
 #endif
 

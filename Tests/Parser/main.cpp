@@ -294,7 +294,7 @@ int main (int argc, char* argv[])
                             if (std::abs(z) <= r0) {
                                 return nc*n0;
                             } else if (std::abs(z) < r0+Lcut) {
-                                return nc*n0*std::exp((-std::abs(z)+r0)/L);
+                                return nc*n0*amrex::Math::exp((-std::abs(z)+r0)/L);
                             } else {
                                 return 0.0;
                             }
@@ -337,7 +337,7 @@ int main (int argc, char* argv[])
                         [=] (Real z) -> Real {
                             Real zc=20.e-6, zp=20.05545177444479562e-6, nc=1.74e27, lgrad=0.08e-6, zp2=24.e-6, zc2=24.05545177444479562e6;
                             if (z < zp) {
-                                return nc*std::exp((z-zc)/lgrad);
+                                return nc*amrex::Math::exp((z-zc)/lgrad);
                             } else if (z <= zp2) {
                                 return 2.*nc;
                             } else {
@@ -352,7 +352,7 @@ int main (int argc, char* argv[])
                         {"x","y","z"},
                         [=] (Real x, Real y, Real z) -> Real {
                             Real epsilon=0.01, kp=3.5, w0=5.e-6, k0=3.e5;
-                            return epsilon/kp*2*x/(w0*w0)*std::exp(-(x*x+y*y)/(w0*w0))*sin(k0*z);
+                            return epsilon/kp*2*x/(w0*w0)*amrex::Math::exp(-(x*x+y*y)/(w0*w0))*sin(k0*z);
                         },
                         {0.e-6, 0.0, -20.e-6}, {20.e-6, 1.e-10, 20.e-6}, 100,
                         1.e-12, 1.e-15);

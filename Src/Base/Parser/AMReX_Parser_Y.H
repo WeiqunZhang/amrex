@@ -264,7 +264,7 @@ bool parser_node_equal (struct parser_node* a, struct parser_node* b);
 
 template <typename T>
 AMREX_GPU_HOST_DEVICE AMREX_NO_INLINE
-T parser_math_exp (T a) { return std::exp(a); }
+T parser_math_exp (T a) { return amrex::Math::exp(a); }
 
 template <typename T>
 AMREX_GPU_HOST_DEVICE AMREX_NO_INLINE
