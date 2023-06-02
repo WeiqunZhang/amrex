@@ -391,9 +391,9 @@ parser_call_f1 (enum parser_f1_t type, double a)
     case PARSER_ASINH:       return parser_math_asinh<double>(a);
     case PARSER_ACOSH:       return parser_math_acosh<double>(a);
     case PARSER_ATANH:       return parser_math_atanh<double>(a);
-    case PARSER_ABS:         return std::abs(a);
-    case PARSER_FLOOR:       return std::floor(a);
-    case PARSER_CEIL:        return std::ceil(a);
+    case PARSER_ABS:         return amrex::Math::abs(a);
+    case PARSER_FLOOR:       return amrex::Math::floor(a);
+    case PARSER_CEIL:        return amrex::Math::ceil(a);
     case PARSER_COMP_ELLINT_1: return parser_math_comp_ellint_1<double>(a);
     case PARSER_COMP_ELLINT_2: return parser_math_comp_ellint_2<double>(a);
     default:

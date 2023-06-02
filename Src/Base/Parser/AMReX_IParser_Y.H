@@ -185,7 +185,7 @@ AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE int
 iparser_call_f1 (enum iparser_f1_t /*type*/, int a)
 {
     /// There is only one type for now
-    return std::abs(a);
+    return amrex::Math::abs(a);
 }
 
 AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE int

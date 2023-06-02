@@ -209,7 +209,7 @@ void mlebabeclap_adotx (Box const& box, Array4<Real> const& y,
             Real fxm = bX(i,j,k,n) * (x(i,j,k,n)-x(i-1,j,k,n));
             if (apxm != Real(0.0) && apxm != Real(1.0)) {
                 int jj = j + static_cast<int>(std::copysign(Real(1.0),fcx(i,j,k)));
-                Real fracy = (ccm(i-1,jj,k) || ccm(i,jj,k)) ? std::abs(fcx(i,j,k)) : Real(0.0);
+                Real fracy = (ccm(i-1,jj,k) || ccm(i,jj,k)) ? amrex::Math::abs(fcx(i,j,k)) : Real(0.0);
                 if (beta_on_center && phi_on_center)
                    fxm = (Real(1.0)-fracy)*fxm + fracy*bX(i,jj,k,n)*(x(i,jj,k,n)-x(i-1,jj,k,n));
                 else if (beta_on_centroid && phi_on_center)
@@ -220,7 +220,7 @@ void mlebabeclap_adotx (Box const& box, Array4<Real> const& y,
             Real fxp = bX(i+1,j,k,n)*(x(i+1,j,k,n)-x(i,j,k,n));
             if (apxp != Real(0.0) && apxp != Real(1.0)) {
                 int jj = j + static_cast<int>(std::copysign(Real(1.0),fcx(i+1,j,k)));
-                Real fracy = (ccm(i,jj,k) || ccm(i+1,jj,k)) ? std::abs(fcx(i+1,j,k)) : Real(0.0);
+                Real fracy = (ccm(i,jj,k) || ccm(i+1,jj,k)) ? amrex::Math::abs(fcx(i+1,j,k)) : Real(0.0);
                 if (beta_on_center && phi_on_center)
                     fxp = (Real(1.0)-fracy)*fxp + fracy*bX(i+1,jj,k,n)*(x(i+1,jj,k,n)-x(i,jj,k,n));
                 else if (beta_on_centroid && phi_on_center)
@@ -231,7 +231,7 @@ void mlebabeclap_adotx (Box const& box, Array4<Real> const& y,
             Real fym = bY(i,j,k,n)*(x(i,j,k,n)-x(i,j-1,k,n));
             if (apym != Real(0.0) && apym != Real(1.0)) {
                 int ii = i + static_cast<int>(std::copysign(Real(1.0),fcy(i,j,k)));
-                Real fracx = (ccm(ii,j-1,k) || ccm(ii,j,k)) ? std::abs(fcy(i,j,k)) : Real(0.0);
+                Real fracx = (ccm(ii,j-1,k) || ccm(ii,j,k)) ? amrex::Math::abs(fcy(i,j,k)) : Real(0.0);
                 if (beta_on_center && phi_on_center)
                     fym = (Real(1.0)-fracx)*fym + fracx*bY(ii,j,k,n)*(x(ii,j,k,n)-x(ii,j-1,k,n));
                 else if (beta_on_centroid && phi_on_center)
@@ -242,7 +242,7 @@ void mlebabeclap_adotx (Box const& box, Array4<Real> const& y,
             Real fyp = bY(i,j+1,k,n)*(x(i,j+1,k,n)-x(i,j,k,n));
             if (apyp != Real(0.0) && apyp != Real(1.0)) {
                 int ii = i + static_cast<int>(std::copysign(Real(1.0),fcy(i,j+1,k)));
-                Real fracx = (ccm(ii,j,k) || ccm(ii,j+1,k)) ? std::abs(fcy(i,j+1,k)) : Real(0.0);
+                Real fracx = (ccm(ii,j,k) || ccm(ii,j+1,k)) ? amrex::Math::abs(fcy(i,j+1,k)) : Real(0.0);
                 if (beta_on_center && phi_on_center)
                     fyp = (Real(1.0)-fracx)*fyp + fracx*bY(ii,j+1,k,n)*(x(ii,j+1,k,n)-x(ii,j,k,n));
                 else if (beta_on_centroid && phi_on_center)
@@ -266,10 +266,10 @@ void mlebabeclap_adotx (Box const& box, Array4<Real> const& y,
                 Real dx_eb = get_dx_eb(kappa);
 
                 Real dg, gx, gy, sx, sy;
-                if (std::abs(anrmx) > std::abs(anrmy)) {
-                    dg = dx_eb / std::abs(anrmx);
+                if (amrex::Math::abs(anrmx) > amrex::Math::abs(anrmy)) {
+                    dg = dx_eb / amrex::Math::abs(anrmx);
                 } else {
-                    dg = dx_eb / std::abs(anrmy);
+                    dg = dx_eb / amrex::Math::abs(anrmy);
                 }
                 gx = (bctx - dg*anrmx);
                 gy = (bcty - dg*anrmy);
@@ -340,10 +340,10 @@ void mlebabeclap_ebflux (int i, int j, int k, int n,
         Real dx_eb = get_dx_eb(kappa);
 
         Real dg, gx, gy, sx, sy;
-        if (std::abs(anrmx) > std::abs(anrmy)) {
-            dg = dx_eb / std::abs(anrmx);
+        if (amrex::Math::abs(anrmx) > amrex::Math::abs(anrmy)) {
+            dg = dx_eb / amrex::Math::abs(anrmx);
         } else {
-            dg = dx_eb / std::abs(anrmy);
+            dg = dx_eb / amrex::Math::abs(anrmy);
         }
         gx = bctx - dg*anrmx;
         gy = bcty - dg*anrmy;
@@ -436,7 +436,7 @@ void mlebabeclap_gsrb (Box const& box,
                     if (apxm != Real(0.0) && apxm != Real(1.0)) {
                         int jj = j + static_cast<int>(std::copysign(Real(1.0),fcx(i,j,k)));
                         Real fracy = (ccm(i-1,jj,k) || ccm(i,jj,k))
-                            ? std::abs(fcx(i,j,k)) : Real(0.0);
+                            ? amrex::Math::abs(fcx(i,j,k)) : Real(0.0);
                         if (!beta_on_centroid && !phi_on_centroid)
                         {
                             fxm = (Real(1.0)-fracy)*fxm +
@@ -458,7 +458,7 @@ void mlebabeclap_gsrb (Box const& box,
                     if (apxp != Real(0.0) && apxp != Real(1.0)) {
                         int jj = j + static_cast<int>(std::copysign(Real(1.0),fcx(i+1,j,k)));
                         Real fracy = (ccm(i,jj,k) || ccm(i+1,jj,k))
-                            ? std::abs(fcx(i+1,j,k)) : Real(0.0);
+                            ? amrex::Math::abs(fcx(i+1,j,k)) : Real(0.0);
                         if (!beta_on_centroid && !phi_on_centroid)
                         {
                             fxp = (Real(1.0)-fracy)*fxp +
@@ -480,7 +480,7 @@ void mlebabeclap_gsrb (Box const& box,
                     if (apym != Real(0.0) && apym != Real(1.0)) {
                         int ii = i + static_cast<int>(std::copysign(Real(1.0),fcy(i,j,k)));
                         Real fracx = (ccm(ii,j-1,k) || ccm(ii,j,k))
-                            ? std::abs(fcy(i,j,k)) : Real(0.0);
+                            ? amrex::Math::abs(fcy(i,j,k)) : Real(0.0);
                         if (!beta_on_centroid && !phi_on_centroid)
                         {
                             fym = (Real(1.0)-fracx)*fym +
@@ -503,7 +503,7 @@ void mlebabeclap_gsrb (Box const& box,
                     if (apyp != Real(0.0) && apyp != Real(1.0)) {
                         int ii = i + static_cast<int>(std::copysign(Real(1.0),fcy(i,j+1,k)));
                         Real fracx = (ccm(ii,j,k) || ccm(ii,j+1,k))
-                            ? std::abs(fcy(i,j+1,k)) : Real(0.0);
+                            ? amrex::Math::abs(fcy(i,j+1,k)) : Real(0.0);
                         if (!beta_on_centroid && !phi_on_centroid)
                         {
                             fyp = (Real(1.0)-fracx)*fyp +
@@ -544,10 +544,10 @@ void mlebabeclap_gsrb (Box const& box,
                         Real dx_eb = get_dx_eb(vfrc(i,j,k));
 
                         Real dg, gx, gy, sx, sy;
-                        if (std::abs(anrmx) > std::abs(anrmy)) {
-                            dg = dx_eb / std::abs(anrmx);
+                        if (amrex::Math::abs(anrmx) > amrex::Math::abs(anrmy)) {
+                            dg = dx_eb / amrex::Math::abs(anrmx);
                         } else {
-                            dg = dx_eb / std::abs(anrmy);
+                            dg = dx_eb / amrex::Math::abs(anrmy);
                         }
                         gx = bctx - dg*anrmx;
                         gy = bcty - dg*anrmy;
@@ -599,7 +599,7 @@ void mlebabeclap_flux_x (Box const& box, Array4<Real> const& fx, Array4<Real con
             } else {
                 Real fxm = bX(i,j,k,n)*(sol(i,j,k,n)-sol(i-1,j,k,n));
                 int jj = j + static_cast<int>(std::copysign(Real(1.0),fcx(i,j,k)));
-                Real fracy = (ccm(i-1,jj,k) || ccm(i,jj,k)) ? std::abs(fcx(i,j,k)) : Real(0.0);
+                Real fracy = (ccm(i-1,jj,k) || ccm(i,jj,k)) ? amrex::Math::abs(fcx(i,j,k)) : Real(0.0);
                 if (!beta_on_centroid && !phi_on_centroid)
                 {
                     fxm = (Real(1.0)-fracy)*fxm + fracy*bX(i,jj,k,n)*(sol(i,jj,k,n)-sol(i-1,jj,k,n));
@@ -631,7 +631,7 @@ void mlebabeclap_flux_y (Box const& box, Array4<Real> const& fy, Array4<Real con
             } else {
                 Real fym = bY(i,j,k,n)*(sol(i,j,k,n)-sol(i,j-1,k,n));
                 int ii = i + static_cast<int>(std::copysign(Real(1.0),fcy(i,j,k)));
-                Real fracx = (ccm(ii,j-1,k) || ccm(ii,j,k)) ? std::abs(fcy(i,j,k)) : Real(0.0);
+                Real fracx = (ccm(ii,j-1,k) || ccm(ii,j,k)) ? amrex::Math::abs(fcy(i,j,k)) : Real(0.0);
                 if (!beta_on_centroid && !phi_on_centroid)
                 {
                     fym = (Real(1.0)-fracx)*fym + fracx*bY(ii,j,k,n)*(sol(ii,j,k,n)-sol(ii,j-1,k,n));
@@ -697,7 +697,7 @@ void mlebabeclap_grad_x (Box const& box, Array4<Real> const& gx, Array4<Real con
         } else {
             Real gxm = (sol(i,j,k,n)-sol(i-1,j,k,n));
             int jj = j + static_cast<int>(std::copysign(Real(1.0),fcx(i,j,k)));
-            Real fracy = (ccm(i-1,jj,k) || ccm(i,jj,k)) ? std::abs(fcx(i,j,k)) : Real(0.0);
+            Real fracy = (ccm(i-1,jj,k) || ccm(i,jj,k)) ? amrex::Math::abs(fcx(i,j,k)) : Real(0.0);
             if (!phi_on_centroid)
                gxm = (Real(1.0)-fracy)*gxm + fracy*(sol(i,jj,k,n)-sol(i-1,jj,k,n));
             gx(i,j,k,n) = gxm*dxi;
@@ -720,7 +720,7 @@ void mlebabeclap_grad_y (Box const& box, Array4<Real> const& gy, Array4<Real con
         } else {
             Real gym = (sol(i,j,k,n)-sol(i,j-1,k,n));
             int ii = i + static_cast<int>(std::copysign(Real(1.0),fcy(i,j,k)));
-            Real fracx = (ccm(ii,j-1,k) || ccm(ii,j,k)) ? std::abs(fcy(i,j,k)) : Real(0.0);
+            Real fracx = (ccm(ii,j-1,k) || ccm(ii,j,k)) ? amrex::Math::abs(fcy(i,j,k)) : Real(0.0);
             if (!phi_on_centroid)
                 gym = (Real(1.0)-fracx)*gym + fracx*(sol(ii,j,k,n)-sol(ii,j-1,k,n));
             gy(i,j,k,n) = gym*dyi;
@@ -789,7 +789,7 @@ void mlebabeclap_normalize (Box const& box, Array4<Real> const& phi,
             if (apxm != Real(0.0) && apxm != Real(1.0) && !beta_on_centroid) {
                 int jj = j + static_cast<int>(std::copysign(Real(1.0),fcx(i,j,k)));
                 Real fracy = (ccm(i-1,jj,k) || ccm(i,jj,k))
-                    ? std::abs(fcx(i,j,k)) : Real(0.0);
+                    ? amrex::Math::abs(fcx(i,j,k)) : Real(0.0);
                 sxm = (Real(1.0)-fracy)*sxm;
             }
 
@@ -797,7 +797,7 @@ void mlebabeclap_normalize (Box const& box, Array4<Real> const& phi,
             if (apxp != Real(0.0) && apxp != Real(1.0) && !beta_on_centroid) {
                 int jj = j + static_cast<int>(std::copysign(Real(1.0),fcx(i+1,j,k)));
                 Real fracy = (ccm(i,jj,k) || ccm(i+1,jj,k))
-                    ? std::abs(fcx(i+1,j,k)) : Real(0.0);
+                    ? amrex::Math::abs(fcx(i+1,j,k)) : Real(0.0);
                 sxp = (Real(1.0)-fracy)*sxp;
             }
 
@@ -805,7 +805,7 @@ void mlebabeclap_normalize (Box const& box, Array4<Real> const& phi,
             if (apym != Real(0.0) && apym != Real(1.0) && !beta_on_centroid) {
                 int ii = i + static_cast<int>(std::copysign(Real(1.0),fcy(i,j,k)));
                 Real fracx = (ccm(ii,j-1,k) || ccm(ii,j,k))
-                    ? std::abs(fcy(i,j,k)) : Real(0.0);
+                    ? amrex::Math::abs(fcy(i,j,k)) : Real(0.0);
                 sym = (Real(1.0)-fracx)*sym;
             }
 
@@ -813,7 +813,7 @@ void mlebabeclap_normalize (Box const& box, Array4<Real> const& phi,
             if (apyp != Real(0.0) && apyp != Real(1.0) && !beta_on_centroid) {
                 int ii = i + static_cast<int>(std::copysign(Real(1.0),fcy(i,j+1,k)));
                 Real fracx = (ccm(ii,j,k) || ccm(ii,j+1,k))
-                    ? std::abs(fcy(i,j+1,k)) : Real(0.0);
+                    ? amrex::Math::abs(fcy(i,j+1,k)) : Real(0.0);
                 syp = (Real(1.0)-fracx)*syp;
             }
 
@@ -835,10 +835,10 @@ void mlebabeclap_normalize (Box const& box, Array4<Real> const& phi,
                 Real dx_eb = get_dx_eb(vfrc(i,j,k));
 
                 Real dg, gx, gy, sx, sy;
-                if (std::abs(anrmx) > std::abs(anrmy)) {
-                    dg = dx_eb / std::abs(anrmx);
+                if (amrex::Math::abs(anrmx) > amrex::Math::abs(anrmy)) {
+                    dg = dx_eb / amrex::Math::abs(anrmx);
                 } else {
-                    dg = dx_eb / std::abs(anrmy);
+                    dg = dx_eb / amrex::Math::abs(anrmy);
                 }
                 gx = bctx - dg*anrmx;
                 gy = bcty - dg*anrmy;
