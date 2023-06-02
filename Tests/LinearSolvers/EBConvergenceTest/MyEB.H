@@ -37,7 +37,7 @@ public:
         amrex::Real posy = y - m_center.y;
         amrex::Real r = std::hypot(posx, posy);
         amrex::Real theta = std::atan2(posy, posx);
-        return m_sign*(r - m_r - m_dr * std::cos(m_npetals*theta));
+        return m_sign*(r - m_r - m_dr * amrex::Math::cos(m_npetals*theta));
     }
 
     inline amrex::Real operator() (const amrex::RealArray& p) const noexcept

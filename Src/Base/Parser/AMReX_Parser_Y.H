@@ -276,15 +276,15 @@ T parser_math_log10 (T a) { return std::log10(a); }
 
 template <typename T>
 AMREX_GPU_HOST_DEVICE AMREX_NO_INLINE
-T parser_math_sin (T a) { return std::sin(a); }
+T parser_math_sin (T a) { return amrex::Math::sin(a); }
 
 template <typename T>
 AMREX_GPU_HOST_DEVICE AMREX_NO_INLINE
-T parser_math_cos (T a) { return std::cos(a); }
+T parser_math_cos (T a) { return amrex::Math::cos(a); }
 
 template <typename T>
 AMREX_GPU_HOST_DEVICE AMREX_NO_INLINE
-T parser_math_tan (T a) { return std::tan(a); }
+T parser_math_tan (T a) { return amrex::Math::tan(a); }
 
 template <typename T>
 AMREX_GPU_HOST_DEVICE AMREX_NO_INLINE
@@ -300,15 +300,15 @@ T parser_math_atan (T a) { return std::atan(a); }
 
 template <typename T>
 AMREX_GPU_HOST_DEVICE AMREX_NO_INLINE
-T parser_math_sinh (T a) { return std::sinh(a); }
+T parser_math_sinh (T a) { return amrex::Math::sinh(a); }
 
 template <typename T>
 AMREX_GPU_HOST_DEVICE AMREX_NO_INLINE
-T parser_math_cosh (T a) { return std::cosh(a); }
+T parser_math_cosh (T a) { return amrex::Math::cosh(a); }
 
 template <typename T>
 AMREX_GPU_HOST_DEVICE AMREX_NO_INLINE
-T parser_math_tanh (T a) { return std::tanh(a); }
+T parser_math_tanh (T a) { return amrex::Math::tanh(a); }
 
 template <typename T>
 AMREX_GPU_HOST_DEVICE AMREX_NO_INLINE

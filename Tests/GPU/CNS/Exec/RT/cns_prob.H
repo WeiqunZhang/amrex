@@ -39,8 +39,8 @@ cns_initdata (int i, int j, int k, amrex::Array4<amrex::Real> const& state,
     const Real rhoet = Pt/(parm.eos_gamma-Real(1.0));
 
     const Real r2d = amrex::min(std::hypot((x-splitx),(y-splity)), Real(0.5)*L_x);
-    const Real pertheight = Real(0.5) - Real(0.01)*std::cos(Real(2.0)*pi*r2d/L_x);
-    const Real rhot = prob_parm.rho_1 + ((prob_parm.rho_2-prob_parm.rho_1)/Real(2.0))*(Real(1.0)+std::tanh((z-pertheight)/Real(0.005)));
+    const Real pertheight = Real(0.5) - Real(0.01)*amrex::Math::cos(Real(2.0)*pi*r2d/L_x);
+    const Real rhot = prob_parm.rho_1 + ((prob_parm.rho_2-prob_parm.rho_1)/Real(2.0))*(Real(1.0)+amrex::Math::tanh((z-pertheight)/Real(0.005)));
 
     state(i,j,k,URHO ) = rhot;
     state(i,j,k,UMX  ) = Real(0.0);

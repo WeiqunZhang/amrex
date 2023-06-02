@@ -73,10 +73,10 @@ MyTest::initializeEB ()
         rotation = (rotation/180.) * pi;
 
         EB2::PlaneIF left({AMREX_D_DECL(pt_on_top_wall[0],pt_on_top_wall[1],0.0)},
-                         {AMREX_D_DECL(-std::sin(rotation),std::cos(rotation),0.0)},
+                         {AMREX_D_DECL(-amrex::Math::sin(rotation),amrex::Math::cos(rotation),0.0)},
                          fluid_inside);
-        EB2::PlaneIF right({AMREX_D_DECL(pt_on_top_wall[0], pt_on_top_wall[1] - (height/std::cos(rotation)),0.0)},
-                         {AMREX_D_DECL(std::sin(rotation),-std::cos(rotation),0.0)},
+        EB2::PlaneIF right({AMREX_D_DECL(pt_on_top_wall[0], pt_on_top_wall[1] - (height/amrex::Math::cos(rotation)),0.0)},
+                         {AMREX_D_DECL(amrex::Math::sin(rotation),-amrex::Math::cos(rotation),0.0)},
                          fluid_inside);
         auto channel = EB2::makeUnion(left, right);
         auto gshop = EB2::makeShop(channel);
@@ -98,12 +98,12 @@ MyTest::initializeEB ()
            Real gamma = (rotation[1]/180.) * pi;
 
            Vector<Real> norm(3);
-           Real norm_mag = std::sqrt(std::sin(alpha)*std::sin(alpha) +
-                      std::cos(alpha)*std::cos(alpha)*std::cos(gamma)*std::cos(gamma) +
-                      std::sin(gamma)*std::sin(gamma));
-           norm[0] = -std::sin(gamma) / norm_mag;
-           norm[1] = std::cos(alpha)*std::cos(gamma) / norm_mag;
-           norm[2] = -std::sin(alpha) / norm_mag;
+           Real norm_mag = std::sqrt(amrex::Math::sin(alpha)*amrex::Math::sin(alpha) +
+                      amrex::Math::cos(alpha)*amrex::Math::cos(alpha)*amrex::Math::cos(gamma)*amrex::Math::cos(gamma) +
+                      amrex::Math::sin(gamma)*amrex::Math::sin(gamma));
+           norm[0] = -amrex::Math::sin(gamma) / norm_mag;
+           norm[1] = amrex::Math::cos(alpha)*amrex::Math::cos(gamma) / norm_mag;
+           norm[2] = -amrex::Math::sin(alpha) / norm_mag;
 
            EB2::PlaneIF left({AMREX_D_DECL(pt_on_top_wall[0],pt_on_top_wall[1],pt_on_top_wall[2])},
                          {AMREX_D_DECL(norm[0],norm[1],norm[2])},

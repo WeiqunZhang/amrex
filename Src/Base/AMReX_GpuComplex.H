@@ -319,7 +319,7 @@ template <typename T>
 AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
 GpuComplex<T> polar (const T& a_r, const T& a_theta) noexcept
 {
-    return GpuComplex<T>(a_r * std::cos(a_theta), a_r * std::sin(a_theta));
+    return GpuComplex<T>(a_r * amrex::Math::cos(a_theta), a_r * amrex::Math::sin(a_theta));
 }
 
 /**

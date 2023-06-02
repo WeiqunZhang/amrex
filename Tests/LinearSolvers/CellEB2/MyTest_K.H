@@ -23,11 +23,11 @@ void mytest_set_phi_reg (int i, int j, int k, amrex::Array4<amrex::Real> const& 
         amrex::Real y = (j+0.5)*dx[1] - 0.5;
         amrex::Real theta = std::atan2(x,y) + 0.5*pi;
         amrex::Real r2 = x*x+y*y;
-        phie(i,j,k) = r2*r2 * std::cos(3.*theta);
+        phie(i,j,k) = r2*r2 * amrex::Math::cos(3.*theta);
         if (prob_type == 1) {
-            rhs(i,j,k) = -7.0 * r2 * std::cos(3.*theta);
+            rhs(i,j,k) = -7.0 * r2 * amrex::Math::cos(3.*theta);
         } else {
-            rhs(i,j,k) = -(7.0 * r2 - 15. * r2*r2) * std::cos(3.*theta);
+            rhs(i,j,k) = -(7.0 * r2 - 15. * r2*r2) * amrex::Math::cos(3.*theta);
         }
     }
 
@@ -84,16 +84,16 @@ void mytest_set_phi_eb (int i, int j, int k, amrex::Array4<amrex::Real> const& p
             amrex::Real y = (j+0.5)*dx[1] - 0.5;
             amrex::Real theta = std::atan2(x,y) + 0.5*pi;
             amrex::Real r2 = x*x+y*y;
-            phie(i,j,k) = r2*r2 * std::cos(3.*theta);
+            phie(i,j,k) = r2*r2 * amrex::Math::cos(3.*theta);
 
             x += cent(i,j,k,0)*dx[0];
             y += cent(i,j,k,1)*dx[1];
             theta = std::atan2(x,y) + 0.5*pi;
             r2 = x*x+y*y;
             if (prob_type == 1) {
-                rhs(i,j,k) = -7.0 * r2 * std::cos(3.*theta);
+                rhs(i,j,k) = -7.0 * r2 * amrex::Math::cos(3.*theta);
             } else {
-                rhs(i,j,k) = -(7.0 * r2 - 15. * r2*r2) * std::cos(3.*theta);
+                rhs(i,j,k) = -(7.0 * r2 - 15. * r2*r2) * amrex::Math::cos(3.*theta);
             }
 
             if (flag(i,j,k).isSingleValued()) {
@@ -101,7 +101,7 @@ void mytest_set_phi_eb (int i, int j, int k, amrex::Array4<amrex::Real> const& p
                 y = (j+0.5+bcent(i,j,k,1))*dx[1] - 0.5;
                 theta = std::atan2(x,y) + 0.5*pi;
                 r2 = x*x+y*y;
-                phib(i,j,k) = r2*r2 * std::cos(3.*theta);
+                phib(i,j,k) = r2*r2 * amrex::Math::cos(3.*theta);
                 if (prob_type == 2) {
                     bb(i,j,k) = 1.0 - r2;
                 }
@@ -169,7 +169,7 @@ void mytest_set_phi_boundary (int i, int j, int k, amrex::Array4<amrex::Real> co
 
         amrex::Real theta = std::atan2(x,y) + 0.5*pi;
         amrex::Real r2 = x*x+y*y;
-        phi(i,j,k) = r2*r2 * std::cos(3.*theta);
+        phi(i,j,k) = r2*r2 * amrex::Math::cos(3.*theta);
     }
 }
 

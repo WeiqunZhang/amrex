@@ -42,6 +42,12 @@ using sycl::ceil;
 using sycl::copysign;
 using sycl::floor;
 using sycl::round;
+using sycl::sin;
+using sycl::cos;
+using sycl::tan;
+using sycl::sinh;
+using sycl::cosh;
+using sycl::tanh;
 
 #else
 
@@ -50,6 +56,12 @@ using std::ceil;
 using std::copysign;
 using std::floor;
 using std::round;
+using std::sin;
+using std::cos;
+using std::tan;
+using std::sinh;
+using std::cosh;
+using std::tanh;
 
 #endif
 

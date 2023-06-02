@@ -254,7 +254,7 @@ int main (int argc, char* argv[])
                         [=] (Real x, Real y, Real z) -> Real {
                             Real m=0.0,n=1.0,pi=3.14,p=1.0,Lx=1.,Ly=1.,Lz=1.,mu_0=1.27e-6;
                             if ((x>-0.5) && (x<0.5) && (y>-0.5) && (y<0.5) && (z>-0.5) &&(z<0.5)) {
-                                return std::cos(m * pi / Lx * (x - Lx / 2)) * std::cos(n * pi / Ly * (y - Ly / 2)) * std::sin(p * pi / Lz * (z - Lz / 2))*mu_0;
+                                return amrex::Math::cos(m * pi / Lx * (x - Lx / 2)) * amrex::Math::cos(n * pi / Ly * (y - Ly / 2)) * amrex::Math::sin(p * pi / Lz * (z - Lz / 2))*mu_0;
                             } else {
                                 return 0.0;
                             }
@@ -268,7 +268,7 @@ int main (int argc, char* argv[])
                         [=] (Real x, Real y, Real z) -> Real {
                             Real m=0.0,n=1.0,pi=3.14,p=1.0,Lx=1.,Ly=1.,Lz=1.,mu_0=1.27e-6;
                             if ((x>-0.5) && (x<0.5) && (y>-0.5) && (y<0.5) && (z>-0.5) &&(z<0.5)) {
-                                return std::cos(m * pi / Lx * (x - Lx / 2)) * std::cos(n * pi / Ly * (y - Ly / 2)) * std::sin(p * pi / Lz * (z - Lz / 2))*mu_0;
+                                return amrex::Math::cos(m * pi / Lx * (x - Lx / 2)) * amrex::Math::cos(n * pi / Ly * (y - Ly / 2)) * amrex::Math::sin(p * pi / Lz * (z - Lz / 2))*mu_0;
                             } else {
                                 return 0.0;
                             }
@@ -281,7 +281,7 @@ int main (int argc, char* argv[])
                         {"x","y","z"},
                         [=] (Real x, Real, Real z) -> Real {
                             Real pi = 3.14;
-                            return 2.*std::sqrt(2.)+std::sqrt(-std::log(x))*std::cos(2*pi*z);
+                            return 2.*std::sqrt(2.)+std::sqrt(-std::log(x))*amrex::Math::cos(2*pi*z);
                         },
                         {0.5, 0.8, 0.3}, {16, 16, 16}, 100,
                         1.e-12, 1.e-15);
@@ -308,7 +308,7 @@ int main (int argc, char* argv[])
                         [=] (Real z) -> Real {
                             Real lramp=8.e-3, pi=3.14, dens=1.e23;
                             if (z < lramp) {
-                                return 0.5*(1-std::cos(pi*z/lramp))*dens;
+                                return 0.5*(1-amrex::Math::cos(pi*z/lramp))*dens;
                             } else {
                                 return dens;
                             }
@@ -322,8 +322,8 @@ int main (int argc, char* argv[])
                         [=] (Real z) -> Real {
                             Real lramp=8.e-3, pi=3.14, dens=1.e23;
                             if (z < lramp) {
-                                //return 0.5*(1-std::cos(pi*z/lramp))*dens;
-                                return 0.5*dens-0.5*dens*std::cos(pi*z/lramp);
+                                //return 0.5*(1-amrex::Math::cos(pi*z/lramp))*dens;
+                                return 0.5*dens-0.5*dens*amrex::Math::cos(pi*z/lramp);
                             } else {
                                 return dens;
                             }

@@ -170,14 +170,14 @@ MyTest::initData ()
                 Real y = j*dx[1];
                 Real z = k*dx[2];
 
-                phi(i,j,k) = (std::cos(tpi*x) * std::cos(tpi*y) * std::cos(tpi*z))
-                    + 0.25 * (std::cos(fpi*x) * std::cos(fpi*y) * std::cos(fpi*z));
+                phi(i,j,k) = (amrex::Math::cos(tpi*x) * amrex::Math::cos(tpi*y) * amrex::Math::cos(tpi*z))
+                    + 0.25 * (amrex::Math::cos(fpi*x) * amrex::Math::cos(fpi*y) * amrex::Math::cos(fpi*z));
 
-                Real d2phidx2 = -fac * (std::cos(tpi*x) * std::cos(tpi*y) * std::cos(tpi*z)
-                                      + std::cos(fpi*x) * std::cos(fpi*y) * std::cos(fpi*z));
+                Real d2phidx2 = -fac * (amrex::Math::cos(tpi*x) * amrex::Math::cos(tpi*y) * amrex::Math::cos(tpi*z)
+                                      + amrex::Math::cos(fpi*x) * amrex::Math::cos(fpi*y) * amrex::Math::cos(fpi*z));
                 Real d2phidy2 = d2phidx2;
-                Real d2phidxdy = fac * (std::sin(tpi*x) * std::sin(tpi*y) * std::cos(tpi*z)
-                                      + std::sin(fpi*x) * std::sin(fpi*y) * std::cos(fpi*z));
+                Real d2phidxdy = fac * (amrex::Math::sin(tpi*x) * amrex::Math::sin(tpi*y) * amrex::Math::cos(tpi*z)
+                                      + amrex::Math::sin(fpi*x) * amrex::Math::sin(fpi*y) * amrex::Math::cos(fpi*z));
 
 #if (AMREX_SPACEDIM == 2)
                 rh(i,j,k) = (1.0-lbeta[0]*lbeta[0]) * d2phidx2
@@ -185,10 +185,10 @@ MyTest::initData ()
                     -         2.*lbeta[0]*lbeta[1]  * d2phidxdy;
 #else
                 Real d2phidz2 = d2phidx2;
-                Real d2phidxdz = fac * (std::sin(tpi*x) * std::sin(tpi*z) * std::cos(tpi*y)
-                                      + std::sin(fpi*x) * std::sin(fpi*z) * std::cos(fpi*y));
-                Real d2phidydz = fac * (std::sin(tpi*y) * std::sin(tpi*z) * std::cos(tpi*x)
-                                      + std::sin(fpi*y) * std::sin(fpi*z) * std::cos(fpi*x));
+                Real d2phidxdz = fac * (amrex::Math::sin(tpi*x) * amrex::Math::sin(tpi*z) * amrex::Math::cos(tpi*y)
+                                      + amrex::Math::sin(fpi*x) * amrex::Math::sin(fpi*z) * amrex::Math::cos(fpi*y));
+                Real d2phidydz = fac * (amrex::Math::sin(tpi*y) * amrex::Math::sin(tpi*z) * amrex::Math::cos(tpi*x)
+                                      + amrex::Math::sin(fpi*y) * amrex::Math::sin(fpi*z) * amrex::Math::cos(fpi*x));
                 rh(i,j,k) = (1.0-lbeta[0]*lbeta[0]) * d2phidx2
                     +       (1.0-lbeta[1]*lbeta[1]) * d2phidy2
                     +       (1.0-lbeta[2]*lbeta[2]) * d2phidz2
