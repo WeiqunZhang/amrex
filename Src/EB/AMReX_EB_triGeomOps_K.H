@@ -161,7 +161,7 @@ namespace amrex::tri_geom_ops
 
                 //Print()<<"midp:"<<midp[0]<<"\t"<<midp[1]<<"\t"<<midp[2]<<"\t"<<plane_eq_mid<<"\n";
 
-                if(Math::abs(plane_eq_mid) < tol)
+                if(std::abs(plane_eq_mid) < tol)
                 {
                     break;
                 }
@@ -215,7 +215,7 @@ namespace amrex::tri_geom_ops
             Real eps = std::numeric_limits<Real>::epsilon();
 
             //coplanar (S1,S2,S3 = 0)
-            if(Math::abs(S1) < eps && Math::abs(S2) < eps && Math::abs(S3) < eps)
+            if(std::abs(S1) < eps && std::abs(S2) < eps && std::abs(S3) < eps)
             {
                 //Print()<<"line segment and triangle are in the same plane\t"<<S1<<"\t"<<S2<<"\t"<<S3<<"\n";
                 tri_area=triangle_area(t1,t2,t3);
@@ -227,7 +227,7 @@ namespace amrex::tri_geom_ops
                 area1=(triangle_area(t1,t2,v1)+triangle_area(t2,t3,v1)+triangle_area(t3,t1,v1));
                 area2=(triangle_area(t1,t2,v2)+triangle_area(t2,t3,v2)+triangle_area(t3,t1,v2));
 
-                if( Math::abs(area1-tri_area)>eps || Math::abs(area2-tri_area)>eps )
+                if( std::abs(area1-tri_area)>eps || std::abs(area2-tri_area)>eps )
                 {
                     no_intersections = 0;
                 }
@@ -235,16 +235,16 @@ namespace amrex::tri_geom_ops
             //proper and edge intersection
             else if( (S1 < 0.0 && S2 < 0.0 && S3 < 0.0) ||
                     (S1 > 0.0 && S2 > 0.0 && S3 > 0.0) ||
-                    (Math::abs(S1) < eps && S2*S3 > 0.0) ||     //S1=0
-                    (Math::abs(S2) < eps && S3*S1 > 0.0) ||     //S2=0
-                    (Math::abs(S3) < eps && S1*S2 > 0.0) )      //S3=0
+                    (std::abs(S1) < eps && S2*S3 > 0.0) ||     //S1=0
+                    (std::abs(S2) < eps && S3*S1 > 0.0) ||     //S2=0
+                    (std::abs(S3) < eps && S1*S2 > 0.0) )      //S3=0
             {
 
                 get_plucker_coords(v1,t1,L2);
                 get_plucker_coords(t1,v2,L3);
                 get_plucker_coords(t2,t3,L4);
 
-                /*if(Math::abs(S1*S2*S3) < eps)
+                /*if(std::abs(S1*S2*S3) < eps)
                   {
                   Print()<<"edge intersection S1,S2,S3:"
                   <<S1<<"\t"<<S2<<"\t"<<S3<<"\n";
@@ -259,8 +259,8 @@ namespace amrex::tri_geom_ops
                 }
             }
             //vertex intersection
-            else if( (Math::abs(S1) < eps && Math::abs(S2) < eps) ||  //S1,S2=0
-                    (Math::abs(S2) < eps && Math::abs(S3) < eps) )   //S2,S3=0
+            else if( (std::abs(S1) < eps && std::abs(S2) < eps) ||  //S1,S2=0
+                    (std::abs(S2) < eps && std::abs(S3) < eps) )   //S2,S3=0
             {
 
                 //Print()<<"vertex intersection type 1\n";
@@ -277,7 +277,7 @@ namespace amrex::tri_geom_ops
                     no_intersections = 0;
                 }
             }
-            else if(Math::abs(S3) < eps && Math::abs(S1) < eps) //S3,S1=0
+            else if(std::abs(S3) < eps && std::abs(S1) < eps) //S3,S1=0
             {
 
                 //Print()<<"vertex intersection type 2\n";

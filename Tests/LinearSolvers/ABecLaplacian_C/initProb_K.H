@@ -18,21 +18,21 @@ void actual_init_poisson (int i, int j, int k,
 
 #if (AMREX_SPACEDIM == 2)
 
-    exact(i,j,k) = (amrex::Math::sin(tpi*x) * amrex::Math::sin(tpi*y))
-           + .25 * (amrex::Math::sin(fpi*x) * amrex::Math::sin(fpi*y));
+    exact(i,j,k) = (std::sin(tpi*x) * std::sin(tpi*y))
+           + .25 * (std::sin(fpi*x) * std::sin(fpi*y));
 
-    rhs(i,j,k) = -fac * (amrex::Math::sin(tpi*x) * amrex::Math::sin(tpi*y))
-                 -fac * (amrex::Math::sin(fpi*x) * amrex::Math::sin(fpi*y));
+    rhs(i,j,k) = -fac * (std::sin(tpi*x) * std::sin(tpi*y))
+                 -fac * (std::sin(fpi*x) * std::sin(fpi*y));
 
 #else
 
     amrex::Real z = prob_lo[2] + dx[2] * (k + 0.5);
 
-    exact(i,j,k) = (amrex::Math::sin(tpi*x) * amrex::Math::sin(tpi*y) * amrex::Math::sin(tpi*z))
-           + .25 * (amrex::Math::sin(fpi*x) * amrex::Math::sin(fpi*y) * amrex::Math::sin(fpi*z));
+    exact(i,j,k) = (std::sin(tpi*x) * std::sin(tpi*y) * std::sin(tpi*z))
+           + .25 * (std::sin(fpi*x) * std::sin(fpi*y) * std::sin(fpi*z));
 
-    rhs(i,j,k) = -fac * (amrex::Math::sin(tpi*x) * amrex::Math::sin(tpi*y) * amrex::Math::sin(tpi*z))
-                 -fac * (amrex::Math::sin(fpi*x) * amrex::Math::sin(fpi*y) * amrex::Math::sin(fpi*z));
+    rhs(i,j,k) = -fac * (std::sin(tpi*x) * std::sin(tpi*y) * std::sin(tpi*z))
+                 -fac * (std::sin(fpi*x) * std::sin(fpi*y) * std::sin(fpi*z));
 
 #endif
 }
@@ -65,7 +65,7 @@ void actual_init_bcoef (int i, int j, int k,
 #endif
 
     amrex::Real r = std::sqrt((x-xc)*(x-xc) + (y-yc)*(y-yc) + (z-zc)*(z-zc));
-    beta(i,j,k) = (sigma-1.)/2.*amrex::Math::tanh(theta*(r-0.25)) + (sigma+1.)/2.;
+    beta(i,j,k) = (sigma-1.)/2.*std::tanh(theta*(r-0.25)) + (sigma+1.)/2.;
 }
 
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE
@@ -105,25 +105,25 @@ void actual_init_abeclap (int i, int j, int k,
 #endif
 
     amrex::Real r = std::sqrt((x-xc)*(x-xc) + (y-yc)*(y-yc) + (z-zc)*(z-zc));
-    amrex::Real tmp = amrex::Math::cosh(theta*(r-0.25));
+    amrex::Real tmp = std::cosh(theta*(r-0.25));
     amrex::Real dbdrfac = (sigma-1.)/2./(tmp*tmp) * theta/r;
     dbdrfac *= b;
 
     alpha(i,j,k) = 1.;
 
-    exact(i,j,k) = amrex::Math::cos(tpi*x) * amrex::Math::cos(tpi*y) * amrex::Math::cos(tpi*z)
-           + .25 * amrex::Math::cos(fpi*x) * amrex::Math::cos(fpi*y) * amrex::Math::cos(fpi*z);
+    exact(i,j,k) = std::cos(tpi*x) * std::cos(tpi*y) * std::cos(tpi*z)
+           + .25 * std::cos(fpi*x) * std::cos(fpi*y) * std::cos(fpi*z);
 
-    rhs(i,j,k) = beta(i,j,k)*b*fac*(amrex::Math::cos(tpi*x) * amrex::Math::cos(tpi*y) * amrex::Math::cos(tpi*z)
-                                  + amrex::Math::cos(fpi*x) * amrex::Math::cos(fpi*y) * amrex::Math::cos(fpi*z))
-             + dbdrfac*((x-xc)*(tpi*amrex::Math::sin(tpi*x) * amrex::Math::cos(tpi*y) * amrex::Math::cos(tpi*z)
-                               + pi*amrex::Math::sin(fpi*x) * amrex::Math::cos(fpi*y) * amrex::Math::cos(fpi*z))
-                      + (y-yc)*(tpi*amrex::Math::cos(tpi*x) * amrex::Math::sin(tpi*y) * amrex::Math::cos(tpi*z)
-                               + pi*amrex::Math::cos(fpi*x) * amrex::Math::sin(fpi*y) * amrex::Math::cos(fpi*z))
-                      + (z-zc)*(tpi*amrex::Math::cos(tpi*x) * amrex::Math::cos(tpi*y) * amrex::Math::sin(tpi*z)
-                               + pi*amrex::Math::cos(fpi*x) * amrex::Math::cos(fpi*y) * amrex::Math::sin(fpi*z)))
-                             + a * (amrex::Math::cos(tpi*x) * amrex::Math::cos(tpi*y) * amrex::Math::cos(tpi*z)
-                           + 0.25 * amrex::Math::cos(fpi*x) * amrex::Math::cos(fpi*y) * amrex::Math::cos(fpi*z));
+    rhs(i,j,k) = beta(i,j,k)*b*fac*(std::cos(tpi*x) * std::cos(tpi*y) * std::cos(tpi*z)
+                                  + std::cos(fpi*x) * std::cos(fpi*y) * std::cos(fpi*z))
+             + dbdrfac*((x-xc)*(tpi*std::sin(tpi*x) * std::cos(tpi*y) * std::cos(tpi*z)
+                               + pi*std::sin(fpi*x) * std::cos(fpi*y) * std::cos(fpi*z))
+                      + (y-yc)*(tpi*std::cos(tpi*x) * std::sin(tpi*y) * std::cos(tpi*z)
+                               + pi*std::cos(fpi*x) * std::sin(fpi*y) * std::cos(fpi*z))
+                      + (z-zc)*(tpi*std::cos(tpi*x) * std::cos(tpi*y) * std::sin(tpi*z)
+                               + pi*std::cos(fpi*x) * std::cos(fpi*y) * std::sin(fpi*z)))
+                             + a * (std::cos(tpi*x) * std::cos(tpi*y) * std::cos(tpi*z)
+                           + 0.25 * std::cos(fpi*x) * std::cos(fpi*y) * std::cos(fpi*z));
 }
 
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE
@@ -163,25 +163,25 @@ void actual_init_abeclap_in (int i, int j, int k,
 #endif
 
     amrex::Real r = std::sqrt((x-xc)*(x-xc) + (y-yc)*(y-yc) + (z-zc)*(z-zc));
-    amrex::Real tmp = amrex::Math::cosh(theta*(r-0.25));
+    amrex::Real tmp = std::cosh(theta*(r-0.25));
     amrex::Real dbdrfac = (sigma-1.)/2./(tmp*tmp) * theta/r;
     dbdrfac *= b;
 
     alpha(i,j,k) = 1.;
 
-    exact(i,j,k) = amrex::Math::sin(tpi*x) * amrex::Math::cos(tpi*y) * amrex::Math::cos(tpi*z)
-           + .25 * amrex::Math::cos(fpi*x) * amrex::Math::sin(fpi*y) * amrex::Math::cos(fpi*z);
+    exact(i,j,k) = std::sin(tpi*x) * std::cos(tpi*y) * std::cos(tpi*z)
+           + .25 * std::cos(fpi*x) * std::sin(fpi*y) * std::cos(fpi*z);
 
-    rhs(i,j,k) = beta(i,j,k)*b*fac*(amrex::Math::sin(tpi*x) * amrex::Math::cos(tpi*y) * amrex::Math::cos(tpi*z)
-                                  + amrex::Math::cos(fpi*x) * amrex::Math::sin(fpi*y) * amrex::Math::cos(fpi*z))
-            + dbdrfac*((x-xc)*(-tpi*amrex::Math::cos(tpi*x) * amrex::Math::cos(tpi*y) * amrex::Math::cos(tpi*z)
-                               + pi*amrex::Math::sin(fpi*x) * amrex::Math::sin(fpi*y) * amrex::Math::cos(fpi*z))
-                     + (y-yc)*( tpi*amrex::Math::sin(tpi*x) * amrex::Math::sin(tpi*y) * amrex::Math::cos(tpi*z)
-                               - pi*amrex::Math::cos(fpi*x) * amrex::Math::cos(fpi*y) * amrex::Math::cos(fpi*z))
-                     + (z-zc)*( tpi*amrex::Math::sin(tpi*x) * amrex::Math::cos(tpi*y) * amrex::Math::sin(tpi*z)
-                               + pi*amrex::Math::cos(fpi*x) * amrex::Math::sin(fpi*y) * amrex::Math::sin(fpi*z)))
-                             + a * (amrex::Math::sin(tpi*x) * amrex::Math::cos(tpi*y) * amrex::Math::cos(tpi*z)
-                           + 0.25 * amrex::Math::cos(fpi*x) * amrex::Math::sin(fpi*y) * amrex::Math::cos(fpi*z));
+    rhs(i,j,k) = beta(i,j,k)*b*fac*(std::sin(tpi*x) * std::cos(tpi*y) * std::cos(tpi*z)
+                                  + std::cos(fpi*x) * std::sin(fpi*y) * std::cos(fpi*z))
+            + dbdrfac*((x-xc)*(-tpi*std::cos(tpi*x) * std::cos(tpi*y) * std::cos(tpi*z)
+                               + pi*std::sin(fpi*x) * std::sin(fpi*y) * std::cos(fpi*z))
+                     + (y-yc)*( tpi*std::sin(tpi*x) * std::sin(tpi*y) * std::cos(tpi*z)
+                               - pi*std::cos(fpi*x) * std::cos(fpi*y) * std::cos(fpi*z))
+                     + (z-zc)*( tpi*std::sin(tpi*x) * std::cos(tpi*y) * std::sin(tpi*z)
+                               + pi*std::cos(fpi*x) * std::sin(fpi*y) * std::sin(fpi*z)))
+                             + a * (std::sin(tpi*x) * std::cos(tpi*y) * std::cos(tpi*z)
+                           + 0.25 * std::cos(fpi*x) * std::sin(fpi*y) * std::cos(fpi*z));
 }
 
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE
@@ -201,8 +201,8 @@ void actual_init_dphi_dx_lo (int i, int j, int k, amrex::Array4<amrex::Real> con
     amrex::Real z = prob_lo[2] + dx[2] * (k + 0.5);
 #endif
 
-    fx(i,j,k) = tpi * amrex::Math::cos(tpi*x) * amrex::Math::cos(tpi*y) * amrex::Math::cos(tpi*z)
-        - .25 * fpi * amrex::Math::sin(fpi*x) * amrex::Math::sin(fpi*y) * amrex::Math::cos(fpi*z);
+    fx(i,j,k) = tpi * std::cos(tpi*x) * std::cos(tpi*y) * std::cos(tpi*z)
+        - .25 * fpi * std::sin(fpi*x) * std::sin(fpi*y) * std::cos(fpi*z);
 }
 
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE
@@ -222,8 +222,8 @@ void actual_init_dphi_dx_hi (int i, int j, int k, amrex::Array4<amrex::Real> con
     amrex::Real z = prob_lo[2] + dx[2] * (k + 0.5);
 #endif
 
-    fx(i,j,k) = tpi * amrex::Math::cos(tpi*x) * amrex::Math::cos(tpi*y) * amrex::Math::cos(tpi*z)
-        - .25 * fpi * amrex::Math::sin(fpi*x) * amrex::Math::sin(fpi*y) * amrex::Math::cos(fpi*z);
+    fx(i,j,k) = tpi * std::cos(tpi*x) * std::cos(tpi*y) * std::cos(tpi*z)
+        - .25 * fpi * std::sin(fpi*x) * std::sin(fpi*y) * std::cos(fpi*z);
 }
 
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE
@@ -243,8 +243,8 @@ void actual_init_dphi_dy_lo (int i, int j, int k, amrex::Array4<amrex::Real> con
     amrex::Real z = prob_lo[2] + dx[2] * (k + 0.5);
 #endif
 
-    fy(i,j,k) = amrex::Math::sin(tpi*x) * (-tpi) * amrex::Math::sin(tpi*y) * amrex::Math::cos(tpi*z)
-        + .25 * amrex::Math::cos(fpi*x) * ( fpi) * amrex::Math::cos(fpi*y) * amrex::Math::cos(fpi*z);
+    fy(i,j,k) = std::sin(tpi*x) * (-tpi) * std::sin(tpi*y) * std::cos(tpi*z)
+        + .25 * std::cos(fpi*x) * ( fpi) * std::cos(fpi*y) * std::cos(fpi*z);
 }
 
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE
@@ -264,8 +264,8 @@ void actual_init_dphi_dy_hi (int i, int j, int k, amrex::Array4<amrex::Real> con
     amrex::Real z = prob_lo[2] + dx[2] * (k + 0.5);
 #endif
 
-    fy(i,j,k) = amrex::Math::sin(tpi*x) * (-tpi) * amrex::Math::sin(tpi*y) * amrex::Math::cos(tpi*z)
-        + .25 * amrex::Math::cos(fpi*x) * ( fpi) * amrex::Math::cos(fpi*y) * amrex::Math::cos(fpi*z);
+    fy(i,j,k) = std::sin(tpi*x) * (-tpi) * std::sin(tpi*y) * std::cos(tpi*z)
+        + .25 * std::cos(fpi*x) * ( fpi) * std::cos(fpi*y) * std::cos(fpi*z);
 }
 
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE
@@ -285,8 +285,8 @@ void actual_init_dphi_dz_lo (int i, int j, int k, amrex::Array4<amrex::Real> con
     amrex::Real z = prob_lo[2] + dx[2] * (k + 1.0);
 #endif
 
-    fz(i,j,k) = amrex::Math::sin(tpi*x) * amrex::Math::cos(tpi*y) * (-tpi) * amrex::Math::sin(tpi*z)
-        + .25 * amrex::Math::cos(fpi*x) * amrex::Math::sin(fpi*y) * (-fpi) * amrex::Math::sin(fpi*z);
+    fz(i,j,k) = std::sin(tpi*x) * std::cos(tpi*y) * (-tpi) * std::sin(tpi*z)
+        + .25 * std::cos(fpi*x) * std::sin(fpi*y) * (-fpi) * std::sin(fpi*z);
 }
 
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE
@@ -306,8 +306,8 @@ void actual_init_dphi_dz_hi (int i, int j, int k, amrex::Array4<amrex::Real> con
     amrex::Real z = prob_lo[2] + dx[2] * (k + 0.0);
 #endif
 
-    fz(i,j,k) = amrex::Math::sin(tpi*x) * amrex::Math::cos(tpi*y) * (-tpi) * amrex::Math::sin(tpi*z)
-        + .25 * amrex::Math::cos(fpi*x) * amrex::Math::sin(fpi*y) * (-fpi) * amrex::Math::sin(fpi*z);
+    fz(i,j,k) = std::sin(tpi*x) * std::cos(tpi*y) * (-tpi) * std::sin(tpi*z)
+        + .25 * std::cos(fpi*x) * std::sin(fpi*y) * (-fpi) * std::sin(fpi*z);
 }
 
 #endif

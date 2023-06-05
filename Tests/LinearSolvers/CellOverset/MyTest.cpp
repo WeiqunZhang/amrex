@@ -195,7 +195,7 @@ MyTest::initData ()
 #endif
 
             amrex::Real r = std::sqrt((x-xc)*(x-xc) + (y-yc)*(y-yc) + (z-zc)*(z-zc));
-            amrex::Real tmp = amrex::Math::cosh(theta*(r-0.25));
+            amrex::Real tmp = std::cosh(theta*(r-0.25));
             amrex::Real dbdrfac = (sigma-1.)/2./(tmp*tmp) * theta/r;
             dbdrfac *= b;
 
@@ -206,23 +206,23 @@ MyTest::initData ()
             z = amrex::min(prob_hi[2], amrex::max(prob_lo[2], z));
 #endif
 
-            beta(i,j,k) = (sigma-1.)/2.*amrex::Math::tanh(theta*(r-0.25)) + (sigma+1.)/2.;
-            exact(i,j,k) = amrex::Math::cos(tpi*x) * amrex::Math::cos(tpi*y) * amrex::Math::cos(tpi*z)
-                   + .25 * amrex::Math::cos(fpi*x) * amrex::Math::cos(fpi*y) * amrex::Math::cos(fpi*z);
+            beta(i,j,k) = (sigma-1.)/2.*std::tanh(theta*(r-0.25)) + (sigma+1.)/2.;
+            exact(i,j,k) = std::cos(tpi*x) * std::cos(tpi*y) * std::cos(tpi*z)
+                   + .25 * std::cos(fpi*x) * std::cos(fpi*y) * std::cos(fpi*z);
             phifab(i,j,k) = 0.0;
 
             if (vbx.contains(IntVect(AMREX_D_DECL(i,j,k)))) {
                 alpha(i,j,k) = 1.;
-                rhsfab(i,j,k) = beta(i,j,k)*b*fac*(amrex::Math::cos(tpi*x) * amrex::Math::cos(tpi*y) * amrex::Math::cos(tpi*z)
-                                                 + amrex::Math::cos(fpi*x) * amrex::Math::cos(fpi*y) * amrex::Math::cos(fpi*z))
-                            + dbdrfac*((x-xc)*(tpi*amrex::Math::sin(tpi*x) * amrex::Math::cos(tpi*y) * amrex::Math::cos(tpi*z)
-                                              + pi*amrex::Math::sin(fpi*x) * amrex::Math::cos(fpi*y) * amrex::Math::cos(fpi*z))
-                                     + (y-yc)*(tpi*amrex::Math::cos(tpi*x) * amrex::Math::sin(tpi*y) * amrex::Math::cos(tpi*z)
-                                              + pi*amrex::Math::cos(fpi*x) * amrex::Math::sin(fpi*y) * amrex::Math::cos(fpi*z))
-                                     + (z-zc)*(tpi*amrex::Math::cos(tpi*x) * amrex::Math::cos(tpi*y) * amrex::Math::sin(tpi*z)
-                                              + pi*amrex::Math::cos(fpi*x) * amrex::Math::cos(fpi*y) * amrex::Math::sin(fpi*z)))
-                                            + a * (amrex::Math::cos(tpi*x) * amrex::Math::cos(tpi*y) * amrex::Math::cos(tpi*z)
-                                          + 0.25 * amrex::Math::cos(fpi*x) * amrex::Math::cos(fpi*y) * amrex::Math::cos(fpi*z));
+                rhsfab(i,j,k) = beta(i,j,k)*b*fac*(std::cos(tpi*x) * std::cos(tpi*y) * std::cos(tpi*z)
+                                                 + std::cos(fpi*x) * std::cos(fpi*y) * std::cos(fpi*z))
+                            + dbdrfac*((x-xc)*(tpi*std::sin(tpi*x) * std::cos(tpi*y) * std::cos(tpi*z)
+                                              + pi*std::sin(fpi*x) * std::cos(fpi*y) * std::cos(fpi*z))
+                                     + (y-yc)*(tpi*std::cos(tpi*x) * std::sin(tpi*y) * std::cos(tpi*z)
+                                              + pi*std::cos(fpi*x) * std::sin(fpi*y) * std::cos(fpi*z))
+                                     + (z-zc)*(tpi*std::cos(tpi*x) * std::cos(tpi*y) * std::sin(tpi*z)
+                                              + pi*std::cos(fpi*x) * std::cos(fpi*y) * std::sin(fpi*z)))
+                                            + a * (std::cos(tpi*x) * std::cos(tpi*y) * std::cos(tpi*z)
+                                          + 0.25 * std::cos(fpi*x) * std::cos(fpi*y) * std::cos(fpi*z));
                 if (loverset && overset_box.contains(IntVect(AMREX_D_DECL(i,j,k)))) {
                     mask(i,j,k) = 0;
                     phifab(i,j,k) = exact(i,j,k);

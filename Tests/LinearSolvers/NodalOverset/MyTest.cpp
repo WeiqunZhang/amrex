@@ -134,10 +134,10 @@ MyTest::initData ()
             Real y = j*dx[1] - 0.5;
             Real theta = std::atan2(x,y) + 0.5*3.1415926535897932;
             Real r2 = x*x + y*y;
-            pa(i,j,k) =  r2*r2*amrex::Math::cos(3.0*theta);
-            ra(i,j,k) = 7.0*r2*amrex::Math::cos(3.0*theta);
+            pa(i,j,k) =  r2*r2*std::cos(3.0*theta);
+            ra(i,j,k) = 7.0*r2*std::cos(3.0*theta);
             Real r = std::sqrt(r2);
-            if (r < (0.3 + 0.15*amrex::Math::cos(6.*theta))) {
+            if (r < (0.3 + 0.15*std::cos(6.*theta))) {
                 ma(i,j,k) = 0; // masked out known nodes
             } else {
                 ma(i,j,k) = 1;

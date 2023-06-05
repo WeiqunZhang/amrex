@@ -23,7 +23,7 @@ initdata(amrex::Box const& bx, amrex::Array4<amrex::Real> const& phi,
             for (int i = lo.x; i <= hi.x; ++i) {
                 Real x = prob_lo[0] + (0.5+i) * dx[0];
                 Real r2 = (std::pow(x-0.5, 2) + std::pow((y-0.75),2)) / 0.01;
-                phi(i,j,k) = 1.0 + amrex::Math::exp(-r2);
+                phi(i,j,k) = 1.0 + std::exp(-r2);
             }
         }
     }

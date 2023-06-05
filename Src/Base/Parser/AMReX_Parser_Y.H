@@ -264,7 +264,7 @@ bool parser_node_equal (struct parser_node* a, struct parser_node* b);
 
 template <typename T>
 AMREX_GPU_HOST_DEVICE AMREX_NO_INLINE
-T parser_math_exp (T a) { return amrex::Math::exp(a); }
+T parser_math_exp (T a) { return std::exp(a); }
 
 template <typename T>
 AMREX_GPU_HOST_DEVICE AMREX_NO_INLINE
@@ -276,15 +276,15 @@ T parser_math_log10 (T a) { return std::log10(a); }
 
 template <typename T>
 AMREX_GPU_HOST_DEVICE AMREX_NO_INLINE
-T parser_math_sin (T a) { return amrex::Math::sin(a); }
+T parser_math_sin (T a) { return std::sin(a); }
 
 template <typename T>
 AMREX_GPU_HOST_DEVICE AMREX_NO_INLINE
-T parser_math_cos (T a) { return amrex::Math::cos(a); }
+T parser_math_cos (T a) { return std::cos(a); }
 
 template <typename T>
 AMREX_GPU_HOST_DEVICE AMREX_NO_INLINE
-T parser_math_tan (T a) { return amrex::Math::tan(a); }
+T parser_math_tan (T a) { return std::tan(a); }
 
 template <typename T>
 AMREX_GPU_HOST_DEVICE AMREX_NO_INLINE
@@ -300,15 +300,15 @@ T parser_math_atan (T a) { return std::atan(a); }
 
 template <typename T>
 AMREX_GPU_HOST_DEVICE AMREX_NO_INLINE
-T parser_math_sinh (T a) { return amrex::Math::sinh(a); }
+T parser_math_sinh (T a) { return std::sinh(a); }
 
 template <typename T>
 AMREX_GPU_HOST_DEVICE AMREX_NO_INLINE
-T parser_math_cosh (T a) { return amrex::Math::cosh(a); }
+T parser_math_cosh (T a) { return std::cosh(a); }
 
 template <typename T>
 AMREX_GPU_HOST_DEVICE AMREX_NO_INLINE
-T parser_math_tanh (T a) { return amrex::Math::tanh(a); }
+T parser_math_tanh (T a) { return std::tanh(a); }
 
 template <typename T>
 AMREX_GPU_HOST_DEVICE AMREX_NO_INLINE
@@ -391,9 +391,9 @@ parser_call_f1 (enum parser_f1_t type, double a)
     case PARSER_ASINH:       return parser_math_asinh<double>(a);
     case PARSER_ACOSH:       return parser_math_acosh<double>(a);
     case PARSER_ATANH:       return parser_math_atanh<double>(a);
-    case PARSER_ABS:         return amrex::Math::abs(a);
-    case PARSER_FLOOR:       return amrex::Math::floor(a);
-    case PARSER_CEIL:        return amrex::Math::ceil(a);
+    case PARSER_ABS:         return std::abs(a);
+    case PARSER_FLOOR:       return std::floor(a);
+    case PARSER_CEIL:        return std::ceil(a);
     case PARSER_COMP_ELLINT_1: return parser_math_comp_ellint_1<double>(a);
     case PARSER_COMP_ELLINT_2: return parser_math_comp_ellint_2<double>(a);
     default:

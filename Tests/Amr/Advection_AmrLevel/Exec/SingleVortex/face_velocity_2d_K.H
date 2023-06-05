@@ -29,8 +29,8 @@ void get_face_velocity_psi(amrex::Box const& bx,
         for (int i = plo.x; i <= phi.x; ++i)
         {
             Real x = ( (Real)i + 0.5 )*dx + prob_lo_x;
-            psi(i,j,0) = std::pow(amrex::Math::sin(PI*x), 2) * std::pow(amrex::Math::sin(PI*y), 2)
-                       * amrex::Math::cos(PI*time/2.0) * 1.0/PI;
+            psi(i,j,0) = std::pow(std::sin(PI*x), 2) * std::pow(std::sin(PI*y), 2)
+                       * std::cos(PI*time/2.0) * 1.0/PI;
         }
     }
 }

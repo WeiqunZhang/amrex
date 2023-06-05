@@ -242,11 +242,11 @@ MyTest::initData ()
                 Real y = j*dx[1];
                 Real z = k*dx[2];
 
-                phi(i,j,k) = (amrex::Math::cos(tpi*x) * amrex::Math::cos(tpi*y) * amrex::Math::cos(tpi*z))
-                    + 0.25 * (amrex::Math::cos(fpi*x) * amrex::Math::cos(fpi*y) * amrex::Math::cos(fpi*z));
+                phi(i,j,k) = (std::cos(tpi*x) * std::cos(tpi*y) * std::cos(tpi*z))
+                    + 0.25 * (std::cos(fpi*x) * std::cos(fpi*y) * std::cos(fpi*z));
 
-                rh(i,j,k) = -fac * (amrex::Math::cos(tpi*x) * amrex::Math::cos(tpi*y) * amrex::Math::cos(tpi*z))
-                    -        fac * (amrex::Math::cos(fpi*x) * amrex::Math::cos(fpi*y) * amrex::Math::cos(fpi*z));
+                rh(i,j,k) = -fac * (std::cos(tpi*x) * std::cos(tpi*y) * std::cos(tpi*z))
+                    -        fac * (std::cos(fpi*x) * std::cos(fpi*y) * std::cos(fpi*z));
             });
         }
 

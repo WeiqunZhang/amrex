@@ -238,7 +238,7 @@ MyTest::initData ()
                     Real rx = (i+0.5)*h - 0.5;
                     Real ry = (j+0.5)*h - 0.5;
                     Real r = std::sqrt(rx*rx+ry*ry);
-                    Real fac = amrex::Math::exp(-(r*r/(0.16*0.16)));
+                    Real fac = std::exp(-(r*r/(0.16*0.16)));
                     fab(i,j,k,0) += 2.0*r*ry/r*fac;
                     fab(i,j,k,1) -= 2.0*r*rx/r*fac;
                });
@@ -251,7 +251,7 @@ MyTest::initData ()
                     Real rx = (i+0.5)*h - 0.5;
                     Real rz = (k+0.5)*h - 0.5;
                     Real r = std::sqrt(rx*rx+rz*rz);
-                    Real fac = amrex::Math::exp(-(r*r/(0.16*0.16)));
+                    Real fac = std::exp(-(r*r/(0.16*0.16)));
                     fab(i,j,k,0) -= 2.0*r*rz/r*fac;
                     fab(i,j,k,2) += 2.0*r*rx/r*fac;
                 });
@@ -263,7 +263,7 @@ MyTest::initData ()
                     Real ry = (j+0.5)*h - 0.5;
                     Real rz = (k+0.5)*h - 0.5;
                     Real r = std::sqrt(ry*ry+rz*rz);
-                    Real fac = amrex::Math::exp(-(r*r/(0.16*0.16)));
+                    Real fac = std::exp(-(r*r/(0.16*0.16)));
                     fab(i,j,k,1) += 2.0*r*rz/r*fac;
                     fab(i,j,k,2) -= 2.0*r*ry/r*fac;
                 });

@@ -53,9 +53,9 @@ void MyTest::initializePoiseuilleDataFor3D(int ilev) {
         Real alpha = (poiseuille_askew_rotation[0] / 180.) * pi;
         Real gamma = (poiseuille_askew_rotation[1] / 180.) * pi;
 
-        Real a = amrex::Math::sin(gamma);
-        Real b = -amrex::Math::cos(alpha) * amrex::Math::cos(gamma);
-        Real c = amrex::Math::sin(alpha);
+        Real a = std::sin(gamma);
+        Real b = -std::cos(alpha) * std::cos(gamma);
+        Real c = std::sin(alpha);
         Real d = -a * poiseuille_pt_on_top_wall[0] -
                  b * poiseuille_pt_on_top_wall[1] -
                  c * poiseuille_pt_on_top_wall[2];
@@ -112,23 +112,23 @@ void MyTest::initializePoiseuilleDataFor3D(int ilev) {
         Vector<Real> flow_norm(3, 0.0);
 
         if (nfdir == 2) {
-          Real flow_norm_mag = std::sqrt(amrex::Math::cos(alpha) * amrex::Math::cos(alpha) *
-                                             amrex::Math::cos(gamma) * amrex::Math::cos(gamma) +
-                                         amrex::Math::sin(gamma) * amrex::Math::sin(gamma));
-          flow_norm[0] = amrex::Math::cos(alpha) * amrex::Math::cos(gamma) / flow_norm_mag;
-          flow_norm[1] = amrex::Math::sin(gamma) / flow_norm_mag;
+          Real flow_norm_mag = std::sqrt(std::cos(alpha) * std::cos(alpha) *
+                                             std::cos(gamma) * std::cos(gamma) +
+                                         std::sin(gamma) * std::sin(gamma));
+          flow_norm[0] = std::cos(alpha) * std::cos(gamma) / flow_norm_mag;
+          flow_norm[1] = std::sin(gamma) / flow_norm_mag;
         } else if (nfdir == 1) {
-          Real flow_norm_mag = std::sqrt(amrex::Math::sin(alpha) * amrex::Math::sin(alpha) +
-                                         amrex::Math::sin(gamma) * amrex::Math::sin(gamma));
-          flow_norm[0] = -amrex::Math::sin(alpha) / flow_norm_mag;
-          flow_norm[2] = amrex::Math::sin(gamma) / flow_norm_mag;
+          Real flow_norm_mag = std::sqrt(std::sin(alpha) * std::sin(alpha) +
+                                         std::sin(gamma) * std::sin(gamma));
+          flow_norm[0] = -std::sin(alpha) / flow_norm_mag;
+          flow_norm[2] = std::sin(gamma) / flow_norm_mag;
 
         } else if (nfdir == 0) {
-          Real flow_norm_mag = std::sqrt(amrex::Math::cos(alpha) * amrex::Math::cos(alpha) *
-                                             amrex::Math::cos(gamma) * amrex::Math::cos(gamma) +
-                                         amrex::Math::sin(alpha) * amrex::Math::sin(alpha));
-          flow_norm[2] = amrex::Math::cos(alpha) * amrex::Math::cos(gamma) / flow_norm_mag;
-          flow_norm[1] = amrex::Math::sin(alpha) / flow_norm_mag;
+          Real flow_norm_mag = std::sqrt(std::cos(alpha) * std::cos(alpha) *
+                                             std::cos(gamma) * std::cos(gamma) +
+                                         std::sin(alpha) * std::sin(alpha));
+          flow_norm[2] = std::cos(alpha) * std::cos(gamma) / flow_norm_mag;
+          flow_norm[1] = std::sin(alpha) / flow_norm_mag;
         } else {
           AMREX_ALWAYS_ASSERT_WITH_MESSAGE(1 == 1, "Invalid flow direction");
         }

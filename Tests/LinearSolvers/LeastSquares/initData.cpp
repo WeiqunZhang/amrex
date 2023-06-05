@@ -112,7 +112,7 @@ MyTest::initData ()
                 {
                     Real rx = (i+0.5)*dx[0];
                     Real ry = (j+0.5)*dx[1];
-                    // fab(i,j,k) = amrex::Math::sin(rx*2.*pi + 43.5)*amrex::Math::sin(ry*2.*pi + 89.);
+                    // fab(i,j,k) = std::sin(rx*2.*pi + 43.5)*std::sin(ry*2.*pi + 89.);
                     fab(i,j,k) = rx*(1.-rx)*ry*(1.-ry);
                 });
             }
