@@ -76,7 +76,7 @@ jobs:
     - name: Dependencies
       run: |
         .github/workflows/dependencies/dependencies_llvm_cuda11_ubuntu22.sh
-        .github/workflows/dependencies/dependencies_ccache.sh
+        .github/workflows/dependencies/dependencies_ccache.sh 4.2
     - name: Set Up Cache
       uses: actions/cache@v3
       with:
