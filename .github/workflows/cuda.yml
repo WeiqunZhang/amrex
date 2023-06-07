@@ -25,7 +25,7 @@ jobs:
     - name: Dependencies
       run: |
         .github/workflows/dependencies/dependencies_llvm_cuda11_ubuntu22.sh
-        .github/workflows/dependencies/dependencies_ccache.sh 4.2
+        .github/workflows/dependencies/dependencies_ccache.sh
     - name: Set Up Cache
       uses: actions/cache@v3
       with:
@@ -39,6 +39,7 @@ jobs:
         export CCACHE_COMPRESSLEVEL=10
         export CCACHE_MAXSIZE=235M
         export CCACHE_LOGFILE=${{ github.workspace }}/ccache.log.txt
+        export CCACHE_DEPEND=1
         ccache -z
 
         export PATH=/usr/local/nvidia/bin:/usr/local/cuda/bin:${PATH}
@@ -60,7 +61,7 @@ jobs:
         ccache -s -v
         du -hs ~/.cache/ccache
 
-        cat ${{ github.workspace }}/ccache.log.tx
+        cat ${{ github.workspace }}/ccache.log.txt
 
   save_pr_number:
     if: github.event_name == 'pull_request'
