@@ -694,6 +694,8 @@ inline void GccPlacaterMF ()
 }
 #endif
 
+void print_nan (MultiFab const& mf, int scomp, int ncomp, IntVect const& ng);
+
 }
 
 #endif /*BL_MULTIFAB_H*/

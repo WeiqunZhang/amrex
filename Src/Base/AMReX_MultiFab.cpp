@@ -1443,4 +1443,21 @@ MultiFab::OverrideSync (const iMultiFab& msk, const Periodicity& period)
     amrex::OverrideSync(*this, msk, period);
 }
 
+void print_nan (MultiFab const& mf, int scomp, int ncomp, IntVect const& ng)
+{
+    for (MFIter mfi(mf); mfi.isValid(); ++mfi)
+    {
+        Box const& bx = amrex::grow(mfi.validbox(), ng);
+        amrex::Print() << "  Box: " << mfi.validbox() << " " << bx << std::endl;
+        auto const& a = mf.const_array(mfi);
+        amrex::ParallelFor(bx, ncomp, [=] AMREX_GPU_DEVICE (int i, int j, int k, int n)
+        {
+            if (std::isnan(a(i,j,k,scomp+n))) {
+                printf("    Cell(%d,%d,%d,%d) is nan\n", i, j, k, scomp+n);
+            }
+        });
+        Gpu::streamSynchronize();
+    }
+}
+
 }

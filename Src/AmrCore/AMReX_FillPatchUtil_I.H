@@ -456,6 +456,11 @@ namespace {
     {
         BL_PROFILE("FillPatchTwoLevels");
 
+        if (amrex::Verbose() > 99) {
+            amrex::Print() << "aaaaa BEG of fillpatch cmf.contains_nan(2,1,IntVect(0): " << cmf[0]->contains_nan(2,1,IntVect(0))
+                           << " fmf.contains_nan(2,1,IntVect(0): " << fmf[0]->contains_nan(2,1,IntVect(0)) << "\n";
+        }
+
         if (nghost.max() > 0 || mf.getBDKey() != fmf[0]->getBDKey())
         {
             const InterpolaterBoxCoarsener& coarsener = mapper->BoxCoarsener(ratio);
@@ -550,6 +555,10 @@ namespace {
 
                     FillPatchSingleLevel(mf_crse_patch, time, cmf, ct, scomp, 0, ncomp, cgeom, cbc, cbccomp);
 
+                    if (amrex::Verbose() > 99) {
+                        amrex::Print() << "aaaaa mf_crse_patch.contains_nan(): " << mf_crse_patch.contains_nan() << "\n";
+                    }
+
                     MF mf_fine_patch = make_mf_fine_patch<MF>(fpc, ncomp);
 
                     detail::call_interp_hook(pre_interp, mf_crse_patch, 0, ncomp);
@@ -568,6 +577,10 @@ namespace {
 
         FillPatchSingleLevel(mf, nghost, time, fmf, ft, scomp, dcomp, ncomp,
                              fgeom, fbc, fbccomp);
+
+        if (amrex::Verbose() > 99) {
+            amrex::Print() << "aaaaa END of fillpatch mf.contains_nan(2,1,IntVect(1,0,0)): " << mf.contains_nan(2,1,IntVect(1,0,0)) << "\n";
+        }
     }
 
     template <typename MF, typename BC, typename Interp, typename PreInterpHook, typename PostInterpHook>

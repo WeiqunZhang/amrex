@@ -86,7 +86,8 @@
 #define AMREX_FORCE_INLINE __forceinline__
 
 #elif defined(__HIP_DEVICE_COMPILE__) && defined(AMREX_USE_HIP)
-#define AMREX_FORCE_INLINE __forceinline__
+//#define AMREX_FORCE_INLINE __forceinline__
+#define AMREX_FORCE_INLINE inline
 
 #elif defined(AMREX_CXX_INTEL)
 #define AMREX_FORCE_INLINE inline __attribute__((always_inline))
@@ -107,7 +108,8 @@
 #define AMREX_FORCE_INLINE inline __attribute__((always_inline))
 
 #elif defined(__clang__)
-#define AMREX_FORCE_INLINE inline __attribute__((always_inline))
+//#define AMREX_FORCE_INLINE inline __attribute__((always_inline))
+#define AMREX_FORCE_INLINE inline
 
 #elif defined(__GNUC__)
 #define AMREX_FORCE_INLINE inline __attribute__((always_inline))
