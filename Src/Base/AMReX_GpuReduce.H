@@ -20,6 +20,10 @@
 #include <rocprim/rocprim.hpp>
 #endif
 
+#if defined(SYCL_EXT_ONEAPI_USER_DEFINED_REDUCTIONS)
+#include <sycl/ext/oneapi/experimental/user_defined_reductions.hpp>
+#endif
+
 //
 // Public interface
 //
@@ -109,8 +113,16 @@ template <typename T>
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE
 T blockReduceSum (T source, Gpu::Handler const& h) noexcept
 {
+#if defined(SYCL_EXT_ONEAPI_USER_DEFINED_REDUCTIONS)
+    auto gs = sycl::ext::oneapi::experimental::group_with_scratchpad(
+        h.item->get_group(),
+        sycl::span((std::byte*)h.local, sizeof(unsigned long long)*AMREX_GPU_MAX_THREADS));
+    return sycl::ext::oneapi::experimental::reduce_over_group(
+        gs, source, amrex::Plus<T>{});
+#else
     return Gpu::blockReduce<Gpu::Device::warp_size>
         (source, Gpu::warpReduce<Gpu::Device::warp_size,T,amrex::Plus<T> >(), (T)0, h);
+#endif
 }
 
 template <typename T>

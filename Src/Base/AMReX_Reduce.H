@@ -385,7 +385,8 @@ public:
 
 #ifdef AMREX_USE_SYCL
             // device reduce needs local(i.e., shared) memory
-            constexpr std::size_t shared_mem_bytes = sizeof(unsigned long long)*Gpu::Device::warp_size;
+//            constexpr std::size_t shared_mem_bytes = sizeof(unsigned long long)*Gpu::Device::warp_size;
+            constexpr std::size_t shared_mem_bytes = sizeof(unsigned long long)*AMREX_GPU_MAX_THREADS;
             amrex::launch<AMREX_GPU_MAX_THREADS>(nblocks_ec, shared_mem_bytes, stream,
                           [=] AMREX_GPU_DEVICE (Gpu::Handler const& gh) noexcept
             {
