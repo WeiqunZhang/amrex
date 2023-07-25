@@ -137,56 +137,6 @@ void launch (T const& n, L&& f) noexcept
     }
 }
 
-namespace detail {
-    template <typename F, typename N>
-    AMREX_GPU_DEVICE
-    auto call_f (F const& f, N i, Gpu::Handler const&)
-        noexcept -> decltype(f(0))
-    {
-        f(i);
-    }
-
-    template <typename F, typename N>
-    AMREX_GPU_DEVICE
-    auto call_f (F const& f, N i, Gpu::Handler const& handler)
-        noexcept -> decltype(f(0,Gpu::Handler{}))
-    {
-        f(i,handler);
-    }
-
-    template <typename F>
-    AMREX_GPU_DEVICE
-    auto call_f (F const& f, int i, int j, int k, Gpu::Handler const&)
-        noexcept -> decltype(f(0,0,0))
-    {
-        f(i,j,k);
-    }
-
-    template <typename F>
-    AMREX_GPU_DEVICE
-    auto call_f (F const& f, int i, int j, int k, Gpu::Handler const& handler)
-        noexcept -> decltype(f(0,0,0,Gpu::Handler{}))
-    {
-        f(i,j,k,handler);
-    }
-
-    template <typename F, typename T>
-    AMREX_GPU_DEVICE
-    auto call_f (F const& f, int i, int j, int k, T ncomp, Gpu::Handler const&)
-        noexcept -> decltype(f(0,0,0,0))
-    {
-        for (T n = 0; n < ncomp; ++n) f(i,j,k,n);
-    }
-
-    template <typename F, typename T>
-    AMREX_GPU_DEVICE
-    auto call_f (F const& f, int i, int j, int k, T ncomp, Gpu::Handler const& handler)
-        noexcept -> decltype(f(0,0,0,0,Gpu::Handler{}))
-    {
-        for (T n = 0; n < ncomp; ++n) f(i,j,k,n,handler);
-    }
-}
-
 template <int MT, typename T, typename L, typename M=std::enable_if_t<std::is_integral<T>::value> >
 void ParallelFor (Gpu::KernelInfo const& info, T n, L&& f) noexcept
 {
@@ -210,8 +160,12 @@ void ParallelFor (Gpu::KernelInfo const& info, T n, L&& f) noexcept
                          i < n; i += stride) {
                         int n_active_threads = amrex::min(n-i+(T)item.get_local_id(0),
                                                           (T)item.get_local_range(0));
-                        detail::call_f(f, i, Gpu::Handler{&item, shared_data.get_pointer(),
-                                                          n_active_threads});
+                        if constexpr (IsCallable<L,T,Gpu::Handler>::value) {
+                            f(i, Gpu::Handler{&item, shared_data.get_pointer(),
+                                              n_active_threads});
+                        } else {
+                            f(i);
+                        }
                     }
                 });
             });
@@ -225,7 +179,11 @@ void ParallelFor (Gpu::KernelInfo const& info, T n, L&& f) noexcept
                 {
                     for (T i = item.get_global_id(0), stride = item.get_global_range(0);
                          i < n; i += stride) {
-                        detail::call_f(f, i, Gpu::Handler{&item});
+                        if constexpr (IsCallable<L,T,Gpu::Handler>::value) {
+                            f(i, Gpu::Handler{&item});
+                        } else {
+                            f(i);
+                        }
                     }
                 });
             });
@@ -269,8 +227,12 @@ void ParallelFor (Gpu::KernelInfo const& info, Box const& box, L&& f) noexcept
                         k += lo.z;
                         int n_active_threads = amrex::min(ncells-icell+(int)item.get_local_id(0),
                                                           (int)item.get_local_range(0));
-                        detail::call_f(f, i, j, k, Gpu::Handler{&item, shared_data.get_pointer(),
-                                                                n_active_threads});
+                        if constexpr (IsCallable<L,int,int,int,Gpu::Handler>::value) {
+                            f(i, j, k, Gpu::Handler{&item, shared_data.get_pointer(),
+                                                    n_active_threads});
+                        } else {
+                            f(i,j,k);
+                        }
                     }
                 });
             });
@@ -290,7 +252,11 @@ void ParallelFor (Gpu::KernelInfo const& info, Box const& box, L&& f) noexcept
                         i += lo.x;
                         j += lo.y;
                         k += lo.z;
-                        detail::call_f(f,i,j,k,Gpu::Handler{&item});
+                        if constexpr (IsCallable<L,int,int,int,Gpu::Handler>::value) {
+                            f(i, j, k, Gpu::Handler{&item});
+                        } else {
+                            f(i,j,k);
+                        }
                     }
                 });
             });
@@ -334,9 +300,17 @@ void ParallelFor (Gpu::KernelInfo const& info, Box const& box, T ncomp, L&& f) n
                         k += lo.z;
                         int n_active_threads = amrex::min(ncells-icell+(int)item.get_local_id(0),
                                                           (int)item.get_local_range(0));
-                        detail::call_f(f, i, j, k, ncomp,
-                                       Gpu::Handler{&item, shared_data.get_pointer(),
-                                                    n_active_threads});
+                        if constexpr (IsCallable<L,int,int,int,int,Gpu::Handler>::value) {
+                            Gpu::Handler gh{&item, shared_data.get_pointer(),
+                                            n_active_threads};
+                            for (int n = 0; n < ncomp; ++n) {
+                                f(i,j,k,n,gh);
+                            }
+                        } else {
+                            for (int n = 0; n < ncomp; ++n) {
+                                f(i,j,k,n);
+                            }
+                        }
                     }
                 });
             });
@@ -356,7 +330,16 @@ void ParallelFor (Gpu::KernelInfo const& info, Box const& box, T ncomp, L&& f) n
                         i += lo.x;
                         j += lo.y;
                         k += lo.z;
-                        detail::call_f(f,i,j,k,ncomp,Gpu::Handler{&item});
+                        if constexpr (IsCallable<L,int,int,int,int,Gpu::Handler>::value) {
+                            Gpu::Handler gh{&item};
+                            for (int n = 0; n < ncomp; ++n) {
+                                f(i, j, k, n, gh);
+                            }
+                        } else {
+                            for (int n = 0; n < ncomp; ++n) {
+                                f(i,j,k,n);
+                            }
+                        }
                     }
                 });
             });
@@ -819,56 +802,6 @@ void launch (T const& n, L&& f) noexcept
     AMREX_GPU_ERROR_CHECK();
 }
 
-namespace detail {
-    template <typename F, typename N>
-    AMREX_GPU_DEVICE
-    auto call_f (F const& f, N i, N /*nleft*/)
-        noexcept -> decltype(f(0))
-    {
-        f(i);
-    }
-
-    template <typename F, typename N>
-    AMREX_GPU_DEVICE
-    auto call_f (F const& f, N i, N nleft)
-        noexcept -> decltype(f(0,Gpu::Handler{}))
-    {
-        f(i,Gpu::Handler(amrex::min(nleft,(N)blockDim.x)));
-    }
-
-    template <typename F>
-    AMREX_GPU_DEVICE
-    auto call_f (F const& f, int i, int j, int k, int /*nleft*/)
-        noexcept -> decltype(f(0,0,0))
-    {
-        f(i,j,k);
-    }
-
-    template <typename F>
-    AMREX_GPU_DEVICE
-    auto call_f (F const& f, int i, int j, int k, int nleft)
-        noexcept -> decltype(f(0,0,0,Gpu::Handler{}))
-    {
-        f(i,j,k,Gpu::Handler(amrex::min(nleft,(int)blockDim.x)));
-    }
-
-    template <typename F, typename T>
-    AMREX_GPU_DEVICE
-    auto call_f (F const& f, int i, int j, int k, T ncomp, int /*nleft*/)
-        noexcept -> decltype(f(0,0,0,0))
-    {
-        for (T n = 0; n < ncomp; ++n) f(i,j,k,n);
-    }
-
-    template <typename F, typename T>
-    AMREX_GPU_DEVICE
-    auto call_f (F const& f, int i, int j, int k, T ncomp, int nleft)
-        noexcept -> decltype(f(0,0,0,0,Gpu::Handler{}))
-    {
-        for (T n = 0; n < ncomp; ++n) f(i,j,k,n,Gpu::Handler(amrex::min(nleft,(int)blockDim.x)));
-    }
-}
-
 template <int MT, typename T, typename L, typename M=std::enable_if_t<std::is_integral<T>::value> >
 std::enable_if_t<MaybeDeviceRunnable<L>::value>
 ParallelFor (Gpu::KernelInfo const&, T n, L&& f) noexcept
@@ -879,7 +812,12 @@ ParallelFor (Gpu::KernelInfo const&, T n, L&& f) noexcept
     [=] AMREX_GPU_DEVICE () noexcept {
         for (T i = blockDim.x*blockIdx.x+threadIdx.x, stride = blockDim.x*gridDim.x;
              i < n; i += stride) {
-            detail::call_f(f, i, (n-i+(T)threadIdx.x));
+            amrex::ignore_unused(f);
+            if constexpr (IsCallable<L,T,T,Gpu::Handler>::value) {
+                f(i, Gpu::Handler(amrex::min(n-i+(T)threadIdx.x, (T)blockDim.x)));
+            } else {
+                f(i);
+            }
         }
     });
     AMREX_GPU_ERROR_CHECK();
@@ -907,7 +845,13 @@ ParallelFor (Gpu::KernelInfo const&, Box const& box, L&& f) noexcept
             i += lo.x;
             j += lo.y;
             k += lo.z;
-            detail::call_f(f, i, j, k, (ncells-icell+(int)threadIdx.x));
+            amrex::ignore_unused(f);
+            if constexpr (IsCallable<decltype(f),int,int,int,int,Gpu::Handler>::value) {
+                f(i,j,k, Gpu::Handler(amrex::min(ncells-icell+(int)threadIdx.x,
+                                                 (int)blockDim.x)));
+            } else {
+                f(i,j,k);
+            }
         }
     });
     AMREX_GPU_ERROR_CHECK();
@@ -925,7 +869,7 @@ ParallelFor (Gpu::KernelInfo const&, Box const& box, T ncomp, L&& f) noexcept
     const auto lenx = len.x;
     const auto ec = Gpu::makeExecutionConfig<MT>(ncells);
     AMREX_LAUNCH_KERNEL(MT, ec.numBlocks, ec.numThreads, 0, Gpu::gpuStream(),
-    [=] AMREX_GPU_DEVICE () noexcept {
+    [f,ncells,lo,lenxy,lenx,ncomp] AMREX_GPU_DEVICE () noexcept {
         for (int icell = blockDim.x*blockIdx.x+threadIdx.x, stride = blockDim.x*gridDim.x;
              icell < ncells; icell += stride) {
             int k =  icell /   lenxy;
@@ -934,7 +878,17 @@ ParallelFor (Gpu::KernelInfo const&, Box const& box, T ncomp, L&& f) noexcept
             i += lo.x;
             j += lo.y;
             k += lo.z;
-            detail::call_f(f, i, j, k, ncomp, (ncells-icell+(int)threadIdx.x));
+            if constexpr (IsCallable<L,int,int,int,int,Gpu::Handler>::value) {
+                Gpu::Handler gh(amrex::min(ncells-icell+(int)threadIdx.x,
+                                           (int)blockDim.x));
+                for (int n = 0; n < ncomp; ++n) {
+                    f(i,j,k,n,gh);
+                }
+            } else {
+                for (int n = 0; n < ncomp; ++n) {
+                    f(i,j,k,n);
+                }
+            }
         }
     });
     AMREX_GPU_ERROR_CHECK();

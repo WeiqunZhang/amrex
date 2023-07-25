@@ -55,24 +55,6 @@ void destroy_par_for_nblocks (char* hp, char* dp)
 
 namespace experimental::detail {
 
-namespace parfor_mf_detail {
-    template <typename F>
-    AMREX_GPU_DEVICE
-    auto call_f (F const& f, int b, int i, int j, int k, int) noexcept
-        -> decltype(f(0,0,0,0))
-    {
-        f(b,i,j,k);
-    }
-
-    template <typename F>
-    AMREX_GPU_DEVICE
-    auto call_f (F const& f, int b, int i, int j, int k, int n) noexcept
-        -> decltype(f(0,0,0,0,0))
-    {
-        f(b,i,j,k,n);
-    }
-}
-
 template <int MT, typename MF, typename F>
 std::enable_if_t<IsFabArray<MF>::value>
 ParallelFor (MF const& mf, IntVect const& nghost, int ncomp, IntVect const&, bool, F&& f)
@@ -86,7 +68,13 @@ ParallelFor (MF const& mf, IntVect const& nghost, int ncomp, IntVect const&, boo
         Box const& b = amrex::grow(mf.box(index_array[0]), nghost);
         amrex::ParallelFor(b, ncomp, [=] AMREX_GPU_DEVICE (int i, int j, int k, int n) noexcept
         {
-            parfor_mf_detail::call_f(f, 0, i, j, k, n);
+            amrex::ignore_unused(f);
+            if constexpr (IsCallable<F,int,int,int,int,int>::value) {
+                f(0,i,j,k,n);
+            } else {
+                amrex::ignore_unused(n);
+                f(0,i,j,k);
+            }
         });
     } else {
         auto const& parforinfo = mf.getParForInfo(nghost,MT);
@@ -137,8 +125,13 @@ ParallelFor (MF const& mf, IntVect const& nghost, int ncomp, IntVect const&, boo
                      AMREX_D_TERM(i += b.smallEnd(0);,
                                   j += b.smallEnd(1);,
                                   k += b.smallEnd(2);)
-                     for (int n = 0; n < ncomp; ++n) {
-                         parfor_mf_detail::call_f(f, ibox, i, j, k, n);
+                     amrex::ignore_unused(f,ncomp);
+                     if constexpr (IsCallable<F,int,int,int,int,int>::value) {
+                         for (int n = 0; n < ncomp; ++n) {
+                             f(ibox,i,j,k,n);
+                         }
+                     } else {
+                         f(ibox,i,j,k);
                      }
                  }
              });
