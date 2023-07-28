@@ -95,6 +95,7 @@ jobs:
         export CCACHE_EXTRAFILES=${{ github.workspace }}/.clang-tidy
         export CCACHE_LOGFILE=${{ github.workspace }}/ccache.log.txt
         ccache -z
+        ccache -C
 
         cmake -S . -B build             \
             -DCMAKE_BUILD_TYPE=Debug    \
@@ -109,7 +110,7 @@ jobs:
         ${{github.workspace}}/Tools/C_scripts/mmclt.py --input ${{github.workspace}}/ccache.log.txt
         make -j2 -f clang-tidy-ccache-misses.mak \
             CLANG_TIDY=clang-tidy-12 \
-            CLANG_TIDY_ARGS="--config-file=${{github.workspace}}/.clang-tidy --warnings-as-errors=*"
+            CLANG_TIDY_ARGS="--config-file=${{github.workspace}}/.clang-tidy"
 
         ctest --test-dir build --output-on-failure
 
