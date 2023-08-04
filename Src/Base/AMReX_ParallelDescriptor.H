@@ -898,8 +898,7 @@ ParallelDescriptor::Bcast (T*     t,
 #ifdef BL_LAZY
     int r;
     MPI_Comm_compare(comm, Communicator(), &r);
-    if (r == MPI_IDENT)
-        Lazy::EvalReduction();
+    if (r == MPI_IDENT) { Lazy::EvalReduction(); }
 #endif
 
     BL_ASSERT(n < static_cast<size_t>(std::numeric_limits<int>::max()));

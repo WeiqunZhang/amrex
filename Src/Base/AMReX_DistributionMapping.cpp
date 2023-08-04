@@ -692,7 +692,7 @@ top: ;
 
                         max_weight = static_cast<Real>(bl_top->weight());
                         efficiency = sum_weight / (static_cast<Real>(nprocs)*max_weight);
-                        goto top;
+                        goto top; // NOLINT
                     }
                 }
             }
@@ -1017,7 +1017,7 @@ DistributionMapping::KnapSackProcessorMap (const DistributionMapping& olddm,
 
                                 max_weight = static_cast<Real>(bl_top->weight());
                                 new_efficiency = avg_weight / max_weight;
-                                goto top;
+                                goto top; // NOLINT
                             }
                         }
                     }

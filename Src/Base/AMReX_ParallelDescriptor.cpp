@@ -471,8 +471,7 @@ Barrier (const MPI_Comm &comm, const std::string &message)
 #ifdef BL_LAZY
     int r;
     MPI_Comm_compare(comm, Communicator(), &r);
-    if (r == MPI_IDENT)
-        Lazy::EvalReduction();
+    if (r == MPI_IDENT) { Lazy::EvalReduction(); }
 #endif
 
     BL_PROFILE_S("ParallelDescriptor::Barrier(comm)");
@@ -1130,8 +1129,7 @@ Bcast(void *buf, int count, MPI_Datatype datatype, int root, MPI_Comm comm)
 #ifdef BL_LAZY
     int r;
     MPI_Comm_compare(comm, Communicator(), &r);
-    if (r == MPI_IDENT)
-        Lazy::EvalReduction();
+    if (r == MPI_IDENT) { Lazy::EvalReduction(); }
 #endif
 
     BL_PROFILE_S("ParallelDescriptor::Bcast(viMiM)");
