@@ -42,8 +42,10 @@ namespace amrex
 
 #ifdef AMREX_USE_HIP
     using randState_t = hiprandState_t;
+    using randGenerator_t = hiprandGenerator_t;
 #else
     using randState_t = curandState_t;
+    using randGenerator_t = curandGenerator_t;
 #endif
 
     extern randState_t* gpu_rand_state;

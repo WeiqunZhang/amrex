@@ -365,8 +365,8 @@ namespace amrex
     /**
      * \brief Fill MultiFab with random numbers from uniform distribution
      *
-     * The uniform distribution range is [0.0, 1.0). All cells including
-     * ghost cells are filled.
+     * The uniform distribution range is [0.0, 1.0) for CPU and SYCL, it's
+     * (0,1] for CUDA and HIP. All cells including ghost cells are filled.
      *
      * \param mf    MultiFab
      * \param scomp starting component
