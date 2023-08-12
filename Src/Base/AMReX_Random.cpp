@@ -247,6 +247,8 @@ void FillRandomNormal (Real* p, Long N, Real mean, Real stddev)
     AMREX_CURAND_SAFE_CALL(curandGenerateNormalDouble(cuda_rand_gen, p, N, mean, stddev));
 #endif
 
+    Gpu::synchronize();
+
 #elif defined(AMREX_USE_HIP)
 
     if (! generator_initialized) {
@@ -262,9 +264,9 @@ void FillRandomNormal (Real* p, Long N, Real mean, Real stddev)
     AMREX_HIPRAND_SAFE_CALL(hiprandGenerateNormalDouble(hip_rand_gen, p, N, mean, stddev));
 #endif
 
-#endif
+    Gpu::synchronize();
 
-    Gpu::streamSynchronize();
+#endif
 
 #else
     std::normal_distribution<Real> distribution(mean, stddev);
