@@ -19,6 +19,7 @@ namespace
 namespace amrex {
 #ifdef AMREX_USE_SYCL
     sycl_rng_descr* rand_engine_descr = nullptr;
+//xxxxx    oneapi::mkl::rng::philox4x32x10* gpu_rand_generator = nullptr;
 #else
     amrex::randState_t* gpu_rand_state = nullptr;
     amrex::randGenerator_t gpu_rand_generator = nullptr;
@@ -42,6 +43,9 @@ void ResizeRandomSeed (amrex::ULong gpu_seed)
 
     rand_engine_descr = new sycl_rng_descr
         (Gpu::Device::streamQueue(), sycl::range<1>(N), gpu_seed, 1);
+
+//xxxxx    gpu_rand_generator = new std::remove_pointer_t<decltype(gpu_rand_generator)>
+//        (Gpu::Device::streamQueue(), gpu_seed+1234ULL);
 
 #elif defined(AMREX_USE_CUDA) || defined(AMREX_USE_HIP)
 
@@ -208,6 +212,11 @@ DeallocateRandomSeedDevArray ()
         Gpu::streamSynchronize();
         rand_engine_descr = nullptr;
     }
+//xxxxx    if (gpu_rand_generator != nullptr) {
+//        delete gpu_rand_generator;
+//        Gpu::streamSynchronize();
+//        gpu_rand_generator = nullptr;
+//    }
 #else
     if (gpu_rand_state != nullptr)
     {
@@ -247,7 +256,11 @@ void FillRandom (Real* p, Long N)
 #  endif
     Gpu::synchronize();
 
-#elif define(AMREX_USE_SYCL)
+#elif defined(AMREX_USE_SYCL)
+
+//xxxxx    oneapi::mkl::rng::uniform<Real> distr;
+//    auto event = oneapi::mkl::rng::generate(distr, gpu_rand_generator, N, p);
+//    event.wait();
 
 #else
     std::uniform_real_distribution<Real> distribution(Real(0.0), Real(1.0));
@@ -278,8 +291,11 @@ void FillRandomNormal (Real* p, Long N, Real mean, Real stddev)
 #  endif
     Gpu::synchronize();
 
-#elif define(AMREX_USE_SYCL)
+#elif defined(AMREX_USE_SYCL)
 
+//xxxxx    oneapi::mkl::rng::gaussian<Real> distr(mean, stddev);
+//    auto event = oneapi::mkl::rng::generate(distr, gpu_rand_generator, N, p);
+//    event.wait();
 
 #else
 
