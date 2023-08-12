@@ -79,6 +79,11 @@ namespace Gpu {
                            + ": " + cudaGetErrorString(amrex_i_err)); \
         amrex::Abort(errStr); \
     }}
+
+#define AMREX_CURAND_SAFE_CALL(x) do { if((x)!=CURAND_STATUS_SUCCESS) { \
+    std::string errStr(std::string("CURAND error in file ") + __FILE__  \
+                       + " line " + std::to_string(__LINE__));          \
+    amrex::Abort(errStr); }} while(0)
 #endif
 
 #ifdef AMREX_USE_HIP

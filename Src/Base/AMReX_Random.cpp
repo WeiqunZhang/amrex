@@ -26,6 +26,16 @@ namespace amrex {
 #endif
 
 #ifdef AMREX_USE_GPU
+namespace
+{
+    bool generator_initialized = false;
+#if defined(AMREX_USE_CUDA)
+    curandGenerator_t cuda_rand_gen;
+#endif
+}
+#endif
+
+#ifdef AMREX_USE_GPU
 namespace {
 void ResizeRandomSeed (amrex::ULong gpu_seed)
 {
@@ -201,6 +211,47 @@ DeallocateRandomSeedDevArray ()
         gpu_rand_state = nullptr;
     }
 #endif
+#endif
+}
+
+void FillRandom (Real* p, Long N)
+{
+#ifdef AMREX_USE_GPU
+#else
+    std::uniform_real_distribution<Real> distribution(Real(0.0), Real(1.0));
+    auto& gen = generators[OpenMP::get_thread_num()];
+    for (Long i = 0; i < N; ++i) {
+        p[i] = distribution(gen);
+    }
+#endif
+}
+
+void FillRandomNormal (Real* p, Long N, Real mean, Real stddev)
+{
+#ifdef AMREX_USE_GPU
+
+#if defined(AMREX_USE_CUDA)
+    if (! generator_initialized) {
+        AMREX_CURAND_SAFE_CALL(curandCreateGenerator(&cuda_rand_gen,
+                                                     CURAND_RNG_PSEUDO_DEFAULT));
+        AMREX_CURAND_SAFE_CALL(curandSetPseudoRandomGeneratorSeed(cuda_rand_gen,
+                                                                  1234ULL));
+    }
+#ifdef BL_USE_FLOAT
+    AMREX_CURAND_SAFE_CALL(curandGenerateNormal(cuda_rand_gen, p, N, mean, stddev));
+#else
+    AMREX_CURAND_SAFE_CALL(curandGenerateNormalDouble(cuda_rand_gen, p, N, mean, stddev));
+#endif
+#endif
+
+    Gpu::streamSynchronize();
+
+#else
+    std::normal_distribution<Real> distribution(mean, stddev);
+    auto& gen = generators[OpenMP::get_thread_num()];
+    for (Long i = 0; i < N; ++i) {
+        p[i] = distribution(gen);
+    }
 #endif
 }
 
