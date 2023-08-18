@@ -262,6 +262,12 @@ void FillRandom (Real* p, Long N)
 //    auto event = oneapi::mkl::rng::generate(distr, gpu_rand_generator, N, p);
 //    event.wait();
 
+    amrex::ParallelForRNG(N, [=] AMREX_GPU_DEVICE (Long i, RandomEngine const& eng)
+    {
+        p[i] = Random(eng);
+    });
+    Gpu::streamSynchronize();
+
 #else
     std::uniform_real_distribution<Real> distribution(Real(0.0), Real(1.0));
     auto& gen = generators[OpenMP::get_thread_num()];
@@ -296,6 +302,12 @@ void FillRandomNormal (Real* p, Long N, Real mean, Real stddev)
 //xxxxx    oneapi::mkl::rng::gaussian<Real> distr(mean, stddev);
 //    auto event = oneapi::mkl::rng::generate(distr, gpu_rand_generator, N, p);
 //    event.wait();
+
+    amrex::ParallelForRNG(N, [=] AMREX_GPU_DEVICE (Long i, RandomEngine const& eng)
+    {
+        p[i] = RandomNormal(mean, stddev, eng);
+    });
+    Gpu::streamSynchronize();
 
 #else
 
