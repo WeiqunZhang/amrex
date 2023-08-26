@@ -846,7 +846,7 @@ MLABecLaplacianT<MF>::Fsmooth (int amrlev, int mglev, MF& sol, const MF& rhs, in
     const RT alpha = m_a_scalar;
 
 #ifdef AMREX_USE_GPU
-    if (Gpu::inLaunchRegion() && sol.isFusingCandidate()
+    if (Gpu::inLaunchRegion()
         && (this->m_overset_mask[amrlev][mglev] || regular_coarsening))
     {
         const auto& m0ma = mm0.const_arrays();
