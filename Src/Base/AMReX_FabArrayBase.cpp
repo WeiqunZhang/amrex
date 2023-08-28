@@ -2607,6 +2607,7 @@ bool
 FabArrayBase::isFusingCandidate () const noexcept // NOLINT(readability-convert-member-functions-to-static)
 {
 #ifdef AMREX_USE_GPU
+    if (Gpu::inFuseRegion()) { return true; } // Always fuse when in fuse region.
     // This is fine tuned on MI100.
     // For V100 and A100, it is not very sensitive to the choice here.
     const int n = local_size();

@@ -182,6 +182,26 @@ namespace Gpu {
         bool m_prev_flag;
     };
 
+    extern bool in_fuse_region;
+
+    [[nodiscard]] inline bool inFuseRegion () noexcept { return in_fuse_region; }
+
+    inline bool setFuseRegion (bool b) noexcept {
+        return std::exchange(in_fuse_region, b);
+    }
+
+    struct [[nodiscard]] FuseRegion
+    {
+        FuseRegion () noexcept
+            : m_prev_flag(std::exchange(in_fuse_region,true))
+        {}
+
+        ~FuseRegion () { in_fuse_region = m_prev_flag; }
+
+    private:
+        bool m_prev_flag;
+    };
+
 #else
 
     [[nodiscard]] inline static constexpr bool inLaunchRegion () { return false; }
@@ -208,6 +228,10 @@ namespace Gpu {
     [[nodiscard]] inline static constexpr bool setNoSyncRegion (bool) { return true; }
     struct [[nodiscard]] SingleStreamRegion {};
     struct [[nodiscard]] NoSyncRegion {};
+
+    [[nodiscard]] inline static constexpr bool inFuseRegion () { return false; }
+    [[nodiscard]] inline static constexpr bool setFuseRegion (bool) { return false; }
+    struct [[nodiscard]] FuseRegion {};
 
 #endif
 
