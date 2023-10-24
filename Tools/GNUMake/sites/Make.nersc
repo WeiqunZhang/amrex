@@ -10,6 +10,8 @@ endif
 
 ifeq ($(which_computer),$(filter $(which_computer),perlmutter))
 
+ifneq ($(AMREX_CCOMP),nvhpc)
+
   ifdef PE_ENV
   ifneq ($(USE_GPU),TRUE)
     lowercase_peenv := $(shell echo $(PE_ENV) | tr A-Z a-z)
@@ -25,28 +27,20 @@ ifeq ($(which_computer),$(filter $(which_computer),perlmutter))
   endif
 
   ifeq ($(USE_CUDA),TRUE)
-    ifdef MPICH_ROOT
-      CFLAGS += -Xcompiler='$(filter-out -Wl%, $(wordlist 2,1024,$(shell mpicc -show 2> /dev/null)))'
-      CXXFLAGS += -Xcompiler='$(filter-out -Wl%, $(wordlist 2,1024,$(shell mpicxx -show 2> /dev/null)))'
-    else ifdef OPENMPI_ROOT
-      CFLAGS += -Xcompiler='$(filter-out -Wl%, $(wordlist 2,1024,$(shell mpicc -show 2> /dev/null)))'
-      CXXFLAGS += -Xcompiler='$(filter-out -Wl%, $(wordlist 2,1024,$(shell mpicxx -show 2> /dev/null)))'
+    ifeq ($(AMREX_CCOMP),nvhpc)
+        #CFLAGS += $(wordlist 2,1024,$(shell cc -craype-verbose 2> /dev/null))
+        #CXXFLAGS += $(wordlist 2,1024,$(shell CC -craype-verbose 2> /dev/null))
     else
-      CFLAGS += -Xcompiler='$(wordlist 2,1024,$(shell cc -craype-verbose 2> /dev/null))'
-      CXXFLAGS += -Xcompiler='$(wordlist 2,1024,$(shell CC -craype-verbose 2> /dev/null))'
-    endif
-  else ifeq ($(USE_MPI),FALSE)
-    CFLAGS += $(wordlist 2,1024,$(shell cc -craype-verbose 2> /dev/null))
-    CXXFLAGS += $(wordlist 2,1024,$(shell CC -craype-verbose 2> /dev/null))
-  endif
-
-  ifeq ($(USE_CUDA),TRUE)
-    ifdef NPE_VERSION
-      CFLAGS += -Xcompiler='$(filter-out -Wl%, $(wordlist 2,1024,$(shell mpicc -show 2> /dev/null)))'
-      CXXFLAGS += -Xcompiler='$(filter-out -Wl%, $(wordlist 2,1024,$(shell mpicxx -show 2> /dev/null)))'
-    else
-      CFLAGS += -Xcompiler='$(wordlist 2,1024,$(shell cc -craype-verbose 2> /dev/null))'
-      CXXFLAGS += -Xcompiler='$(wordlist 2,1024,$(shell CC -craype-verbose 2> /dev/null))'
+      ifdef MPICH_ROOT
+        CFLAGS += -Xcompiler='$(filter-out -Wl%, $(wordlist 2,1024,$(shell mpicc -show 2> /dev/null)))'
+        CXXFLAGS += -Xcompiler='$(filter-out -Wl%, $(wordlist 2,1024,$(shell mpicxx -show 2> /dev/null)))'
+      else ifdef OPENMPI_ROOT
+        CFLAGS += -Xcompiler='$(filter-out -Wl%, $(wordlist 2,1024,$(shell mpicc -show 2> /dev/null)))'
+        CXXFLAGS += -Xcompiler='$(filter-out -Wl%, $(wordlist 2,1024,$(shell mpicxx -show 2> /dev/null)))'
+      else
+        CFLAGS += -Xcompiler='$(wordlist 2,1024,$(shell cc -craype-verbose 2> /dev/null))'
+        CXXFLAGS += -Xcompiler='$(wordlist 2,1024,$(shell CC -craype-verbose 2> /dev/null))'
+      endif
     endif
   else ifeq ($(USE_MPI),FALSE)
     CFLAGS += $(wordlist 2,1024,$(shell cc -craype-verbose 2> /dev/null))
@@ -118,6 +112,7 @@ ifeq ($(which_computer),$(filter $(which_computer),perlmutter))
 
   endif
 
+endif
 endif
 
 ifeq ($(which_computer),$(filter $(which_computer),cori))

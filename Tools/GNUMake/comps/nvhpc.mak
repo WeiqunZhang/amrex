@@ -52,9 +52,19 @@ ifeq ($(USE_ACC),TRUE)
   endif
 endif
 
-# Note that -O2 is the default optimization level for NVHPC
+ifeq ($(USE_CUDA),TRUE)
+  GENERIC_NVHPC_FLAGS += -cuda
+  ifneq ($(CUDA_ARCH),)
+    GENERIC_NVHPC_FLAGS += -gpu=cc$(CUDA_ARCH)
+  endif
+  ifeq ($(USE_GPU_RDC),TRUE)
+    GENERIC_NVHPC_FLAGS += -gpu=rdc
+  endif
+endif
 
-NVHPC_OPT := -O2 -fast
+# Note that -O3 is the default optimization level for NVHPC
+
+NVHPC_OPT := -O3 -fast
 
 ########################################################################
 ########################################################################
@@ -127,6 +137,7 @@ endif # AMREX_CCOMP == nvhpc
 ########################################################################
 ########################################################################
 
+ifneq ($(BL_NO_FORT),TRUE)
 ifeq ($(AMREX_FCOMP),nvhpc)
 
 #
@@ -220,3 +231,4 @@ override XTRALIBS += -lstdc++ -latomic -lnvf -lrt
 LINK_WITH_FORTRAN_COMPILER ?= $(USE_F_INTERFACES)
 
 endif # AMREX_FCOMP == nvhpc
+endif # not BL_NO_FORT

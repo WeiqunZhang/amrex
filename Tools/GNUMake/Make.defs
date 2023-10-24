@@ -446,6 +446,8 @@ else ifeq ($(USE_CUDA),TRUE)
     AMREX_CCOMP = $(NVCC_HOST_COMP)
   else ifeq ($(COMP),cray)
     AMREX_CCOMP = cray
+  else ifeq ($(COMP),nvhpc)
+    AMREX_CCOMP = nvhpc
   else
     AMREX_CCOMP = gnu
   endif
@@ -776,8 +778,10 @@ else ifeq ($(USE_CUDA),TRUE)
         LINK_WITH_FORTRAN_COMPILER=TRUE
     endif
 
-    $(info Loading $(AMREX_HOME)/Tools/GNUMake/comps/nvcc.mak...)
-    include $(AMREX_HOME)/Tools/GNUMake/comps/nvcc.mak
+    ifneq ($(lowercase_comp),nvhpc)
+        $(info Loading $(AMREX_HOME)/Tools/GNUMake/comps/nvcc.mak...)
+        include $(AMREX_HOME)/Tools/GNUMake/comps/nvcc.mak
+    endif
 
     ifeq ($(USE_MPI),TRUE)
       # Make sure that the C/C++ MPI
