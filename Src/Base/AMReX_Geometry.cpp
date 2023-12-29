@@ -569,6 +569,9 @@ Geometry::computeRoundoffDomain ()
             // The assertion on rlo_out makes sure the compiler cannot optimize it away.
             AMREX_ALWAYS_ASSERT(rlo_out > std::numeric_limits<ParticleReal>::lowest()
                                 && iters < maxiters);
+            amrex::Print().SetPrecision(17) << "AAAAA rlo_out = " << rlo_out
+                                            << " rlo = " << rlo
+                                            << " iters = " << iters << std::endl;
         }
         else
         {
@@ -585,6 +588,9 @@ Geometry::computeRoundoffDomain ()
             // The assertion on rtmp makes sure the compiler cannot optimize it away.
             AMREX_ALWAYS_ASSERT(rtmp > std::numeric_limits<ParticleReal>::lowest()
                                 && iters < maxiters);
+            amrex::Print().SetPrecision(17) << "BBBBB rlo_out = " << rlo_out
+                                            << " rlo = " << rlo
+                                            << " iters = " << iters << std::endl;
         }
 
         {
@@ -616,6 +622,10 @@ Geometry::computeRoundoffDomain ()
             // The assertion on rlo_minus makes sure the compiler cannot optimize it away.
             AMREX_ALWAYS_ASSERT(rlo_minus > std::numeric_limits<ParticleReal>::lowest()
                                 && iters < maxiters);
+
+            amrex::Print().SetPrecision(17) << "CCCCC rlo_out = " << rlo_out
+                                            << " rlo = " << rlo
+                                            << " iters = " << iters << std::endl;
         }
 
         ParticleReal rhi_out;
@@ -632,6 +642,10 @@ Geometry::computeRoundoffDomain ()
             // The assertion on rhi_out makes sure the compiler cannot optimize it away.
             AMREX_ALWAYS_ASSERT(rhi_out > std::numeric_limits<ParticleReal>::lowest()
                                 && iters < maxiters);
+
+            amrex::Print().SetPrecision(17) << "AAAAA rhi_out = " << rhi_out
+                                            << " rhi = " << rhi
+                                            << " iters = " << iters << std::endl;
         }
         else
         {
@@ -651,6 +665,10 @@ Geometry::computeRoundoffDomain ()
             // The assertion on rtmp makes sure the compiler cannot optimize it away.
             AMREX_ALWAYS_ASSERT(rtmp > std::numeric_limits<ParticleReal>::lowest()
                                 && iters < maxiters);
+
+            amrex::Print().SetPrecision(17) << "BBBBB rhi_out = " << rhi_out
+                                            << " rhi = " << rhi
+                                            << " iters = " << iters << std::endl;
         }
 
         {
@@ -682,6 +700,10 @@ Geometry::computeRoundoffDomain ()
             // The assertion on rhi_plus makes sure the compiler cannot optimize it away.
             AMREX_ALWAYS_ASSERT(rhi_plus > std::numeric_limits<ParticleReal>::lowest()
                                 && iters < maxiters);
+
+            amrex::Print().SetPrecision(17) << "CCCCC rhi_out = " << rhi_out
+                                            << " rhi = " << rhi
+                                            << " iters = " << iters << std::endl;
         }
     }
 }
