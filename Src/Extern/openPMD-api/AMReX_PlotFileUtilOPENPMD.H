@@ -7,8 +7,10 @@
 #include <AMReX_MultiFab.H>
 #include <AMReX_PlotFileDataImpl.H>
 
+#ifdef AMREX_PARTICLES
 #include <AMReX_ParIter.H>
 #include <AMReX_Particles.H>
+#endif
 
 #ifdef AMREX_USE_OPENPMD_API
 #include <openPMD/openPMD.hpp>
