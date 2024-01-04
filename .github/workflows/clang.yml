@@ -187,7 +187,7 @@ jobs:
       run: |
         export CCACHE_COMPRESS=1
         export CCACHE_COMPRESSLEVEL=10
-        export CCACHE_MAXSIZE=200M
+        export CCACHE_MAXSIZE=40M
 
         sudo apt-get install -y --no-install-recommends libhdf5-mpi-dev
         wget -q https://github.com/openPMD/openPMD-api/archive/refs/tags/0.15.2.tar.gz
@@ -203,7 +203,7 @@ jobs:
       run: |
         export CCACHE_COMPRESS=1
         export CCACHE_COMPRESSLEVEL=10
-        export CCACHE_MAXSIZE=200M
+        export CCACHE_MAXSIZE=40M
         export CCACHE_EXTRAFILES=${{ github.workspace }}/.clang-tidy
         export CCACHE_LOGFILE=${{ github.workspace }}/ccache.log.txt
         ccache -z
