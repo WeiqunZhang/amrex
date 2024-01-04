@@ -2,10 +2,8 @@
 #define AMREX_PLOTFILE_OPENPMD_PTLS_API_H
 
 //extern  std::unique_ptr< amrex::openpmd_api::AMReX_openPMDHandler > amrex::openpmd_api::m_OpenPMDHandler;
-namespace amrex
+namespace amrex::openpmd_api
 {
-  namespace openpmd_api
-  {
     extern  std::unique_ptr< amrex::openpmd_api::AMReX_openPMDHandler > m_OpenPMDHandler;
     ////////////////////////////////////////////////////////////////////////
     //
@@ -426,7 +424,7 @@ namespace amrex
               //amrex::AllPrint()<<"  i =  "<<i<<" "<<aos[i]<<"\n";
               curr.get()[i] = aos[i].pos(currDim);
             }
-            std::string const positionComponent = positionComponents[currDim];
+            std::string const& positionComponent = positionComponents[currDim];
             currSpecies["position"][positionComponent].storeChunk(curr, {offset + GetGrandOffset()}, {numParticleOnTile64});
           }
       }
@@ -658,7 +656,6 @@ namespace amrex
         }
     }
 
-  } // namespace openpmd_api
-} // namespace amrex
+} // namespace amrex::openpmd_api
 
 #endif // AMREX_PLOTFILE_OPENPMD_API_H

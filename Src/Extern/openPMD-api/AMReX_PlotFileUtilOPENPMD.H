@@ -19,10 +19,8 @@
 #include <string>
 #include <memory>
 
-namespace amrex
+namespace amrex::openpmd_api
 {
-  namespace openpmd_api
-  {
     namespace helper
     {
       inline void
@@ -426,8 +424,7 @@ namespace amrex
     }; // class AMReX_openPMDHandler
 
 
-  }// name space openpmd_api
-} // namespace amrex
+} // namespace amrex::openpmd_api
 
 
 #include <AMReX_PlotFileUtilOPENPMD_PTLImpl.H>

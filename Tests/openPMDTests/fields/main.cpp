@@ -52,8 +52,6 @@ struct TestField
 {
   TestField(const InputParams& inputs)
   {
-    m_Time = 0.0;
-
     const int nghost = 0;
 
     Vector<Box> domains;
@@ -99,14 +97,14 @@ struct TestField
   Vector<int> m_Level_steps;
 
   Vector<std::string> m_Varnames;
-  Real m_Time;
+  Real m_Time = Real(0.0);
   Vector<IntVect> m_Ref_ratio;
   Vector<Geometry> m_Geom;
   Vector<std::unique_ptr<MultiFab> > m_mf;
 };
 
 
-void saveFile(char* fname,  const InputParams& inputs, const TestField& testField)
+void saveFile(char const* fname, const InputParams& inputs, const TestField& testField)
 {
 #ifdef AMREX_USE_OPENPMD_API
   openpmd_api::InitHandler(fname);
