@@ -19,3 +19,5 @@ sudo apt-get install -y --no-install-recommends\
     g++ gfortran    \
     libopenmpi-dev  \
     openmpi-bin
+
+ls /sys/devices/system/cpu/
