@@ -535,18 +535,29 @@ partitionParticlesByDest (PTile& ptile, const PLocator& ploc, CellAssignor&& ass
                 return ((assigned_grid == gid) && (assigned_lev == lev) && (getPID(lev, gid) == pid));
             };
 
-            num_stay = Scan::PrefixSum<int> (this_chunk_size,
-                          [=] AMREX_GPU_DEVICE (int i) -> int
-                          {
-                              return particle_stays(i);
-                          },
-                          [=] AMREX_GPU_DEVICE (int i, int const& s)
-                          {
-                              int src_i = i + this_offset;
-                              int dst_i = particle_stays(i) ? s : this_chunk_size-1-(i-s);
-                              copyParticle(dst_data, src_data, src_i, dst_i);
-                          },
-                          Scan::Type::exclusive);
+            Gpu::DeviceVector<int> particle_stay_flags(this_chunk_size);
+            auto* pflags = particle_stay_flags.data();
+            ParallelFor(this_chunk_size, [=] AMREX_GPU_DEVICE (int i)
+            {
+                pflags[i] = particle_stays(i);
+            });
+
+            amrex::AllPrintToFile("log") << " ** before **" << "\n";
+
+            Gpu::DeviceVector<int> particle_offset(this_chunk_size);
+            auto* poffset = particle_offset.data();
+            num_stay = Scan::ExclusiveSum(this_chunk_size, pflags, poffset);
+
+            amrex::AllPrintToFile("log") << " ** after **" << "\n";
+
+            ParallelFor(this_chunk_size, [=] AMREX_GPU_DEVICE (int i)
+            {
+                auto s = poffset[i];
+                int src_i = i + this_offset;
+                int dst_i = pflags[i] ? s : this_chunk_size-1-(i-s);
+                copyParticle(dst_data, src_data, src_i, dst_i);
+            });
+            Gpu::streamSynchronize();
         }
 
         if (num_chunks == 1)
