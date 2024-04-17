@@ -24,7 +24,6 @@ jobs:
         restore-keys: |
              ccache-${{ github.workflow }}-${{ github.job }}-git-
     - name: Build & Install
-      # Have to have -Wno-deprecated-declarations due to deprecated atomicAddNoRet
       # Have to have -Wno-gnu-zero-variadic-macro-arguments to avoid
       #    amrex/Src/Base/AMReX_GpuLaunchGlobal.H:15:5: error: must specify at least one argument for '...' parameter of variadic macro [-Werror,-Wgnu-zero-variadic-macro-arguments]
       #        __launch_bounds__(amrex_launch_bounds_max_threads)
@@ -38,7 +37,7 @@ jobs:
       #    /opt/rocm-6.1.0/include/rocprim/device/detail/device_adjacent_difference.hpp:198:26: error: token is not a valid binary operator in a preprocessor subexpression
       #      198 | #if defined(__gfx1102__) or defined(__gfx1030__)
       #          |     ~~~~~~~~~~~~~~~~~~~~~^~
-      env: {CXXFLAGS: "-Werror -Wall -Wextra -Wpedantic -Wnull-dereference -Wfloat-conversion -Wshadow -Woverloaded-virtual -Wextra-semi -Wunreachable-code -Wnon-virtual-dtor -Wno-deprecated-declarations -Wno-gnu-zero-variadic-macro-arguments"}
+      env: {CXXFLAGS: "-Werror -Wall -Wextra -Wpedantic -Wnull-dereference -Wfloat-conversion -Wshadow -Woverloaded-virtual -Wextra-semi -Wunreachable-code -Wnon-virtual-dtor -Wno-gnu-zero-variadic-macro-arguments"}
       run: |
         export CCACHE_COMPRESS=1
         export CCACHE_COMPRESSLEVEL=10
@@ -92,7 +91,6 @@ jobs:
         restore-keys: |
              ccache-${{ github.workflow }}-${{ github.job }}-git-
     - name: Build & Install
-      # Have to have -Wno-deprecated-declarations due to deprecated atomicAddNoRet
       # Have to have -Wno-gnu-zero-variadic-macro-arguments to avoid
       #    amrex/Src/Base/AMReX_GpuLaunchGlobal.H:15:5: error: must specify at least one argument for '...' parameter of variadic macro [-Werror,-Wgnu-zero-variadic-macro-arguments]
       #        __launch_bounds__(amrex_launch_bounds_max_threads)
@@ -106,7 +104,7 @@ jobs:
       #    /opt/rocm-6.1.0/include/rocprim/device/detail/device_adjacent_difference.hpp:198:26: error: token is not a valid binary operator in a preprocessor subexpression
       #      198 | #if defined(__gfx1102__) or defined(__gfx1030__)
       #          |     ~~~~~~~~~~~~~~~~~~~~~^~
-      env: {CXXFLAGS: "-Werror -Wall -Wextra -Wpedantic -Wnull-dereference -Wfloat-conversion -Wshadow -Woverloaded-virtual -Wextra-semi -Wunreachable-code -Wnon-virtual-dtor -Wno-deprecated-declarations -Wno-gnu-zero-variadic-macro-arguments"}
+      env: {CXXFLAGS: "-Werror -Wall -Wextra -Wpedantic -Wnull-dereference -Wfloat-conversion -Wshadow -Woverloaded-virtual -Wextra-semi -Wunreachable-code -Wnon-virtual-dtor -Wno-gnu-zero-variadic-macro-arguments"}
       run: |
         export CCACHE_COMPRESS=1
         export CCACHE_COMPRESSLEVEL=10
