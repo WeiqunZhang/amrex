@@ -268,7 +268,7 @@ TracerParticleContainer::Timestamp (const std::string&      basename,
                 std::vector<ParticleReal> vals(M);
 
                 const auto& pmap = GetParticles(lev);
-                for (const auto& kv : pmap) {
+                for (const auto& kv : std::as_const(pmap)) {
                   using PinnedTile = amrex::ParticleTile<Particle<AMREX_SPACEDIM, 0>, 0, 0,
                                                          amrex::PinnedArenaAllocator>;
                   PinnedTile pinned_tile;
