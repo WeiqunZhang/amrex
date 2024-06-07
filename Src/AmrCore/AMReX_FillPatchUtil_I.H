@@ -510,7 +510,7 @@ namespace detail {
                              const PreInterpHook& pre_interp,
                              const PostInterpHook& post_interp,
                              EB2::IndexSpace const* index_space,
-                             bool return_error_code = false)
+                             bool return_error_code)
     {
         BL_PROFILE("FillPatchTwoLevels");
 
@@ -846,7 +846,7 @@ FillPatchTwoLevels (MF& mf, IntVect const& nghost, Real time,
     detail::FillPatchTwoLevels_doit(mf,nghost,time,cmf,ct,fmf,ft,
                             scomp,dcomp,ncomp,cgeom,fgeom,
                             cbc,cbccomp,fbc,fbccomp,ratio,mapper,bcs,bcscomp,
-                            pre_interp,post_interp,index_space);
+                            pre_interp,post_interp,index_space,false);
 }
 
 template <typename MF, typename BC, typename Interp, typename PreInterpHook, typename PostInterpHook>
@@ -873,7 +873,7 @@ FillPatchTwoLevels (MF& mf, Real time,
     detail::FillPatchTwoLevels_doit(mf,mf.nGrowVect(),time,cmf,ct,fmf,ft,
                             scomp,dcomp,ncomp,cgeom,fgeom,
                             cbc,cbccomp,fbc,fbccomp,ratio,mapper,bcs,bcscomp,
-                            pre_interp,post_interp,index_space);
+                            pre_interp,post_interp,index_space,false);
 }
 
 template <typename MF, typename BC, typename Interp, typename PreInterpHook, typename PostInterpHook>
@@ -985,7 +985,7 @@ FillPatchTwoLevels (MF& mf, IntVect const& nghost, Real time,
     detail::FillPatchTwoLevels_doit(mf,nghost,time,cmf,ct,fmf,ft,
                             scomp,dcomp,ncomp,cgeom,fgeom,
                             cbc,cbccomp,fbc,fbccomp,ratio,mapper,bcs,bcscomp,
-                            pre_interp,post_interp,&index_space);
+                            pre_interp,post_interp,&index_space,false);
 }
 
 template <typename MF, typename BC, typename Interp, typename PreInterpHook, typename PostInterpHook>
@@ -1007,7 +1007,7 @@ FillPatchTwoLevels (MF& mf, Real time,
     detail::FillPatchTwoLevels_doit(mf,mf.nGrowVect(),time,cmf,ct,fmf,ft,
                             scomp,dcomp,ncomp,cgeom,fgeom,
                             cbc,cbccomp,fbc,fbccomp,ratio,mapper,bcs,bcscomp,
-                            pre_interp,post_interp,&index_space);
+                            pre_interp,post_interp,&index_space,false);
 }
 #endif
 
@@ -1352,7 +1352,7 @@ FillPatchNLevels (MF& mf, int level, const IntVect& nghost, Real time,
                                         bc[level-1], bccomp,
                                         bc[level  ], bccomp,
                                         ratio[level-1], mapper, bcr, bccomp,
-                                        hook, hook, nullptr);
+                                        hook, hook, nullptr,false);
     }
 }
 #endif
