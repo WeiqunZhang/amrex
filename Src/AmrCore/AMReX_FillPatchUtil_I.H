@@ -438,6 +438,7 @@ namespace detail {
         // nothing
     }
 
+#if 0
     inline BoxArray periodic_wrap_boxarray (BoxArray const& a_ba, Geometry const& geom)
     {
         if (geom.isAnyPeriodic()) {
@@ -491,6 +492,7 @@ namespace detail {
             return a_ba;
         }
     }
+#endif
 
     template <typename MF, typename BC, typename Interp, typename PreInterpHook, typename PostInterpHook>
     std::enable_if_t<IsFabArray<MF>::value,int>
@@ -544,7 +546,8 @@ namespace detail {
                 {
                     if (return_error_code) {
                         BoxArray const& cba = amrex::convert(cmf[0]->boxArray(), IntVect(0));
-                        if (!cba.contains(detail::periodic_wrap_boxarray(fpc.ba_crse_patch,cgeom))) {
+                        // xxx if (!cba.contains(detail::periodic_wrap_boxarray(fpc.ba_crse_patch,cgeom))) {
+                        if (!cba.contains(fpc.ba_crse_patch)) {
                             return failure_code;
                         }
                     }
@@ -611,7 +614,8 @@ namespace detail {
                 {
                     if (return_error_code) {
                         BoxArray const& cba = cmf[0]->boxArray();
-                        if (!cba.contains(detail::periodic_wrap_boxarray(fpc.ba_crse_patch,cgeom))) {
+                        //xxxxx if (!cba.contains(detail::periodic_wrap_boxarray(fpc.ba_crse_patch,cgeom))) {
+                        if (!cba.contains(fpc.ba_crse_patch)) {
                             return failure_code;
                         }
                     }
@@ -1264,6 +1268,7 @@ InterpFromCoarseLevel (Array<MF*, AMREX_SPACEDIM> const& mf, IntVect const& ngho
     }
 }
 
+#if 0
 template <typename MF, typename BC, typename Interp>
 std::enable_if_t<IsFabArray<MF>::value>
 FillPatchNLevels (MF& mf, int level, const IntVect& nghost, Real time,
@@ -1345,6 +1350,7 @@ FillPatchNLevels (MF& mf, int level, const IntVect& nghost, Real time,
                                         hook, hook, nullptr);
     }
 }
+#endif
 
 }
 
