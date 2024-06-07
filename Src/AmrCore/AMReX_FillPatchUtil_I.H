@@ -440,7 +440,7 @@ namespace detail {
 
     template <typename MF, typename BC, typename Interp, typename PreInterpHook, typename PostInterpHook>
     std::enable_if_t<IsFabArray<MF>::value,int>
-    FillPatchTwoLevels_doit (MF& mf, IntVect const& nghost, Real time,
+    FillPatchTwoLevels_doit_windows_sucks (MF& mf, IntVect const& nghost, Real time,
                              const Vector<MF*>& cmf, const Vector<Real>& ct,
                              const Vector<MF*>& fmf, const Vector<Real>& ft,
                              int scomp, int dcomp, int ncomp,
@@ -765,7 +765,7 @@ FillPatchTwoLevels (MF& mf, IntVect const& nghost, Real time,
 #else
     EB2::IndexSpace const* index_space = nullptr;
 #endif
-    auto ierror = detail::FillPatchTwoLevels_doit(mf,nghost,time,cmf,ct,fmf,ft,
+    auto ierror = detail::FillPatchTwoLevels_doit_windows_sucks(mf,nghost,time,cmf,ct,fmf,ft,
                             scomp,dcomp,ncomp,cgeom,fgeom,
                             cbc,cbccomp,fbc,fbccomp,ratio,mapper,bcs,bcscomp,
                             pre_interp,post_interp,index_space);
@@ -793,7 +793,7 @@ FillPatchTwoLevels (MF& mf, Real time,
     EB2::IndexSpace const* index_space = nullptr;
 #endif
 
-    auto ierror = detail::FillPatchTwoLevels_doit(mf,mf.nGrowVect(),time,cmf,ct,fmf,ft,
+    auto ierror = detail::FillPatchTwoLevels_doit_windows_sucks(mf,mf.nGrowVect(),time,cmf,ct,fmf,ft,
                             scomp,dcomp,ncomp,cgeom,fgeom,
                             cbc,cbccomp,fbc,fbccomp,ratio,mapper,bcs,bcscomp,
                             pre_interp,post_interp,index_space);
@@ -906,7 +906,7 @@ FillPatchTwoLevels (MF& mf, IntVect const& nghost, Real time,
                     const PreInterpHook& pre_interp,
                     const PostInterpHook& post_interp)
 {
-    auto ierror = detail::FillPatchTwoLevels_doit(mf,nghost,time,cmf,ct,fmf,ft,
+    auto ierror = detail::FillPatchTwoLevels_doit_windows_sucks(mf,nghost,time,cmf,ct,fmf,ft,
                             scomp,dcomp,ncomp,cgeom,fgeom,
                             cbc,cbccomp,fbc,fbccomp,ratio,mapper,bcs,bcscomp,
                             pre_interp,post_interp,&index_space);
@@ -929,7 +929,7 @@ FillPatchTwoLevels (MF& mf, Real time,
                     const PreInterpHook& pre_interp,
                     const PostInterpHook& post_interp)
 {
-    auto ierror = detail::FillPatchTwoLevels_doit(mf,mf.nGrowVect(),time,cmf,ct,fmf,ft,
+    auto ierror = detail::FillPatchTwoLevels_doit_windows_sucks(mf,mf.nGrowVect(),time,cmf,ct,fmf,ft,
                             scomp,dcomp,ncomp,cgeom,fgeom,
                             cbc,cbccomp,fbc,fbccomp,ratio,mapper,bcs,bcscomp,
                             pre_interp,post_interp,&index_space);
