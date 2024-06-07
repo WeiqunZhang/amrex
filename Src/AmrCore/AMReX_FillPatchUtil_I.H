@@ -765,10 +765,11 @@ FillPatchTwoLevels (MF& mf, IntVect const& nghost, Real time,
 #else
     EB2::IndexSpace const* index_space = nullptr;
 #endif
-    detail::FillPatchTwoLevels_doit(mf,nghost,time,cmf,ct,fmf,ft,
+    auto ierror = detail::FillPatchTwoLevels_doit(mf,nghost,time,cmf,ct,fmf,ft,
                             scomp,dcomp,ncomp,cgeom,fgeom,
                             cbc,cbccomp,fbc,fbccomp,ratio,mapper,bcs,bcscomp,
                             pre_interp,post_interp,index_space);
+    amrex::ignore_unused(ierror);
 }
 
 template <typename MF, typename BC, typename Interp, typename PreInterpHook, typename PostInterpHook>
@@ -792,10 +793,11 @@ FillPatchTwoLevels (MF& mf, Real time,
     EB2::IndexSpace const* index_space = nullptr;
 #endif
 
-    detail::FillPatchTwoLevels_doit(mf,mf.nGrowVect(),time,cmf,ct,fmf,ft,
+    auto ierror = detail::FillPatchTwoLevels_doit(mf,mf.nGrowVect(),time,cmf,ct,fmf,ft,
                             scomp,dcomp,ncomp,cgeom,fgeom,
                             cbc,cbccomp,fbc,fbccomp,ratio,mapper,bcs,bcscomp,
                             pre_interp,post_interp,index_space);
+    amrex::ignore_unused(ierror);
 }
 
 template <typename MF, typename BC, typename Interp, typename PreInterpHook, typename PostInterpHook>
@@ -904,10 +906,11 @@ FillPatchTwoLevels (MF& mf, IntVect const& nghost, Real time,
                     const PreInterpHook& pre_interp,
                     const PostInterpHook& post_interp)
 {
-    detail::FillPatchTwoLevels_doit(mf,nghost,time,cmf,ct,fmf,ft,
+    auto ierror = detail::FillPatchTwoLevels_doit(mf,nghost,time,cmf,ct,fmf,ft,
                             scomp,dcomp,ncomp,cgeom,fgeom,
                             cbc,cbccomp,fbc,fbccomp,ratio,mapper,bcs,bcscomp,
                             pre_interp,post_interp,&index_space);
+    amrex::ignore_unused(ierror);
 }
 
 template <typename MF, typename BC, typename Interp, typename PreInterpHook, typename PostInterpHook>
@@ -926,10 +929,11 @@ FillPatchTwoLevels (MF& mf, Real time,
                     const PreInterpHook& pre_interp,
                     const PostInterpHook& post_interp)
 {
-    detail::FillPatchTwoLevels_doit(mf,mf.nGrowVect(),time,cmf,ct,fmf,ft,
+    auto ierror = detail::FillPatchTwoLevels_doit(mf,mf.nGrowVect(),time,cmf,ct,fmf,ft,
                             scomp,dcomp,ncomp,cgeom,fgeom,
                             cbc,cbccomp,fbc,fbccomp,ratio,mapper,bcs,bcscomp,
                             pre_interp,post_interp,&index_space);
+    amrex::ignore_unused(ierror);
 }
 #endif
 
