@@ -546,11 +546,13 @@ namespace detail {
                 if ( ! fpc.ba_crse_patch.empty())
                 {
                     if (return_error_code) {
+#if 0
                         BoxArray const& cba = amrex::convert(cmf[0]->boxArray(), IntVect(0));
                         // xxx if (!cba.contains(detail::periodic_wrap_boxarray(fpc.ba_crse_patch,cgeom))) {
                         if (!cba.contains(fpc.ba_crse_patch)) {
                             return failure_code;
                         }
+#endif
                     }
 
                     MF mf_crse_patch     = make_mf_crse_patch<MF>      (fpc, ncomp, mf.boxArray().ixType());
@@ -614,11 +616,13 @@ namespace detail {
                 if ( ! fpc.ba_crse_patch.empty())
                 {
                     if (return_error_code) {
+#if 0
                         BoxArray const& cba = cmf[0]->boxArray();
                         //xxxxx if (!cba.contains(detail::periodic_wrap_boxarray(fpc.ba_crse_patch,cgeom))) {
                         if (!cba.contains(fpc.ba_crse_patch)) {
                             return failure_code;
                         }
+#endif
                     }
 
                     MF mf_crse_patch = make_mf_crse_patch<MF>(fpc, ncomp);
