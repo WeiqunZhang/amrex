@@ -494,8 +494,9 @@ namespace detail {
     }
 #endif
 
-    template <typename MF, typename BC, typename Interp, typename PreInterpHook, typename PostInterpHook>
-    std::enable_if_t<IsFabArray<MF>::value,int>
+    template <typename MF, typename BC, typename Interp, typename PreInterpHook, typename PostInterpHook,
+              std::enable_if_t<IsFabArray<MF>::value,int> = 0>
+    int
     FillPatchTwoLevels_doit (MF& mf, IntVect const& nghost, Real time,
                              const Vector<MF*>& cmf, const Vector<Real>& ct,
                              const Vector<MF*>& fmf, const Vector<Real>& ft,
