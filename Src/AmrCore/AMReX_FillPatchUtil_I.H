@@ -439,7 +439,7 @@ namespace detail {
     }
 
     template <typename MF, typename BC, typename Interp, typename PreInterpHook, typename PostInterpHook>
-    std::enable_if_t<IsFabArray<MF>::value>
+    std::enable_if_t<IsFabArray<MF>::value,int>
     FillPatchTwoLevels_doit (MF& mf, IntVect const& nghost, Real time,
                              const Vector<MF*>& cmf, const Vector<Real>& ct,
                              const Vector<MF*>& fmf, const Vector<Real>& ft,
@@ -455,6 +455,8 @@ namespace detail {
                              EB2::IndexSpace const* index_space)
     {
         BL_PROFILE("FillPatchTwoLevels");
+
+        int success_code = -1;
 
         if (nghost.max() > 0 || mf.getBDKey() != fmf[0]->getBDKey())
         {
@@ -568,6 +570,8 @@ namespace detail {
 
         FillPatchSingleLevel(mf, nghost, time, fmf, ft, scomp, dcomp, ncomp,
                              fgeom, fbc, fbccomp);
+
+        return success_code;
     }
 
     template <typename MF, typename BC, typename Interp, typename PreInterpHook, typename PostInterpHook>
