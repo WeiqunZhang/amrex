@@ -510,7 +510,7 @@ namespace detail {
                              const PreInterpHook& pre_interp,
                              const PostInterpHook& post_interp,
                              EB2::IndexSpace const* index_space,
-                             bool return_error_code)
+                             int return_error_code)
     {
         BL_PROFILE("FillPatchTwoLevels");
 
