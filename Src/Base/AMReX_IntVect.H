@@ -710,6 +710,9 @@ public:
         return IntVectND<dim>(std::numeric_limits<int>::lowest());
     }
 
+    static const IntVectND<dim> Zero;
+    static const IntVectND<dim> Unit;
+
     AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
     static constexpr std::size_t size () noexcept {
         return static_cast<std::size_t>(dim);
@@ -766,6 +769,13 @@ private:
 
     int vect[dim] = {};
 };
+
+
+template <>
+inline constexpr IntVectND<AMREX_SPACEDIM> IntVectND<AMREX_SPACEDIM>::Zero{0};
+
+template <>
+inline constexpr IntVectND<AMREX_SPACEDIM> IntVectND<AMREX_SPACEDIM>::Unit{1};
 
 // Template deduction guide for IntVectND
 template<std::size_t dim>
