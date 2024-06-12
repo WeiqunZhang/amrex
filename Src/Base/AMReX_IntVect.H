@@ -772,10 +772,10 @@ private:
 
 
 template <>
-inline constexpr IntVectND<AMREX_SPACEDIM> IntVectND<AMREX_SPACEDIM>::Zero{0};
+inline constexpr const IntVectND<AMREX_SPACEDIM> IntVectND<AMREX_SPACEDIM>::Zero{0};
 
 template <>
-inline constexpr IntVectND<AMREX_SPACEDIM> IntVectND<AMREX_SPACEDIM>::Unit{1};
+inline constexpr const IntVectND<AMREX_SPACEDIM> IntVectND<AMREX_SPACEDIM>::Unit{1};
 
 // Template deduction guide for IntVectND
 template<std::size_t dim>
