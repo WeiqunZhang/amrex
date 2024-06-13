@@ -47,7 +47,7 @@ namespace {
     Long the_pinned_arena_release_threshold = std::numeric_limits<Long>::max();
     Long the_comms_arena_release_threshold = std::numeric_limits<Long>::max();
     Long the_async_arena_release_threshold = std::numeric_limits<Long>::max();
-    bool the_arena_is_managed = false;
+    bool the_arena_is_managed = true;
     bool abort_on_out_of_gpu_memory = false;
 }
 

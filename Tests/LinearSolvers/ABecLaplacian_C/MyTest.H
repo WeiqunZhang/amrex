@@ -1,11 +1,14 @@
 #ifndef MY_TEST_H_
 #define MY_TEST_H_
 
-#include <AMReX_MLMG.H>
+//#include <AMReX_MLMG.H>
 
-#ifdef AMREX_USE_HYPRE
-#include <AMReX_Hypre.H>
-#endif
+//#ifdef AMREX_USE_HYPRE
+//#include <AMReX_Hypre.H>
+//#endif
+
+#include <AMReX_MultiFab.H>
+#include <AMReX_Geometry.H>
 
 class MyTest
 {
@@ -26,11 +29,6 @@ private:
 
     void readParameters ();
     void initData ();
-    void solvePoisson ();
-    void solveABecLaplacian ();
-    void solveABecLaplacianInhomNeumann ();
-    void solveNodeABecLaplacian ();
-    void solveABecLaplacianGMRES ();
 
 #ifdef AMREX_USE_HYPRE
     void solveMLHypre ();
@@ -38,8 +36,8 @@ private:
 
     int max_level = 1;
     int ref_ratio = 2;
-    int n_cell = 128;
-    int max_grid_size = 64;
+    int n_cell = 16;
+    int max_grid_size = 8;
 
     bool composite_solve = true;
 
@@ -47,14 +45,14 @@ private:
     // 4. NodeABecLaplacian
     int prob_type = 1;
 
-    bool use_mlhypre = false; // use multi-level hypre solver
+    bool use_mlhypre = true; // use multi-level hypre solver
 
     // For MLMG solver
     int verbose = 2;
     int bottom_verbose = 0;
     int max_iter = 100;
     int max_fmg_iter = 0;
-    int linop_maxorder = 2;
+    int linop_maxorder = 3;
     bool agglomeration = true;
     bool consolidation = true;
     bool semicoarsening = false;
@@ -67,8 +65,8 @@ private:
     bool use_gmres = false;
 
 #ifdef AMREX_USE_HYPRE
-    int hypre_interface_i = 1;  // 1. structed, 2. semi-structed, 3. ij
-    amrex::Hypre::Interface hypre_interface = amrex::Hypre::Interface::structed;
+//    int hypre_interface_i = 1;  // 1. structed, 2. semi-structed, 3. ij
+//    amrex::Hypre::Interface hypre_interface = amrex::Hypre::Interface::structed;
 #endif
 
     amrex::Vector<amrex::Geometry> geom;

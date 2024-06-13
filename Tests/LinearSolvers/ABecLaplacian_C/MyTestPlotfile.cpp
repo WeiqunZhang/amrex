@@ -8,19 +8,6 @@ using namespace amrex;
 void
 MyTest::writePlotfile () const
 {
-    if (prob_type == 4) {
-        for (int ilev = 0; ilev <= max_level; ++ilev) {
-            VisMF::Write(solution[ilev], "solution-lev"+std::to_string(ilev));
-            MultiFab errmf(solution[ilev].boxArray(),
-                           solution[ilev].DistributionMap(), 1, 1);
-            MultiFab::Copy(errmf, solution[ilev], 0, 0, 1, 0);
-            MultiFab::Subtract(errmf, exact_solution[ilev], 0, 0, 1, 0);
-            auto error = errmf.norminf();
-            amrex::Print() << "Level " << ilev << " max-norm error: " << error << '\n';
-        }
-        return;
-    }
-
     ParmParse pp;
     bool gpu_regtest = false;
 #ifdef AMREX_USE_GPU
@@ -30,30 +17,7 @@ MyTest::writePlotfile () const
     const int nlevels = max_level+1;
     Vector<MultiFab> plotmf(nlevels);
 
-    if (gpu_regtest) {
-        const int ncomp = (acoef.empty()) ? 3 : 5;
-        Vector<std::string> varname = {"solution", "rhs", "exact_solution"};
-        if (!acoef.empty()) {
-            varname.emplace_back("acoef");
-            varname.emplace_back("bcoef");
-        }
-
-        for (int ilev = 0; ilev < nlevels; ++ilev)
-        {
-            plotmf[ilev].define(grids[ilev], dmap[ilev], ncomp, 0);
-            MultiFab::Copy(plotmf[ilev], solution      [ilev], 0, 0, 1, 0);
-            MultiFab::Copy(plotmf[ilev], rhs           [ilev], 0, 1, 1, 0);
-            MultiFab::Copy(plotmf[ilev], exact_solution[ilev], 0, 2, 1, 0);
-            if (!acoef.empty()) {
-                MultiFab::Copy(plotmf[ilev], acoef[ilev], 0, 3, 1, 0);
-                MultiFab::Copy(plotmf[ilev], bcoef[ilev], 0, 4, 1, 0);
-            }
-        }
-
-        WriteMultiLevelPlotfile("plot", nlevels, amrex::GetVecOfConstPtrs(plotmf),
-                                varname, geom, 0.0, Vector<int>(nlevels, 0),
-                                Vector<IntVect>(nlevels, IntVect{ref_ratio}));
-    } else {
+    {
         const int ncomp = (acoef.empty()) ? 4 : 6;
         Vector<std::string> varname = {"solution", "rhs", "exact_solution", "error"};
         if (!acoef.empty()) {
@@ -61,6 +25,7 @@ MyTest::writePlotfile () const
             varname.emplace_back("bcoef");
         }
 
+        amrex::Print() << "\n\n";
         for (int ilev = 0; ilev < nlevels; ++ilev)
         {
             plotmf[ilev].define(grids[ilev], dmap[ilev], ncomp, 0);
@@ -78,11 +43,12 @@ MyTest::writePlotfile () const
             amrex::Print() << "Level " << ilev
                            << " max-norm error: " << plotmf[ilev].norminf(3)
                            << " 1-norm error: " << plotmf[ilev].norm1(3)*dvol
-                           << " 2-norm error: " << plotmf[ilev].norm2(3)*std::sqrt(dvol) << '\n';
+                           << " 2-norm error: " << plotmf[ilev].norm2(3)*std::sqrt(dvol) << "\n";
         }
+        amrex::Print() << "\n\n";
 
-        WriteMultiLevelPlotfile("plot", nlevels, amrex::GetVecOfConstPtrs(plotmf),
-                                varname, geom, 0.0, Vector<int>(nlevels, 0),
-                                Vector<IntVect>(nlevels, IntVect{ref_ratio}));
+//        WriteMultiLevelPlotfile("plot", nlevels, amrex::GetVecOfConstPtrs(plotmf),
+//                                varname, geom, 0.0, Vector<int>(nlevels, 0),
+//                                Vector<IntVect>(nlevels, IntVect{ref_ratio}));
     }
 }
