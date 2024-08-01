@@ -7,7 +7,8 @@ applications.
 
 Key features of AMReX include:
 
-   - C++ and Fortran interfaces
+   - C++, Python and Fortran interfaces
+   - Performance portability across CPUs and GPUs
    - 1-, 2- and 3-D support
    - Support for cell-centered, face-centered, edge-centered, and nodal data
    - Support for hyperbolic, parabolic, and elliptic solves on hierarchical
@@ -15,8 +16,7 @@ Key features of AMReX include:
    - Optional subcycling in time for time-dependent PDEs
    - Support for particles
    - Support for embedded boundary (cut cell) representations of complex geometries
-   - Parallelization via flat MPI, OpenMP, hybrid MPI/OpenMP, hybrid
-     MPI/(CUDA or HIP or SYCL), or MPI/MPI
+   - Parallelization via flat MPI, OpenMP, hybrid MPI/OpenMP, or MPI/MPI
    - Parallel I/O
    - Plotfile format supported by AmrVis, VisIt, ParaView, and yt.
 
