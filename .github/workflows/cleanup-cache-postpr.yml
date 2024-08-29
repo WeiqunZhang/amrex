@@ -23,6 +23,7 @@ jobs:
 
           REPO=${{ github.repository }}
 
+          cat ${GITHUB_EVENT_PATH}
           pr_number=$(jq --raw-output .workflow_run.pull_requests[0].number < ${GITHUB_EVENT_PATH})
           echo "Clean up cache for PR ${pr_number}."
           BRANCH=refs/pull/${pr_number}/merge
