@@ -4,17 +4,13 @@ on:
     types:
       - closed
 
+# Because this workflow is run in the context of a pull_request event, it
+# does not have the permission to remove caches. We use this workflow to
+# trigger CleanUpCachePostPR to remove caches.
+
 jobs:
   cleanup:
     runs-on: ubuntu-latest
     steps:
-      - name: Save PR number
-        env:
-          PR_NUMBER: ${{ github.event.number }}
-        run: |
-          echo $PR_NUMBER > pr_number.txt
-      - uses: actions/upload-artifact@v4
-        with:
-          name: pr_number
-          path: pr_number.txt
-          retention-days: 1
+      - name: Do nothing
+        run: echo "This workflow will trigger CleanUpCachePostPR."
