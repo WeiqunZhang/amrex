@@ -33,7 +33,7 @@ jobs:
             echo "xxxxx beging ...."
             cat ${GITHUB_EVENT_PATH}
             echo "xxxxx end"
-            pr_number = $(jq --raw-output .pull_requests[0].number < ${GITHUB_EVENT_PATH})
+            pr_number=$(jq --raw-output .pull_requests[0].number < ${GITHUB_EVENT_PATH})
             echo "xxxxx new PR NUMBER is ${pr_number}."
             BRANCH=refs/pull/${pr_number}/merge
           else
