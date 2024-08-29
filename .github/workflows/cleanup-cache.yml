@@ -30,11 +30,8 @@ jobs:
           WORKFLOW_NAME="${{ github.event.workflow_run.name }}"
 
           if [[ $EVENT == "pull_request" ]]; then
-            echo "xxxxx beging ...."
-            cat ${GITHUB_EVENT_PATH}
-            echo "xxxxx end"
-            pr_number=$(jq --raw-output .pull_requests[0].number < ${GITHUB_EVENT_PATH})
-            echo "xxxxx new PR NUMBER is ${pr_number}."
+            pr_number=$(jq --raw-output .workflow_run.pull_requests[0].number < ${GITHUB_EVENT_PATH})
+            echo "Clean up cache for PR ${pr_number}."
             BRANCH=refs/pull/${pr_number}/merge
           else
             BRANCH=refs/heads/${{ github.event.workflow_run.head_branch }}
