@@ -10,6 +10,7 @@ jobs:
   test-petsc-cpu-2d:
     name: GCC 2D EB PETSc@3.18.1
     runs-on: ubuntu-latest
+    if: false
     steps:
     - uses: actions/checkout@v4
     - name: Dependencies

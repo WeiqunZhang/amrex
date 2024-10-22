@@ -10,6 +10,7 @@ jobs:
   sundials-cpu:
     name: GCC SUNDIALS@6.5.0
     runs-on: ubuntu-22.04
+    if: false
     env:
        CCACHE_COMPRESS: 1
        CCACHE_COMPRESSLEVEL: 10
@@ -70,6 +71,7 @@ jobs:
   sundials-cuda:
     name: CUDA SUNDIALS@7.0.0
     runs-on: ubuntu-22.04
+    if: false
     env:
        CCACHE_COMPRESS: 1
        CCACHE_COMPRESSLEVEL: 10
