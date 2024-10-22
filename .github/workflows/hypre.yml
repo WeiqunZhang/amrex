@@ -14,6 +14,14 @@ jobs:
       AMREX_HYPRE_HOME: ${HOME}/.cache/hypre-2.26.0-cuda
     steps:
     - uses: actions/checkout@v4
+    - name: Check Changes
+      id: check-changes
+      uses: ./.github/actions/check-changes
+    - name: Early Exit
+      if: ${{ steps.check-changes.outputs.only_docs_changed == 'true' }}
+      run: |
+        echo "Exit because only Docs/ has changed."
+        exit 0
     - name: Dependencies
       run: |
         .github/workflows/dependencies/dependencies_nvcc.sh 11.2
@@ -63,6 +71,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
+    - name: Check Changes
+      id: check-changes
+      uses: ./.github/actions/check-changes
+    - name: Early Exit
+      if: ${{ steps.check-changes.outputs.only_docs_changed == 'true' }}
+      run: |
+        echo "Exit because only Docs/ has changed."
+        exit 0
     - name: Dependencies
       run: |
         .github/workflows/dependencies/dependencies.sh
@@ -112,6 +128,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
+    - name: Check Changes
+      id: check-changes
+      uses: ./.github/actions/check-changes
+    - name: Early Exit
+      if: ${{ steps.check-changes.outputs.only_docs_changed == 'true' }}
+      run: |
+        echo "Exit because only Docs/ has changed."
+        exit 0
     - name: Dependencies
       run: |
         .github/workflows/dependencies/dependencies.sh

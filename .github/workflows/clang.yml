@@ -9,11 +9,20 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  check_changes:
+    name: Check Changes
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/check-changes
+
   # Build and install libamrex as AMReX CMake project
   # Note: this is an intentional "minimal" build that does not enable (many) options
   library_clang:
     name: Clang@7.0 C++17 SP NOMPI Debug [lib]
     runs-on: ubuntu-20.04
+    needs: check_changes
+    if: needs.check_changes.outputs.only_docs_changed == 'false'
     steps:
     - uses: actions/checkout@v4
     - name: Dependencies
@@ -75,6 +84,8 @@ jobs:
   tests_clang:
     name: Clang@14.0 C++17 SP Particles DP Mesh Debug [tests]
     runs-on: ubuntu-22.04
+    needs: check_changes
+    if: needs.check_changes.outputs.only_docs_changed == 'false'
     steps:
     - uses: actions/checkout@v4
     - name: Dependencies
@@ -131,6 +142,8 @@ jobs:
   tests_cxx20:
     name: Clang C++20 [tests]
     runs-on: ubuntu-22.04
+    needs: check_changes
+    if: needs.check_changes.outputs.only_docs_changed == 'false'
     steps:
     - uses: actions/checkout@v4
     - name: Dependencies
@@ -180,6 +193,8 @@ jobs:
   configure-2d:
     name: Clang NOMPI Release [configure 2D]
     runs-on: ubuntu-22.04
+    needs: check_changes
+    if: needs.check_changes.outputs.only_docs_changed == 'false'
     steps:
     - uses: actions/checkout@v4
     - name: Dependencies

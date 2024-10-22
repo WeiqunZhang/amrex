@@ -1,0 +1,23 @@
+name: Check Changes
+
+outputs:
+  only_docs_changed:
+    description: "True if only Docs/ has changed"
+    value: ${{ steps.set-output.outputs.only_docs_changed }}
+runs:
+  using: "composite"
+  steps:
+    - uses: actions/checkout@v4
+    - uses: dorny/paths-filter@v3
+      id: changes
+      with:
+        filters: |
+          docs:
+            - 'Docs/**'
+          others:
+            - '!Docs/**'
+    - name: Set output
+      id: set-output
+      shell: bash
+      run: |
+        echo "only_docs_changed=${{ steps.changes.outputs.others == 'false' }}" >> $GITHUB_OUTPUT

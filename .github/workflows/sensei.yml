@@ -22,6 +22,14 @@ jobs:
       image: senseiinsitu/ci:fedora35-amrex-20220613
     steps:
     - uses: actions/checkout@v4
+    - name: Check Changes
+      id: check-changes
+      uses: ./.github/actions/check-changes
+    - name: Early Exit
+      if: ${{ steps.check-changes.outputs.only_docs_changed == 'true' }}
+      run: |
+        echo "Exit because only Docs/ has changed."
+        exit 0
     - name: Setup
       run: mkdir build
     - name: Configure

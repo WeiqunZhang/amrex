@@ -12,6 +12,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
+    - name: Check Changes
+      id: check-changes
+      uses: ./.github/actions/check-changes
+    - name: Early Exit
+      if: ${{ steps.check-changes.outputs.only_docs_changed == 'true' }}
+      run: |
+        echo "Exit because only Docs/ has changed."
+        exit 0
     - name: Get Latest Release Tag
       run: |
         CASTRO_TAG=$(wget https://github.com/AMReX-Astro/Castro/releases/latest 2>&1 | grep Location: | awk '{print $2}' | awk -F/ '{print $NF}')
@@ -64,6 +72,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
+    - name: Check Changes
+      id: check-changes
+      uses: ./.github/actions/check-changes
+    - name: Early Exit
+      if: ${{ steps.check-changes.outputs.only_docs_changed == 'true' }}
+      run: |
+        echo "Exit because only Docs/ has changed."
+        exit 0
     - name: Download WarpX
       uses: actions/checkout@v4
       with:
@@ -107,6 +123,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
+    - name: Check Changes
+      id: check-changes
+      uses: ./.github/actions/check-changes
+    - name: Early Exit
+      if: ${{ steps.check-changes.outputs.only_docs_changed == 'true' }}
+      run: |
+        echo "Exit because only Docs/ has changed."
+        exit 0
     - name: Checkout pyamrex
       uses: actions/checkout@v4
       with:
