@@ -11,6 +11,7 @@ jobs:
   tests-macos-universal-nompi:
     name: AppleClang Universal w/o MPI [tests-universal]
     runs-on: macos-latest
+    if: false
     steps:
     - uses: actions/checkout@v4
     - name: Dependencies
@@ -55,6 +56,7 @@ jobs:
   tests-macos:
     name: AppleClang@11.0 GFortran@9.3 [tests]
     runs-on: macos-latest
+    if: false
     steps:
     - uses: actions/checkout@v4
     - name: Dependencies

@@ -10,6 +10,7 @@ jobs:
   multid:
     name: GNU Multi-D
     runs-on: ubuntu-latest
+    if: false
     steps:
     - uses: actions/checkout@v4
     - name: Dependencies

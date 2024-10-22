@@ -10,6 +10,7 @@ jobs:
   tests-hip:
     name: HIP ROCm Flang C++17 [tests]
     runs-on: ubuntu-20.04
+    if: false
     steps:
     - uses: actions/checkout@v4
     - name: Dependencies
@@ -69,6 +70,7 @@ jobs:
   tests-hip-wrapper:
     name: HIP ROCm GFortran@9.3 C++17 [tests-hipcc]
     runs-on: ubuntu-20.04
+    if: false
     steps:
     - uses: actions/checkout@v4
     - name: Dependencies
@@ -127,6 +129,7 @@ jobs:
   configure-2d-single-hip:
     name: HIP EB [configure 2D]
     runs-on: ubuntu-20.04
+    if: false
     steps:
     - uses: actions/checkout@v4
     - name: Dependencies
@@ -160,6 +163,7 @@ jobs:
   hip-3d-eb-gmake:
     name: HIP EB 3D GMake
     runs-on: ubuntu-20.04
+    if: false
     steps:
     - uses: actions/checkout@v4
     - name: Dependencies

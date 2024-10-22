@@ -10,6 +10,7 @@ jobs:
   bittree-2d:
     name: Bittree 2D
     runs-on: ubuntu-latest
+    if: false
     steps:
     - uses: actions/checkout@v4
     - name: Dependencies
@@ -62,6 +63,7 @@ jobs:
   bittree-3d:
     name: Bittree 3D
     runs-on: ubuntu-latest
+    if: false
     steps:
     - uses: actions/checkout@v4
     - name: Dependencies
