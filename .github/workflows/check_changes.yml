@@ -22,7 +22,6 @@ jobs:
             docs:
               - 'Docs/**'
             others:
-              - '**'
               - '!Docs/**'
       - id: set-output
         run: |
