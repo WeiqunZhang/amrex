@@ -23,7 +23,7 @@ jobs:
               - 'Docs/**'
             others:
               - '**'
-              - '!(Docs)/**'
+              - '!(Docs/**)'
       - id: set-output
         run: |
           echo "has_docs_changes=${{ steps.changes.outputs.docs }}" >> $GITHUB_OUTPUT
