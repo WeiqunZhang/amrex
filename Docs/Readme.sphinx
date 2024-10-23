@@ -6,7 +6,7 @@ To update the online AMReX documentation using sphinx:
 
       3. Commit your changes.
 
-The GitHub action will build the html pages and commit them to AMReX's gh-pages branch for you. If you would like to
+The GitHub action will build the html pages and commit them to AMReX's gh-pages repo for you. If you would like to
 preview the html locally, you can:
 
         4. Go back into amrex/Docs/sphinx_documentation.
