@@ -10,7 +10,7 @@ namespace amrex::FFT
 /**
  * \brief Poisson solver for all periodic boundaries using FFT
  */
-template <typename MF>
+template <typename MF = MultiFab>
 class Poisson
 {
 public:
@@ -33,7 +33,7 @@ private:
  * \brief 3D Poisson solver for periodic boundaries in the first two
  * dimensions and Neumann in the last dimension.
  */
-template <typename MF>
+template <typename MF = MultiFab>
 class PoissonHybrid
 {
 public:

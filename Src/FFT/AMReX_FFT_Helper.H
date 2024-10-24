@@ -3,11 +3,14 @@
 #include <AMReX_Config.H>
 
 #include <AMReX_DistributionMapping.H>
+#include <AMReX_Enum.H>
 
 namespace amrex::FFT
 {
 
 enum struct Direction { forward, backward, both };
+
+AMREX_ENUM( Boundary, periodic, even, odd );
 
 struct Info
 {

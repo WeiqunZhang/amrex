@@ -964,6 +964,194 @@ void R2C<T,D>::backward (cMF const& inmf, MF& outmf)
     backward_doit(outmf);
 }
 
+
+template <typename T = Real>
+class R2X
+{
+public:
+    using MF = std::conditional_t<std::is_same_v<T,Real>,
+                                  MultiFab, FabArray<BaseFab<T> > >;
+    using cMF = FabArray<BaseFab<GpuComplex<T> > >;
+
+    R2X (Box const& domain,
+         Array<std::pair<Boundary,Boundary>,AMREX_SPACEDIM> const& bc);
+
+    ~R2X ();
+
+    R2X (R2X const&) = delete;
+    R2X (R2X &&) = delete;
+    R2X& operator= (R2X const&) = delete;
+    R2X& operator= (R2X &&) = delete;
+
+private:
+    Box m_dom_0;
+    Array<std::pair<Boundary,Boundary>,AMREX_SPACEDIM> m_bc;
+
+    MF m_rx;
+    MF m_ry;
+    MF m_rz;
+    cMF m_cx;
+    cMF m_cy;
+    cMF m_cz;
+
+    Box m_dom_rx;
+    Box m_dom_ry;
+    Box m_dom_rz;
+    Box m_dom_cx;
+    Box m_dom_cy;
+    Box m_dom_cz;
+};
+
+template <typename T>
+R2X<T>::R2X (Box const& domain,
+             Array<std::pair<Boundary,Boundary>,AMREX_SPACEDIM> const& bc)
+    : m_dom_0(domain),
+      m_bc(bc)
+{
+    AMREX_ALWAYS_ASSERT(domain.cellCentered());
+    for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
+        if (bc[idim].first == Boundary::periodic ||
+            bc[idim].second == Boundary::periodic) {
+            AMREX_ALWAYS_ASSERT(bc[idim].first == bc[idim].second);
+        }
+    }
+
+    int myproc = ParallelContext::MyProcSub();
+    int nprocs = ParallelContext::NProcsSub();
+
+    //
+    // make data containers
+    //
+
+    m_dom_rx = m_dom_0;
+    auto bax = amrex::decompose(m_dom_rx, nprocs, {AMREX_D_DECL(false,true,true)});
+    DistributionMapping dmx = detail::make_iota_distromap(bax.size());
+    m_rx.define(bax, dmx, 1, 0);
+
+    // x-direction
+    if (bc[0].first == Boundary::periodic) {
+        // x-fft: r2c(m_rx->m_cx)
+        m_dom_cx = Box(IntVect(0), IntVect(AMREX_D_DECL(domain.length(0)/2,
+                                                        domain.bigEnd(1),
+                                                        domain.bigEnd(2))));
+        BoxList bl = bax.boxList();
+        for (auto & b : bl) {
+            b.setBig(0, m_dom_0.bigEnd(0));
+        }
+        BoxArray cbax(std::move(bl));
+        m_cx.define(cbax, dmx, 1, 0);
+    } // else: x-fft: r2r(m_rx)
+
+#if (AMREX_SPACEDIM >= 2)
+    if (! m_cx.empty()) {
+        // copy(m_cx->m_cy)
+        m_dom_cy = Box(IntVect(0), IntVect(AMREX_D_DECL(m_dom_cx.bigEnd(1),
+                                                        m_dom_cx.bigEnd(0),
+                                                        m_dom_cx.bigEnd(2))));
+        auto ba = amrex::decompose(m_dom_cy, nprocs, {AMREX_D_DECL(false,true,true)});
+        DistributionMapping dm;
+        if (ba.size() == m_cx.size()) {
+            dm = m_cx.DistributionMap();
+        } else {
+            dm = detail::make_iota_distromap(ba.size());
+        }
+        m_cy.define(ba,dm,1,0);
+        // if bc[1] is periodic:
+        //     c2c(m_cy->m_cy)
+        // else:
+        //     r2r(m_cy.re) & r2r(m_cy.im)
+    } else {
+        // copy(m_rx->m_ry)
+        m_dom_ry = Box(IntVect(0), IntVect(AMREX_D_DECL(m_dom_rx.bigEnd(1),
+                                                        m_dom_rx.bigEnd(0),
+                                                        m_dom_rx.bigEnd(2))));
+        auto ba = amrex::decompose(m_dom_ry, nprocs, {AMREX_D_DECL(false,true,true)});
+        DistributionMapping dm;
+        if (ba.size() == m_rx.size()) {
+            dm = m_rx.DistributionMap();
+        } else {
+            dm = detail::make_iota_distromap(ba.size());
+        }
+        m_ry.define(ba,dm,1,0);
+        // if bc[1] is periodic:
+        //     r2c(m_ry->m_cy)
+        // else:
+        //     r2r(m_ry)
+        if (bc[1].first == Boundary::periodic) {
+            m_dom_cy = Box(IntVect(0), IntVect(AMREX_D_DECL(m_dom_ry.length(0)/2,
+                                                            m_dom_ry.bigEnd(1),
+                                                            m_dom_ry.bigEnd(2))));
+            BoxList bl = ba.boxList();
+            for (auto & b : bl) {
+                b.setBig(0, m_dom_cy.bigEnd(0));
+            }
+            BoxArray cba(std::move(bl));
+            m_cy.define(cba, dm, 1, 0);
+        }
+    }
+#endif
+
+#if (AMREX_SPACEDIM == 3)
+    if (! m_cy.empty()) {
+        // copy(m_cy, m_cz)
+        m_dom_cz = Box(IntVect(0), IntVect(AMREX_D_DECL(m_dom_cy.bigEnd(1),
+                                                        m_dom_cy.bigEnd(0),
+                                                        m_dom_cy.bigEnd(2))));
+        auto ba = amrex::decompose(m_dom_cz, nprocs, {AMREX_D_DECL(false,true,true)});
+        DistributionMapping dm;
+        if (ba.size() == m_cy.size()) {
+            dm = m_cy.DistributionMap();
+        } else {
+            dm = detail::make_iota_distromap(ba.size());
+        }
+        m_cz.define(ba,dm,1,0);
+        // if bc[2] is periodic:
+        //     c2c(m_cz->m_cz)
+        // else:
+        //     r2r(m_cz.re) & r2r(m_cz.im)
+    } else {
+        // copy(m_ry, m_rz)
+        m_dom_rz = Box(IntVect(0), IntVect(AMREX_D_DECL(m_dom_ry.bigEnd(1),
+                                                        m_dom_ry.bigEnd(0),
+                                                        m_dom_ry.bigEnd(2))));
+        auto ba = amrex::decompose(m_dom_rz, nprocs, {AMREX_D_DECL(false,true,true)});
+        DistributionMapping dm;
+        if (ba.size() == m_ry.size()) {
+            dm = m_ry.DistributionMap();
+        } else {
+            dm = detail::make_iota_distromap(ba.size());
+        }
+        m_rz.define(ba,dm,1,0);
+        // if bc[2] is periodic:
+        //     r2c(m_rz->m_cz)
+        // else:
+        //     r2r(m_rz)
+        if (bc[2].first == Boundary::periodic) {
+            m_dom_cz = Box(IntVect(0), IntVect(AMREX_D_DECL(m_dom_rz.length(0)/2,
+                                                            m_dom_rz.bigEnd(1),
+                                                            m_dom_rz.bigEnd(2))));
+            BoxList bl = ba.boxList();
+            for (auto & b : bl) {
+                b.setBig(0, m_dom_cy.bigEnd(0));
+            }
+            BoxArray cba(std::move(bl));
+            m_cz.define(cba, dm, 1, 0);
+        }
+    }
+#endif
+
+    //
+    // make copiers
+    //
+
+
+    //
+    // make plans
+    //
+
+
+}
+
 }
 
 #endif

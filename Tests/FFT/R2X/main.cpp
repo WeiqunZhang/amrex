@@ -67,60 +67,42 @@ int main (int argc, char* argv[])
 
         MultiFab mf2(ba,dm,1,0);
 
-        auto scaling = Real(1) / Real(geom.Domain().d_numPts());
-
-        {
-            cMultiFab cmf(ba,dm,1,0);
-
-            // forward
-            {
-                FFT::R2C<Real,FFT::Direction::forward> r2c(geom.Domain());
-                r2c.forward(mf,cmf);
+        // For each dimension, there are 2 possibilities
+        constexpr int ncases = 2;
+        Array<std::pair<FFT::Boundary,FFT::Boundary>,ncases>
+            bcs{std::pair<FFT::Boundary,FFT::Boundary>{FFT::Boundary::periodic,
+                                                       FFT::Boundary::periodic},
+                std::pair<FFT::Boundary,FFT::Boundary>{FFT::Boundary::even,
+                                                       FFT::Boundary::even }};
+        int ncasesy = (AMREX_SPACEDIM > 1) ? ncases : 1;
+        int ncasesz = (AMREX_SPACEDIM > 2) ? ncases : 1;
+        for (int zcase = 0; zcase < ncasesz; ++zcase) {
+        for (int ycase = 0; ycase < ncasesy; ++ycase) {
+        for (int xcase = 0; xcase < ncases ; ++xcase) {
+            Array<std::pair<FFT::Boundary,FFT::Boundary>,AMREX_SPACEDIM>
+                fft_bc{AMREX_D_DECL(bcs[xcase],bcs[ycase],bcs[zcase])};
+            amrex::Print() << "  Testing (";
+            for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
+                amrex::Print() << "(" << getEnumNameString(fft_bc[idim].first)
+                               << "," << getEnumNameString(fft_bc[idim].second)
+                               << ")";
+                if (idim+1 < AMREX_SPACEDIM) { amrex::Print() << " "; }
             }
+            amrex::Print() << ")\n";
 
-            // backward
-            {
-                FFT::R2C<Real,FFT::Direction::backward> r2c(geom.Domain());
-                r2c.backward(cmf,mf2);
-            }
-
-            auto const& ma2 = mf2.arrays();
-            ParallelFor(mf2, [=] AMREX_GPU_DEVICE (int b, int i, int j, int k)
-            {
-                ma2[b](i,j,k) = ma[b](i,j,k) - ma2[b](i,j,k)*scaling;
-            });
-
-            auto error = mf2.norminf();
-            amrex::Print() << "  Expected to be close to zero: " << error << "\n";
-#ifdef AMREX_USE_FLOAT
-            auto eps = 1.e-6f;
-#else
-            auto eps = 1.e-13;
-#endif
-            AMREX_ALWAYS_ASSERT(error < eps);
-        }
-
-        mf2.setVal(std::numeric_limits<Real>::max());
-
-        { // forward and backward
-            FFT::R2C<Real,FFT::Direction::both> r2c(geom.Domain());
-            r2c.forwardThenBackward(mf, mf2,
-                                    [=] AMREX_GPU_DEVICE (int, int, int, auto& sp)
-            {
-                sp *= scaling;
-            });
-
+#if 0
             MultiFab::Subtract(mf2, mf, 0, 0, 1, 0);
 
             auto error = mf2.norminf();
-            amrex::Print() << "  Expected to be close to zero: " << error << "\n";
+            amrex::Print() << "    Expected to be close to zero: " << error << "\n";
 #ifdef AMREX_USE_FLOAT
             auto eps = 1.e-6f;
 #else
             auto eps = 1.e-13;
 #endif
             AMREX_ALWAYS_ASSERT(error < eps);
-        }
+#endif
+        }}}
     }
     amrex::Finalize();
 }
