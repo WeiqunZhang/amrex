@@ -74,16 +74,18 @@ int main (int argc, char* argv[])
 
             // forward
             {
-                FFT::R2C<Real,FFT::Direction::forward,FFT::DomainStrategy::pencil> r2c(geom.Domain());
+                FFT::R2C<Real,FFT::Direction::forward,FFT::DomainStrategy::slab> r2c(geom.Domain());
                 auto const& [cba, cdm] = r2c.getSpectralDataLayout();
                 cmf.define(cba, cdm, 1, 0);
                 r2c.forward(mf,cmf);
+                amrex::Print() << "Finished forward transform.\n";
             }
 
             // backward
             {
-                FFT::R2C<Real,FFT::Direction::backward,FFT::DomainStrategy::pencil> r2c(geom.Domain());
+                FFT::R2C<Real,FFT::Direction::backward,FFT::DomainStrategy::slab> r2c(geom.Domain());
                 r2c.backward(cmf,mf2);
+                amrex::Print() << "Finished backward transform.\n";
             }
 
             auto const& ma2 = mf2.arrays();
@@ -111,6 +113,7 @@ int main (int argc, char* argv[])
             {
                 sp *= scaling;
             });
+            amrex::Print() << "Finished forward and then backward transforms.\n";
 
             MultiFab::Subtract(mf2, mf, 0, 0, 1, 0);
 
