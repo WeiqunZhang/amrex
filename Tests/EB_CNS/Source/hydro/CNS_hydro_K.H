@@ -6,6 +6,10 @@
 #include <AMReX_FArrayBox.H>
 #include <cmath>
 
+#if defined(_WIN32) && defined(small)
+#undef small
+#endif
+
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE
 void
 cns_ctoprim (int i, int j, int k,

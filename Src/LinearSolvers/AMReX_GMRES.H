@@ -10,6 +10,10 @@
 #include <limits>
 #include <memory>
 
+#if defined(_WIN32) && defined(small)
+#undef small
+#endif
+
 namespace amrex {
 
 /**

@@ -230,7 +230,11 @@ BndryRegisterT<MF>::operator+= (const BndryRegisterT<MF>& rhs)
             const Box& bx = bfsi.validbox();
             auto const sfab =   rhs[f].array(bfsi);
             auto       dfab = bndry[f].array(bfsi);
+#if defined(AMREX_USE_GPU) && defined(_WIN32)
+            amrex::ParallelFor(bx, ncomp, [=] AMREX_GPU_DEVICE (int i, int j, int k, int n)
+#else
             AMREX_HOST_DEVICE_PARALLEL_FOR_4D ( bx, ncomp, i, j, k, n,
+#endif
             {
                 dfab(i,j,k,n) += sfab(i,j,k,n);
             });

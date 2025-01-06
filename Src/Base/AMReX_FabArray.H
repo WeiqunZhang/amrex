@@ -225,7 +225,11 @@ Copy (FabArray<DFAB>& dst, FabArray<SFAB> const& src, int srccomp, int dstcomp, 
             {
                 auto const& srcFab = src.const_array(mfi);
                 auto const& dstFab = dst.array(mfi);
+#if defined(AMREX_USE_GPU) && defined(_WIN32)
+                amrex::ParallelFor(bx, numcomp, [=] AMREX_GPU_DEVICE (int i, int j, int k, int n)
+#else
                 AMREX_HOST_DEVICE_PARALLEL_FOR_4D( bx, numcomp, i, j, k, n,
+#endif
                 {
                     dstFab(i,j,k,dstcomp+n) = DT(srcFab(i,j,k,srccomp+n));
                 });
@@ -274,7 +278,11 @@ Add (FabArray<FAB>& dst, FabArray<FAB> const& src, int srccomp, int dstcomp, int
             {
                 auto const srcFab = src.array(mfi);
                 auto       dstFab = dst.array(mfi);
+#if defined(AMREX_USE_GPU) && defined(_WIN32)
+                amrex::ParallelFor(bx, numcomp, [=] AMREX_GPU_DEVICE (int i, int j, int k, int n)
+#else
                 AMREX_HOST_DEVICE_PARALLEL_FOR_4D( bx, numcomp, i, j, k, n,
+#endif
                 {
                     dstFab(i,j,k,n+dstcomp) += srcFab(i,j,k,n+srccomp);
                 });
@@ -537,55 +545,117 @@ public:
     FAB const* fabPtr (int K) const noexcept;
 
     template <class F=FAB, std::enable_if_t<IsBaseFab<F>::value,int> = 0>
-    void prefetchToHost (const MFIter& mfi) const noexcept;
+    void prefetchToHost (const MFIter& mfi) const noexcept
+    {
+#ifdef AMREX_USE_CUDA
+        this->fabPtr(mfi)->prefetchToHost();
+#else
+        amrex::ignore_unused(mfi);
+#endif
+    }
 
     template <class F=FAB, std::enable_if_t<IsBaseFab<F>::value,int> = 0>
-    void prefetchToDevice (const MFIter& mfi) const noexcept;
+    void prefetchToDevice (const MFIter& mfi) const noexcept
+    {
+#ifdef AMREX_USE_CUDA
+        this->fabPtr(mfi)->prefetchToDevice();
+#else
+        amrex::ignore_unused(mfi);
+#endif
+    }
 
     template <class F=FAB, std::enable_if_t<IsBaseFab<F>::value,int> = 0>
-    Array4<typename FabArray<FAB>::value_type const> array (const MFIter& mfi) const noexcept;
-    //
-    template <class F=FAB, std::enable_if_t<IsBaseFab<F>::value,int> = 0>
-    Array4<typename FabArray<FAB>::value_type> array (const MFIter& mfi) noexcept;
-    //
-    template <class F=FAB, std::enable_if_t<IsBaseFab<F>::value,int> = 0>
-    Array4<typename FabArray<FAB>::value_type const> array (int K) const noexcept;
-    //
-    template <class F=FAB, std::enable_if_t<IsBaseFab<F>::value,int> = 0>
-    Array4<typename FabArray<FAB>::value_type> array (int K) noexcept;
+    Array4<typename FabArray<FAB>::value_type const> array (const MFIter& mfi) const noexcept
+    {
+        return fabPtr(mfi)->const_array();
+    }
 
     template <class F=FAB, std::enable_if_t<IsBaseFab<F>::value,int> = 0>
-    Array4<typename FabArray<FAB>::value_type const> const_array (const MFIter& mfi) const noexcept;
-    //
-    template <class F=FAB, std::enable_if_t<IsBaseFab<F>::value,int> = 0>
-    Array4<typename FabArray<FAB>::value_type const> const_array (int K) const noexcept;
+    Array4<typename FabArray<FAB>::value_type> array (const MFIter& mfi) noexcept
+    {
+        return fabPtr(mfi)->array();
+    }
 
     template <class F=FAB, std::enable_if_t<IsBaseFab<F>::value,int> = 0>
-    Array4<typename FabArray<FAB>::value_type const> array (const MFIter& mfi, int start_comp) const noexcept;
-    //
-    template <class F=FAB, std::enable_if_t<IsBaseFab<F>::value,int> = 0>
-    Array4<typename FabArray<FAB>::value_type> array (const MFIter& mfi, int start_comp) noexcept;
-    //
-    template <class F=FAB, std::enable_if_t<IsBaseFab<F>::value,int> = 0>
-    Array4<typename FabArray<FAB>::value_type const> array (int K, int start_comp) const noexcept;
-    //
-    template <class F=FAB, std::enable_if_t<IsBaseFab<F>::value,int> = 0>
-    Array4<typename FabArray<FAB>::value_type> array (int K, int start_comp) noexcept;
+    Array4<typename FabArray<FAB>::value_type const> array (int K) const noexcept
+    {
+        return fabPtr(K)->const_array();
+    }
 
     template <class F=FAB, std::enable_if_t<IsBaseFab<F>::value,int> = 0>
-    Array4<typename FabArray<FAB>::value_type const> const_array (const MFIter& mfi, int start_comp) const noexcept;
-    //
-    template <class F=FAB, std::enable_if_t<IsBaseFab<F>::value,int> = 0>
-    Array4<typename FabArray<FAB>::value_type const> const_array (int K, int start_comp) const noexcept;
+    Array4<typename FabArray<FAB>::value_type> array (int K) noexcept
+    {
+        return fabPtr(K)->array();
+    }
 
     template <class F=FAB, std::enable_if_t<IsBaseFab<F>::value,int> = 0>
-    MultiArray4<typename FabArray<FAB>::value_type> arrays () noexcept;
+    Array4<typename FabArray<FAB>::value_type const> const_array (const MFIter& mfi) const noexcept
+    {
+        return fabPtr(mfi)->const_array();
+    }
 
     template <class F=FAB, std::enable_if_t<IsBaseFab<F>::value,int> = 0>
-    MultiArray4<typename FabArray<FAB>::value_type const> arrays () const noexcept;
+    Array4<typename FabArray<FAB>::value_type const> const_array (int K) const noexcept
+    {
+        return fabPtr(K)->const_array();
+    }
 
     template <class F=FAB, std::enable_if_t<IsBaseFab<F>::value,int> = 0>
-    MultiArray4<typename FabArray<FAB>::value_type const> const_arrays () const noexcept;
+    Array4<typename FabArray<FAB>::value_type const> array (const MFIter& mfi, int start_comp) const noexcept
+    {
+        return fabPtr(mfi)->const_array(start_comp);
+    }
+
+    template <class F=FAB, std::enable_if_t<IsBaseFab<F>::value,int> = 0>
+    Array4<typename FabArray<FAB>::value_type> array (const MFIter& mfi, int start_comp) noexcept
+    {
+        return fabPtr(mfi)->array(start_comp);
+    }
+
+    template <class F=FAB, std::enable_if_t<IsBaseFab<F>::value,int> = 0>
+    Array4<typename FabArray<FAB>::value_type const> array (int K, int start_comp) const noexcept
+    {
+        return fabPtr(K)->const_array(start_comp);
+    }
+
+    template <class F=FAB, std::enable_if_t<IsBaseFab<F>::value,int> = 0>
+    Array4<typename FabArray<FAB>::value_type> array (int K, int start_comp) noexcept
+    {
+        return fabPtr(K)->array(start_comp);
+    }
+
+    template <class F=FAB, std::enable_if_t<IsBaseFab<F>::value,int> = 0>
+    Array4<typename FabArray<FAB>::value_type const> const_array (const MFIter& mfi, int start_comp) const noexcept
+    {
+        return fabPtr(mfi)->const_array(start_comp);
+    }
+
+    template <class F=FAB, std::enable_if_t<IsBaseFab<F>::value,int> = 0>
+    Array4<typename FabArray<FAB>::value_type const> const_array (int K, int start_comp) const noexcept
+    {
+        return fabPtr(K)->const_array(start_comp);
+    }
+
+    template <class F=FAB, std::enable_if_t<IsBaseFab<F>::value,int> = 0>
+    MultiArray4<typename FabArray<FAB>::value_type> arrays () noexcept
+    {
+        build_arrays();
+        return m_arrays;
+    }
+
+    template <class F=FAB, std::enable_if_t<IsBaseFab<F>::value,int> = 0>
+    MultiArray4<typename FabArray<FAB>::value_type const> arrays () const noexcept
+    {
+        build_arrays();
+        return m_const_arrays;
+    }
+
+    template <class F=FAB, std::enable_if_t<IsBaseFab<F>::value,int> = 0>
+    MultiArray4<typename FabArray<FAB>::value_type const> const_arrays () const noexcept
+    {
+        build_arrays();
+        return m_const_arrays;
+    }
 
     //! Explicitly set the Kth FAB in the FabArray to point to elem.
     void setFab (int boxno, std::unique_ptr<FAB> elem);
@@ -1534,153 +1604,6 @@ FabArray<FAB>::fabPtr (int K) const noexcept
 template <class FAB>
 template <class F, std::enable_if_t<IsBaseFab<F>::value,int>>
 void
-FabArray<FAB>::prefetchToHost (const MFIter& mfi) const noexcept
-{
-#ifdef AMREX_USE_CUDA
-    this->fabPtr(mfi)->prefetchToHost();
-#else
-    amrex::ignore_unused(mfi);
-#endif
-}
-
-template <class FAB>
-template <class F, std::enable_if_t<IsBaseFab<F>::value,int>>
-void
-FabArray<FAB>::prefetchToDevice (const MFIter& mfi) const noexcept
-{
-#ifdef AMREX_USE_CUDA
-    this->fabPtr(mfi)->prefetchToDevice();
-#else
-    amrex::ignore_unused(mfi);
-#endif
-}
-
-template <class FAB>
-template <class F, std::enable_if_t<IsBaseFab<F>::value,int>>
-Array4<typename FabArray<FAB>::value_type const>
-FabArray<FAB>::array (const MFIter& mfi) const noexcept
-{
-    return fabPtr(mfi)->const_array();
-}
-
-template <class FAB>
-template <class F, std::enable_if_t<IsBaseFab<F>::value,int>>
-Array4<typename FabArray<FAB>::value_type>
-FabArray<FAB>::array (const MFIter& mfi) noexcept
-{
-    return fabPtr(mfi)->array();
-}
-
-template <class FAB>
-template <class F, std::enable_if_t<IsBaseFab<F>::value,int>>
-Array4<typename FabArray<FAB>::value_type const>
-FabArray<FAB>::array (int K) const noexcept
-{
-    return fabPtr(K)->const_array();
-}
-
-template <class FAB>
-template <class F, std::enable_if_t<IsBaseFab<F>::value,int>>
-Array4<typename FabArray<FAB>::value_type>
-FabArray<FAB>::array (int K) noexcept
-{
-    return fabPtr(K)->array();
-}
-
-template <class FAB>
-template <class F, std::enable_if_t<IsBaseFab<F>::value,int>>
-Array4<typename FabArray<FAB>::value_type const>
-FabArray<FAB>::const_array (const MFIter& mfi) const noexcept
-{
-    return fabPtr(mfi)->const_array();
-}
-
-template <class FAB>
-template <class F, std::enable_if_t<IsBaseFab<F>::value,int>>
-Array4<typename FabArray<FAB>::value_type const>
-FabArray<FAB>::const_array (int K) const noexcept
-{
-    return fabPtr(K)->const_array();
-}
-
-template <class FAB>
-template <class F, std::enable_if_t<IsBaseFab<F>::value,int>>
-Array4<typename FabArray<FAB>::value_type const>
-FabArray<FAB>::array (const MFIter& mfi, int start_comp) const noexcept
-{
-    return fabPtr(mfi)->const_array(start_comp);
-}
-
-template <class FAB>
-template <class F, std::enable_if_t<IsBaseFab<F>::value,int>>
-Array4<typename FabArray<FAB>::value_type>
-FabArray<FAB>::array (const MFIter& mfi, int start_comp) noexcept
-{
-    return fabPtr(mfi)->array(start_comp);
-}
-
-template <class FAB>
-template <class F, std::enable_if_t<IsBaseFab<F>::value,int>>
-Array4<typename FabArray<FAB>::value_type const>
-FabArray<FAB>::array (int K, int start_comp) const noexcept
-{
-    return fabPtr(K)->const_array(start_comp);
-}
-
-template <class FAB>
-template <class F, std::enable_if_t<IsBaseFab<F>::value,int>>
-Array4<typename FabArray<FAB>::value_type>
-FabArray<FAB>::array (int K, int start_comp) noexcept
-{
-    return fabPtr(K)->array(start_comp);
-}
-
-template <class FAB>
-template <class F, std::enable_if_t<IsBaseFab<F>::value,int>>
-Array4<typename FabArray<FAB>::value_type const>
-FabArray<FAB>::const_array (const MFIter& mfi, int start_comp) const noexcept
-{
-    return fabPtr(mfi)->const_array(start_comp);
-}
-
-template <class FAB>
-template <class F, std::enable_if_t<IsBaseFab<F>::value,int>>
-Array4<typename FabArray<FAB>::value_type const>
-FabArray<FAB>::const_array (int K, int start_comp) const noexcept
-{
-    return fabPtr(K)->const_array(start_comp);
-}
-
-template <class FAB>
-template <class F, std::enable_if_t<IsBaseFab<F>::value,int>>
-MultiArray4<typename FabArray<FAB>::value_type>
-FabArray<FAB>::arrays () noexcept
-{
-    build_arrays();
-    return m_arrays;
-}
-
-template <class FAB>
-template <class F, std::enable_if_t<IsBaseFab<F>::value,int>>
-MultiArray4<typename FabArray<FAB>::value_type const>
-FabArray<FAB>::arrays () const noexcept
-{
-    build_arrays();
-    return m_const_arrays;
-}
-
-template <class FAB>
-template <class F, std::enable_if_t<IsBaseFab<F>::value,int>>
-MultiArray4<typename FabArray<FAB>::value_type const>
-FabArray<FAB>::const_arrays () const noexcept
-{
-    build_arrays();
-    return m_const_arrays;
-}
-
-template <class FAB>
-template <class F, std::enable_if_t<IsBaseFab<F>::value,int>>
-void
 FabArray<FAB>::build_arrays () const
 {
     using A = Array4<value_type>;
@@ -2553,7 +2476,11 @@ FabArray<FAB>::setVal (value_type val,
         {
             const Box& bx = fai.growntilebox(nghost);
             auto fab = this->array(fai);
+#if defined(AMREX_USE_GPU) && defined(_WIN32)
+            amrex::ParallelFor(bx, ncomp, [=] AMREX_GPU_DEVICE (int i, int j, int k, int n)
+#else
             AMREX_HOST_DEVICE_PARALLEL_FOR_4D( bx, ncomp, i, j, k, n,
+#endif
             {
                 fab(i,j,k,n+comp) = val;
             });
@@ -2613,7 +2540,11 @@ FabArray<FAB>::setVal (value_type val,
 
             if (b.ok()) {
                 auto fab = this->array(fai);
+#if defined(AMREX_USE_GPU) && defined(_WIN32)
+                amrex::ParallelFor(b, ncomp, [=] AMREX_GPU_DEVICE (int i, int j, int k, int n)
+#else
                 AMREX_HOST_DEVICE_PARALLEL_FOR_4D( b, ncomp, i, j, k, n,
+#endif
                 {
                     fab(i,j,k,n+comp) = val;
                 });
@@ -2660,7 +2591,11 @@ FabArray<FAB>::abs (int comp, int ncomp, const IntVect& nghost)
         {
             const Box& bx = mfi.growntilebox(nghost);
             auto fab = this->array(mfi);
+#if defined(AMREX_USE_GPU) && defined(_WIN32)
+            amrex::ParallelFor(bx, ncomp, [=] AMREX_GPU_DEVICE (int i, int j, int k, int n)
+#else
             AMREX_HOST_DEVICE_PARALLEL_FOR_4D( bx, ncomp, i, j, k, n,
+#endif
             {
                 fab(i,j,k,n+comp) = std::abs(fab(i,j,k,n+comp));
             });
@@ -2696,7 +2631,11 @@ FabArray<FAB>::plus (value_type val, int comp, int num_comp, int nghost)
         {
             const Box& bx = mfi.growntilebox(nghost);
             auto fab = this->array(mfi);
+#if defined(AMREX_USE_GPU) && defined(_WIN32)
+            amrex::ParallelFor(bx, num_comp, [=] AMREX_GPU_DEVICE (int i, int j, int k, int n)
+#else
             AMREX_HOST_DEVICE_PARALLEL_FOR_4D( bx, num_comp, i, j, k, n,
+#endif
             {
                 fab(i,j,k,n+comp) += val;
             });
@@ -2735,7 +2674,11 @@ FabArray<FAB>::plus (value_type val, const Box& region, int comp, int num_comp, 
             const Box& bx = mfi.growntilebox(nghost) & region;
             if (bx.ok()) {
                 auto fab = this->array(mfi);
+#if defined(AMREX_USE_GPU) && defined(_WIN32)
+                amrex::ParallelFor(bx, num_comp, [=] AMREX_GPU_DEVICE (int i, int j, int k, int n)
+#else
                 AMREX_HOST_DEVICE_PARALLEL_FOR_4D( bx, num_comp, i, j, k, n,
+#endif
                 {
                     fab(i,j,k,n+comp) += val;
                 });
@@ -2772,7 +2715,11 @@ FabArray<FAB>::mult (value_type val, int comp, int num_comp, int nghost)
         {
             const Box& bx = mfi.growntilebox(nghost);
             auto fab = this->array(mfi);
+#if defined(AMREX_USE_GPU) && defined(_WIN32)
+            amrex::ParallelFor(bx, num_comp, [=] AMREX_GPU_DEVICE (int i, int j, int k, int n)
+#else
             AMREX_HOST_DEVICE_PARALLEL_FOR_4D( bx, num_comp, i, j, k, n,
+#endif
             {
                 fab(i,j,k,n+comp) *= val;
             });
@@ -2811,7 +2758,11 @@ FabArray<FAB>::mult (value_type val, const Box& region, int comp, int num_comp, 
             const Box& bx = mfi.growntilebox(nghost) & region;
             if (bx.ok()) {
                 auto fab = this->array(mfi);
+#if defined(AMREX_USE_GPU) && defined(_WIN32)
+                amrex::ParallelFor(bx, num_comp, [=] AMREX_GPU_DEVICE (int i, int j, int k, int n)
+#else
                 AMREX_HOST_DEVICE_PARALLEL_FOR_4D( bx, num_comp, i, j, k, n,
+#endif
                 {
                     fab(i,j,k,n+comp) *= val;
                 });
@@ -2848,7 +2799,11 @@ FabArray<FAB>::invert (value_type numerator, int comp, int num_comp, int nghost)
         {
             const Box& bx = mfi.growntilebox(nghost);
             auto fab = this->array(mfi);
+#if defined(AMREX_USE_GPU) && defined(_WIN32)
+            amrex::ParallelFor(bx, num_comp, [=] AMREX_GPU_DEVICE (int i, int j, int k, int n)
+#else
             AMREX_HOST_DEVICE_PARALLEL_FOR_4D( bx, num_comp, i, j, k, n,
+#endif
             {
                 fab(i,j,k,n+comp) = numerator / fab(i,j,k,n+comp);
             });
@@ -2887,7 +2842,11 @@ FabArray<FAB>::invert (value_type numerator, const Box& region, int comp, int nu
             const Box& bx = mfi.growntilebox(nghost) & region;
             if (bx.ok()) {
                 auto fab = this->array(mfi);
+#if defined(AMREX_USE_GPU) && defined(_WIN32)
+                amrex::ParallelFor(bx, num_comp, [=] AMREX_GPU_DEVICE (int i, int j, int k, int n)
+#else
                 AMREX_HOST_DEVICE_PARALLEL_FOR_4D( bx, num_comp, i, j, k, n,
+#endif
                 {
                     fab(i,j,k,n+comp) = numerator / fab(i,j,k,n+comp);
                 });
@@ -2949,7 +2908,11 @@ void FabArray<FAB>::Saxpy (FabArray<FAB>& y, value_type a, FabArray<FAB> const& 
             if (bx.ok()) {
                 auto const& xfab = x.const_array(mfi);
                 auto const& yfab = y.array(mfi);
+#if defined(AMREX_USE_GPU) && defined(_WIN32)
+                amrex::ParallelFor(bx, ncomp, [=] AMREX_GPU_DEVICE (int i, int j, int k, int n)
+#else
                 AMREX_HOST_DEVICE_PARALLEL_FOR_4D( bx, ncomp, i, j, k, n,
+#endif
                 {
                     yfab(i,j,k,ycomp+n) += a * xfab(i,j,k,xcomp+n);
                 });
@@ -2994,7 +2957,11 @@ FabArray<FAB>::Xpay (FabArray<FAB>& y, value_type a, FabArray<FAB> const& x,
             const Box& bx = mfi.growntilebox(nghost);
             auto const& xFab = x.const_array(mfi);
             auto const& yFab = y.array(mfi);
+#if defined(AMREX_USE_GPU) && defined(_WIN32)
+            amrex::ParallelFor(bx, ncomp, [=] AMREX_GPU_DEVICE (int i, int j, int k, int n)
+#else
             AMREX_HOST_DEVICE_PARALLEL_FOR_4D( bx, ncomp, i, j, k, n,
+#endif
             {
                 yFab(i,j,k,n+ycomp) = xFab(i,j,k,n+xcomp)
                     +             a * yFab(i,j,k,n+ycomp);
@@ -3045,7 +3012,11 @@ FabArray<FAB>::LinComb (FabArray<FAB>& dst,
             auto const& xfab = x.const_array(mfi);
             auto const& yfab = y.const_array(mfi);
             auto const& dfab = dst.array(mfi);
+#if defined(AMREX_USE_GPU) && defined(_WIN32)
+            amrex::ParallelFor(bx, numcomp, [=] AMREX_GPU_DEVICE (int i, int j, int k, int n)
+#else
             AMREX_HOST_DEVICE_PARALLEL_FOR_4D( bx, numcomp, i, j, k, n,
+#endif
             {
                 dfab(i,j,k,dstcomp+n) = a*xfab(i,j,k,xcomp+n) + b*yfab(i,j,k,ycomp+n);
             });
@@ -3441,7 +3412,11 @@ FabArray<FAB>::BuildMask (const Box& phys_domain, const Periodicity& period,
             Box const& fbx = mfi.growntilebox();
             Box const& gbx = fbx & domain;
             Box const& vbx = mfi.validbox();
+#if defined(AMREX_USE_GPU) && defined(_WIN32)
+            amrex::ParallelFor(fbx, ncomp, [=] AMREX_GPU_DEVICE (int i, int j, int k, int n)
+#else
             AMREX_HOST_DEVICE_FOR_4D(fbx, ncomp, i, j, k, n,
+#endif
             {
                 if (vbx.contains(i,j,k)) {
                     fab(i,j,k,n) = interior;

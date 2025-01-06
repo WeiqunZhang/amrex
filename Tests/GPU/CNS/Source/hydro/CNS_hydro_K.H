@@ -6,6 +6,10 @@
 #include <AMReX_FArrayBox.H>
 #include <cmath>
 
+#if defined(_WIN32) && defined(small)
+#undef small
+#endif
+
 AMREX_GPU_DEVICE
 inline
 void

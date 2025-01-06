@@ -531,7 +531,11 @@ YAFluxRegisterT<MF>::Reflux (MF& state, int srccomp, int destcomp, int numcomp)
             const Box& bx = m_cfpatch[mfi].box();
             auto const maskfab = m_cfp_mask.array(mfi);
             auto       cfptfab = m_cfpatch.array(mfi,srccomp);
+#if defined(AMREX_USE_GPU) && defined(_WIN32)
+            amrex::ParallelFor(bx, numcomp, [=] AMREX_GPU_DEVICE (int i, int j, int k, int n)
+#else
             AMREX_HOST_DEVICE_PARALLEL_FOR_4D ( bx, numcomp, i, j, k, n,
+#endif
             {
                 cfptfab(i,j,k,n) *= maskfab(i,j,k);
             });

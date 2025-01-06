@@ -4,6 +4,10 @@
 #include <AMReX_ParallelReduce.H>
 #include <AMReX_BLProfiler.H>
 
+#if defined(_WIN32) && defined(small)
+#undef small
+#endif
+
 namespace amrex {
 
 #ifdef AMREX_USE_MPI

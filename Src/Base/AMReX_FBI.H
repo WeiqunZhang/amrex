@@ -422,7 +422,11 @@ FabArray<FAB>::FB_local_copy_cuda_graph_1 (const FB& TheFB, int scomp, int ncomp
             {
                 const auto offset = tag.offset.dim3();
                 CopyMemory* cmem = TheFB.m_localCopy.getDevicePtr(idx++);
+#if defined(AMREX_USE_GPU) && defined(_WIN32)
+                amrex::ParallelFor(tag.dbox, [=] AMREX_GPU_DEVICE (int i, int j, int k)
+#else
                 AMREX_HOST_DEVICE_FOR_3D (tag.dbox, i, j, k,
+#endif
                 {
                     // Build the Array4's.
                     auto const dst = cmem->getDst<value_type>();
@@ -507,7 +511,11 @@ FabArray<FAB>::FB_local_copy_cuda_graph_n (const FB& TheFB, int scomp, int ncomp
                 const Dim3 offset = tag.offset.dim3();
 
                 CopyMemory* cmem = TheFB.m_localCopy.getDevicePtr(idx++);
+#if defined(AMREX_USE_GPU) && defined(_WIN32)
+                amrex::ParallelFor(tag.dbox, [=] AMREX_GPU_DEVICE (int i, int j, int k)
+#else
                 AMREX_HOST_DEVICE_FOR_3D(tag.dbox, i, j, k,
+#endif
                 {
                     auto const dst = cmem->getDst<value_type>();
                     auto const src = cmem->getSrc<value_type>();
@@ -593,7 +601,11 @@ FabArray<FAB>::FB_pack_send_buffer_cuda_graph (const FB& TheFB, int scomp, int n
                 {
                     const Box& bx = tag.sbox;
                     CopyMemory* cmem = TheFB.m_copyToBuffer.getDevicePtr(idx++);
+#if defined(AMREX_USE_GPU) && defined(_WIN32)
+                    amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE (int ii, int jj, int kk)
+#else
                     AMREX_HOST_DEVICE_FOR_3D (bx, ii, jj, kk,
+#endif
                     {
                         auto const pfab = cmem->getDst<value_type>();
                         auto const sfab = cmem->getSrc<value_type>();
@@ -685,7 +697,11 @@ FabArray<FAB>::FB_unpack_recv_buffer_cuda_graph (const FB& TheFB, int dcomp, int
             for (auto const & tag : tags)
             {
                 CopyMemory* cmem = TheFB.m_copyFromBuffer.getDevicePtr(idx++);
+#if defined(AMREX_USE_GPU) && defined(_WIN32)
+                amrex::ParallelFor(tag.dbox, [=] AMREX_GPU_DEVICE (int i, int j, int k)
+#else
                 AMREX_HOST_DEVICE_FOR_3D (tag.dbox, i, j, k,
+#endif
                 {
                     auto const pfab = cmem->getSrc<value_type>();
                     auto const dfab = cmem->getDst<value_type>();

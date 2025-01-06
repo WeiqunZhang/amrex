@@ -251,7 +251,11 @@ MLPoissonT<MF>::Fapply (int amrlev, int mglev, MF& out, const MF& in) const
             if (this->m_overset_mask[amrlev][mglev]) {
                 AMREX_ASSERT(!this->m_has_metric_term);
                 const auto& osm = this->m_overset_mask[amrlev][mglev]->const_array(mfi);
+#if defined(AMREX_USE_GPU) && defined(_WIN32)
+                amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE (int i, int j, int k)
+#else
                 AMREX_HOST_DEVICE_PARALLEL_FOR_3D( bx, i, j, k,
+#endif
                 {
                     amrex::ignore_unused(j,k);
                     mlpoisson_adotx_os(AMREX_D_DECL(i,j,k), yfab, xfab, osm,
@@ -263,26 +267,42 @@ MLPoissonT<MF>::Fapply (int amrlev, int mglev, MF& out, const MF& in) const
                     Box const& bx2d = this->compactify(bx);
                     const auto& xfab2d = this->compactify(xfab);
                     const auto& yfab2d = this->compactify(yfab);
+#if defined(AMREX_USE_GPU) && defined(_WIN32)
+                    amrex::ParallelFor(bx2d, [=] AMREX_GPU_DEVICE (int i, int j, int k)
+#else
                     AMREX_HOST_DEVICE_PARALLEL_FOR_3D(bx2d, i, j, k,
+#endif
                     {
                         amrex::ignore_unused(k);
                         TwoD::mlpoisson_adotx(i, j, yfab2d, xfab2d, dh0, dh1);
                     });
                 } else {
+#if defined(AMREX_USE_GPU) && defined(_WIN32)
+                    amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE (int i, int j, int k)
+#else
                     AMREX_HOST_DEVICE_PARALLEL_FOR_3D(bx, i, j, k,
+#endif
                     {
                         mlpoisson_adotx(i, j, k, yfab, xfab, dhx, dhy, dhz);
                     });
                 }
 #elif (AMREX_SPACEDIM == 2)
                 if (this->m_has_metric_term) {
+#if defined(AMREX_USE_GPU) && defined(_WIN32)
+                    amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE (int i, int j, int k)
+#else
                     AMREX_HOST_DEVICE_PARALLEL_FOR_3D(bx, i, j, k,
+#endif
                     {
                         amrex::ignore_unused(k);
                         mlpoisson_adotx_m(i, j, yfab, xfab, dhx, dhy, dx, probxlo);
                     });
                 } else {
+#if defined(AMREX_USE_GPU) && defined(_WIN32)
+                    amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE (int i, int j, int k)
+#else
                     AMREX_HOST_DEVICE_PARALLEL_FOR_3D(bx, i, j, k,
+#endif
                     {
                         amrex::ignore_unused(k);
                         mlpoisson_adotx(i, j, yfab, xfab, dhx, dhy);
@@ -290,13 +310,21 @@ MLPoissonT<MF>::Fapply (int amrlev, int mglev, MF& out, const MF& in) const
                 }
 #elif (AMREX_SPACEDIM == 1)
                 if (this->m_has_metric_term) {
+#if defined(AMREX_USE_GPU) && defined(_WIN32)
+                    amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE (int i, int j, int k)
+#else
                     AMREX_HOST_DEVICE_PARALLEL_FOR_3D(bx, i, j, k,
+#endif
                     {
                         amrex::ignore_unused(j,k);
                         mlpoisson_adotx_m(i, yfab, xfab, dhx, dx, probxlo);
                     });
                 } else {
+#if defined(AMREX_USE_GPU) && defined(_WIN32)
+                    amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE (int i, int j, int k)
+#else
                     AMREX_HOST_DEVICE_PARALLEL_FOR_3D(bx, i, j, k,
+#endif
                     {
                         amrex::ignore_unused(j,k);
                         mlpoisson_adotx(i, yfab, xfab, dhx);
@@ -346,12 +374,20 @@ MLPoissonT<MF>::normalize (int amrlev, int mglev, MF& mf) const
             const auto& fab = mf.array(mfi);
 
 #if (AMREX_SPACEDIM == 2)
+#if defined(AMREX_USE_GPU) && defined(_WIN32)
+            amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE (int i, int j, int k)
+#else
             AMREX_HOST_DEVICE_PARALLEL_FOR_3D(bx, i, j, k,
+#endif
             {
                 mlpoisson_normalize(i,j,k, fab, dhx, dhy, dx, probxlo);
             });
 #else
+#if defined(AMREX_USE_GPU) && defined(_WIN32)
+            amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE (int i, int j, int k)
+#else
             AMREX_HOST_DEVICE_PARALLEL_FOR_3D(bx, i, j, k,
+#endif
             {
                 mlpoisson_normalize(i,j,k, fab, dhx, dx, probxlo);
             });
@@ -613,7 +649,11 @@ MLPoissonT<MF>::Fsmooth (int amrlev, int mglev, MF& sol, const MF& rhs, int redb
                 AMREX_ASSERT(!this->m_has_metric_term);
                 const auto& osm = this->m_overset_mask[amrlev][mglev]->const_array(mfi);
                 if (this->m_use_gauss_seidel) {
+#if defined(AMREX_USE_GPU) && defined(_WIN32)
+                    amrex::ParallelFor(tbx, [=] AMREX_GPU_DEVICE (int i, int j, int k)
+#else
                     AMREX_HOST_DEVICE_PARALLEL_FOR_3D ( tbx, i, j, k,
+#endif
                     {
                         mlpoisson_gsrb_os(i, j, k, solnfab, rhsfab, osm, dhx,
                                           f0fab, m0,
@@ -622,7 +662,11 @@ MLPoissonT<MF>::Fsmooth (int amrlev, int mglev, MF& sol, const MF& rhs, int redb
                     });
                 } else {
                     const auto& axfab = Ax.const_array(mfi);
+#if defined(AMREX_USE_GPU) && defined(_WIN32)
+                    amrex::ParallelFor(tbx, [=] AMREX_GPU_DEVICE (int i, int j, int k)
+#else
                     AMREX_HOST_DEVICE_PARALLEL_FOR_3D ( tbx, i, j, k,
+#endif
                     {
                         mlpoisson_jacobi_os(i, j, k, solnfab, rhsfab, axfab,
                                             osm, dhx,
@@ -633,7 +677,11 @@ MLPoissonT<MF>::Fsmooth (int amrlev, int mglev, MF& sol, const MF& rhs, int redb
                 }
             } else if (this->m_has_metric_term) {
                 if (this->m_use_gauss_seidel) {
+#if defined(AMREX_USE_GPU) && defined(_WIN32)
+                    amrex::ParallelFor(tbx, [=] AMREX_GPU_DEVICE (int i, int j, int k)
+#else
                     AMREX_HOST_DEVICE_PARALLEL_FOR_3D ( tbx, i, j, k,
+#endif
                     {
                         mlpoisson_gsrb_m(i, j, k, solnfab, rhsfab, dhx,
                                          f0fab, m0,
@@ -643,7 +691,11 @@ MLPoissonT<MF>::Fsmooth (int amrlev, int mglev, MF& sol, const MF& rhs, int redb
                     });
                 } else {
                     const auto& axfab = Ax.const_array(mfi);
+#if defined(AMREX_USE_GPU) && defined(_WIN32)
+                    amrex::ParallelFor(tbx, [=] AMREX_GPU_DEVICE (int i, int j, int k)
+#else
                     AMREX_HOST_DEVICE_PARALLEL_FOR_3D ( tbx, i, j, k,
+#endif
                     {
                         mlpoisson_jacobi_m(i, j, k, solnfab, rhsfab, axfab, dhx,
                                            f0fab, m0,
@@ -653,7 +705,11 @@ MLPoissonT<MF>::Fsmooth (int amrlev, int mglev, MF& sol, const MF& rhs, int redb
                 }
             } else {
                 if (this->m_use_gauss_seidel) {
+#if defined(AMREX_USE_GPU) && defined(_WIN32)
+                    amrex::ParallelFor(tbx, [=] AMREX_GPU_DEVICE (int i, int j, int k)
+#else
                     AMREX_HOST_DEVICE_PARALLEL_FOR_3D ( tbx, i, j, k,
+#endif
                     {
                         mlpoisson_gsrb(i, j, k, solnfab, rhsfab, dhx,
                                        f0fab, m0,
@@ -662,7 +718,11 @@ MLPoissonT<MF>::Fsmooth (int amrlev, int mglev, MF& sol, const MF& rhs, int redb
                     });
                 } else {
                     const auto& axfab = Ax.const_array(mfi);
+#if defined(AMREX_USE_GPU) && defined(_WIN32)
+                    amrex::ParallelFor(tbx, [=] AMREX_GPU_DEVICE (int i, int j, int k)
+#else
                     AMREX_HOST_DEVICE_PARALLEL_FOR_3D ( tbx, i, j, k,
+#endif
                     {
                         mlpoisson_jacobi(i, j, k, solnfab, rhsfab, axfab, dhx,
                                          f0fab, m0,
@@ -678,7 +738,11 @@ MLPoissonT<MF>::Fsmooth (int amrlev, int mglev, MF& sol, const MF& rhs, int redb
                 AMREX_ASSERT(!this->m_has_metric_term);
                 const auto& osm = this->m_overset_mask[amrlev][mglev]->const_array(mfi);
                 if (this->m_use_gauss_seidel) {
+#if defined(AMREX_USE_GPU) && defined(_WIN32)
+                    amrex::ParallelFor(tbx, [=] AMREX_GPU_DEVICE (int i, int j, int k)
+#else
                     AMREX_HOST_DEVICE_PARALLEL_FOR_3D ( tbx, i, j, k,
+#endif
                     {
                         mlpoisson_gsrb_os(i, j, k, solnfab, rhsfab, osm, dhx, dhy,
                                           f0fab, m0,
@@ -689,7 +753,11 @@ MLPoissonT<MF>::Fsmooth (int amrlev, int mglev, MF& sol, const MF& rhs, int redb
                     });
                 } else {
                     const auto& axfab = Ax.const_array(mfi);
+#if defined(AMREX_USE_GPU) && defined(_WIN32)
+                    amrex::ParallelFor(tbx, [=] AMREX_GPU_DEVICE (int i, int j, int k)
+#else
                     AMREX_HOST_DEVICE_PARALLEL_FOR_3D ( tbx, i, j, k,
+#endif
                     {
                         mlpoisson_jacobi_os(i, j, k, solnfab, rhsfab, axfab,
                                             osm, dhx, dhy,
@@ -702,7 +770,11 @@ MLPoissonT<MF>::Fsmooth (int amrlev, int mglev, MF& sol, const MF& rhs, int redb
                 }
             } else if (this->m_has_metric_term) {
                 if (this->m_use_gauss_seidel) {
+#if defined(AMREX_USE_GPU) && defined(_WIN32)
+                    amrex::ParallelFor(tbx, [=] AMREX_GPU_DEVICE (int i, int j, int k)
+#else
                     AMREX_HOST_DEVICE_PARALLEL_FOR_3D ( tbx, i, j, k,
+#endif
                     {
                         mlpoisson_gsrb_m(i, j, k, solnfab, rhsfab, dhx, dhy,
                                          f0fab, m0,
@@ -714,7 +786,11 @@ MLPoissonT<MF>::Fsmooth (int amrlev, int mglev, MF& sol, const MF& rhs, int redb
                     });
                 } else {
                     const auto& axfab = Ax.const_array(mfi);
+#if defined(AMREX_USE_GPU) && defined(_WIN32)
+                    amrex::ParallelFor(tbx, [=] AMREX_GPU_DEVICE (int i, int j, int k)
+#else
                     AMREX_HOST_DEVICE_PARALLEL_FOR_3D ( tbx, i, j, k,
+#endif
                     {
                         mlpoisson_jacobi_m(i, j, k, solnfab, rhsfab, axfab, dhx, dhy,
                                            f0fab, m0,
@@ -726,7 +802,11 @@ MLPoissonT<MF>::Fsmooth (int amrlev, int mglev, MF& sol, const MF& rhs, int redb
                 }
             } else {
                 if (this->m_use_gauss_seidel) {
+#if defined(AMREX_USE_GPU) && defined(_WIN32)
+                    amrex::ParallelFor(tbx, [=] AMREX_GPU_DEVICE (int i, int j, int k)
+#else
                     AMREX_HOST_DEVICE_PARALLEL_FOR_3D ( tbx, i, j, k,
+#endif
                     {
                         mlpoisson_gsrb(i, j, k, solnfab, rhsfab, dhx, dhy,
                                        f0fab, m0,
@@ -737,7 +817,11 @@ MLPoissonT<MF>::Fsmooth (int amrlev, int mglev, MF& sol, const MF& rhs, int redb
                     });
                 } else {
                     const auto& axfab = Ax.const_array(mfi);
+#if defined(AMREX_USE_GPU) && defined(_WIN32)
+                    amrex::ParallelFor(tbx, [=] AMREX_GPU_DEVICE (int i, int j, int k)
+#else
                     AMREX_HOST_DEVICE_PARALLEL_FOR_3D ( tbx, i, j, k,
+#endif
                     {
                         mlpoisson_jacobi(i, j, k, solnfab, rhsfab, axfab, dhx, dhy,
                                          f0fab, m0,
@@ -755,7 +839,11 @@ MLPoissonT<MF>::Fsmooth (int amrlev, int mglev, MF& sol, const MF& rhs, int redb
                 AMREX_ASSERT(!this->m_has_metric_term);
                 const auto& osm = this->m_overset_mask[amrlev][mglev]->const_array(mfi);
                 if (this->m_use_gauss_seidel) {
+#if defined(AMREX_USE_GPU) && defined(_WIN32)
+                    amrex::ParallelFor(tbx, [=] AMREX_GPU_DEVICE (int i, int j, int k)
+#else
                     AMREX_HOST_DEVICE_PARALLEL_FOR_3D ( tbx, i, j, k,
+#endif
                     {
                         mlpoisson_gsrb_os(i, j, k, solnfab, rhsfab, osm, dhx, dhy, dhz,
                                           f0fab, m0,
@@ -768,7 +856,11 @@ MLPoissonT<MF>::Fsmooth (int amrlev, int mglev, MF& sol, const MF& rhs, int redb
                     });
                 } else {
                     const auto& axfab = Ax.const_array(mfi);
+#if defined(AMREX_USE_GPU) && defined(_WIN32)
+                    amrex::ParallelFor(tbx, [=] AMREX_GPU_DEVICE (int i, int j, int k)
+#else
                     AMREX_HOST_DEVICE_PARALLEL_FOR_3D ( tbx, i, j, k,
+#endif
                     {
                         mlpoisson_jacobi_os(i, j, k, solnfab, rhsfab, axfab,
                                             osm, dhx, dhy, dhz,
@@ -795,7 +887,11 @@ MLPoissonT<MF>::Fsmooth (int amrlev, int mglev, MF& sol, const MF& rhs, int redb
                 const auto& m2_2d = this->compactify(this->get_d0(m3,m4,m5));
                 const auto& m3_2d = this->compactify(this->get_d1(m3,m4,m5));
                 if (this->m_use_gauss_seidel) {
+#if defined(AMREX_USE_GPU) && defined(_WIN32)
+                    amrex::ParallelFor(tbx_2d, [=] AMREX_GPU_DEVICE (int i, int j, int k)
+#else
                     AMREX_HOST_DEVICE_PARALLEL_FOR_3D ( tbx_2d, i, j, k,
+#endif
                     {
                         TwoD::mlpoisson_gsrb(i, j, k, solnfab_2d, rhsfab_2d, dh0, dh1,
                                              f0fab_2d, m0_2d,
@@ -807,7 +903,11 @@ MLPoissonT<MF>::Fsmooth (int amrlev, int mglev, MF& sol, const MF& rhs, int redb
                 } else {
                     const auto& axfab = Ax.const_array(mfi);
                     const auto& axfab_2d = this->compactify(axfab);
+#if defined(AMREX_USE_GPU) && defined(_WIN32)
+                    amrex::ParallelFor(tbx_2d, [=] AMREX_GPU_DEVICE (int i, int j, int k)
+#else
                     AMREX_HOST_DEVICE_PARALLEL_FOR_3D ( tbx_2d, i, j, k,
+#endif
                     {
                         TwoD::mlpoisson_jacobi(i, j, k, solnfab_2d, rhsfab_2d,
                                                axfab_2d, dh0, dh1,
@@ -820,7 +920,11 @@ MLPoissonT<MF>::Fsmooth (int amrlev, int mglev, MF& sol, const MF& rhs, int redb
                 }
             } else {
                 if (this->m_use_gauss_seidel) {
+#if defined(AMREX_USE_GPU) && defined(_WIN32)
+                    amrex::ParallelFor(tbx, [=] AMREX_GPU_DEVICE (int i, int j, int k)
+#else
                     AMREX_HOST_DEVICE_PARALLEL_FOR_3D ( tbx, i, j, k,
+#endif
                     {
                         mlpoisson_gsrb(i, j, k, solnfab, rhsfab, dhx, dhy, dhz,
                                        f0fab, m0,
@@ -833,7 +937,11 @@ MLPoissonT<MF>::Fsmooth (int amrlev, int mglev, MF& sol, const MF& rhs, int redb
                     });
                 } else {
                     const auto& axfab = Ax.const_array(mfi);
+#if defined(AMREX_USE_GPU) && defined(_WIN32)
+                    amrex::ParallelFor(tbx, [=] AMREX_GPU_DEVICE (int i, int j, int k)
+#else
                     AMREX_HOST_DEVICE_PARALLEL_FOR_3D ( tbx, i, j, k,
+#endif
                     {
                         mlpoisson_jacobi(i, j, k, solnfab, rhsfab, axfab,
                                          dhx, dhy, dhz,

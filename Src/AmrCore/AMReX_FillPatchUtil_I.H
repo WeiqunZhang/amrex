@@ -142,14 +142,22 @@ FillPatchSingleLevel (MF& mf, IntVect const& nghost, Real time,
 
                 if (time == t0)
                 {
+#if defined(AMREX_USE_GPU) && defined(_WIN32)
+                    amrex::ParallelFor(bx, ncomp, [=] AMREX_GPU_DEVICE (int i, int j, int k, int n)
+#else
                     AMREX_HOST_DEVICE_PARALLEL_FOR_4D ( bx, ncomp, i, j, k, n,
+#endif
                     {
                         dfab(i,j,k,n+destcomp) = sfab0(i,j,k,n+scomp);
                     });
                 }
                 else if (time == t1)
                 {
+#if defined(AMREX_USE_GPU) && defined(_WIN32)
+                    amrex::ParallelFor(bx, ncomp, [=] AMREX_GPU_DEVICE (int i, int j, int k, int n)
+#else
                     AMREX_HOST_DEVICE_PARALLEL_FOR_4D ( bx, ncomp, i, j, k, n,
+#endif
                     {
                         dfab(i,j,k,n+destcomp) = sfab1(i,j,k,n+scomp);
                     });
@@ -158,7 +166,11 @@ FillPatchSingleLevel (MF& mf, IntVect const& nghost, Real time,
                 {
                     Real alpha = (t1-time)/(t1-t0);
                     Real beta = (time-t0)/(t1-t0);
+#if defined(AMREX_USE_GPU) && defined(_WIN32)
+                    amrex::ParallelFor(bx, ncomp, [=] AMREX_GPU_DEVICE (int i, int j, int k, int n)
+#else
                     AMREX_HOST_DEVICE_PARALLEL_FOR_4D ( bx, ncomp, i, j, k, n,
+#endif
                     {
                         dfab(i,j,k,n+destcomp) = alpha*sfab0(i,j,k,n+scomp)
                             +                     beta*sfab1(i,j,k,n+scomp);
@@ -166,7 +178,11 @@ FillPatchSingleLevel (MF& mf, IntVect const& nghost, Real time,
                 }
                 else
                 {
+#if defined(AMREX_USE_GPU) && defined(_WIN32)
+                    amrex::ParallelFor(bx, ncomp, [=] AMREX_GPU_DEVICE (int i, int j, int k, int n)
+#else
                     AMREX_HOST_DEVICE_PARALLEL_FOR_4D ( bx, ncomp, i, j, k, n,
+#endif
                     {
                         dfab(i,j,k,n+destcomp) = sfab0(i,j,k,n+scomp);
                     });

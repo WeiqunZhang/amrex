@@ -185,7 +185,11 @@ void copyParticles (DstTile& dst, const SrcTile& src,
     const auto src_data = src.getConstParticleTileData();
           auto dst_data = dst.getParticleTileData();
 
+#if defined(AMREX_USE_GPU) && defined(_WIN32)
+    amrex::ParallelFor(n, [=] AMREX_GPU_DEVICE (N i)
+#else
     AMREX_HOST_DEVICE_FOR_1D( n, i,
+#endif
     {
         copyParticle(dst_data, src_data, src_start+i, dst_start+i);
     });
@@ -239,7 +243,11 @@ void transformParticles (DstTile& dst, const SrcTile& src,
     const auto src_data = src.getConstParticleTileData();
           auto dst_data = dst.getParticleTileData();
 
+#if defined(AMREX_USE_GPU) && defined(_WIN32)
+    amrex::ParallelFor(n, [=] AMREX_GPU_DEVICE (N i)
+#else
     AMREX_HOST_DEVICE_FOR_1D( n, i,
+#endif
     {
         f(dst_data, src_data, src_start+i, dst_start+i);
     });
@@ -300,7 +308,11 @@ void transformParticles (DstTile1& dst1, DstTile2& dst2, const SrcTile& src,
           auto dst1_data = dst1.getParticleTileData();
           auto dst2_data = dst2.getParticleTileData();
 
+#if defined(AMREX_USE_GPU) && defined(_WIN32)
+    amrex::ParallelFor(n, [=] AMREX_GPU_DEVICE (N i)
+#else
     AMREX_HOST_DEVICE_FOR_1D( n, i,
+#endif
     {
         f(dst1_data, dst2_data, src_data, src_start+i, dst1_start+i, dst2_start+i);
     });
@@ -361,7 +373,11 @@ Index filterParticles (DstTile& dst, const SrcTile& src, const Index* mask,
     const auto src_data = src.getConstParticleTileData();
           auto dst_data = dst.getParticleTileData();
 
+#if defined(AMREX_USE_GPU) && defined(_WIN32)
+    amrex::ParallelFor(n, [=] AMREX_GPU_DEVICE (N i)
+#else
     AMREX_HOST_DEVICE_FOR_1D( n, i,
+#endif
     {
         if (mask[i]) { copyParticle(dst_data, src_data, src_start+i, dst_start+p_offsets[i]); }
     });
@@ -462,7 +478,11 @@ Index filterAndTransformParticles (DstTile& dst, const SrcTile& src, Index* mask
     const auto src_data = src.getConstParticleTileData();
           auto dst_data = dst.getParticleTileData();
 
+#if defined(AMREX_USE_GPU) && defined(_WIN32)
+    amrex::ParallelFor(n, [=] AMREX_GPU_DEVICE (int i)
+#else
     AMREX_HOST_DEVICE_FOR_1D( np, i,
+#endif
     {
         if (mask[i]) {
             f(dst_data, src_data, src_start+i,
@@ -554,7 +574,11 @@ Index filterAndTransformParticles (DstTile1& dst1, DstTile2& dst2,
           auto dst_data1 = dst1.getParticleTileData();
           auto dst_data2 = dst2.getParticleTileData();
 
+#if defined(AMREX_USE_GPU) && defined(_WIN32)
+    amrex::ParallelFor(np, [=] AMREX_GPU_DEVICE (int i)
+#else
     AMREX_HOST_DEVICE_FOR_1D( np, i,
+#endif
     {
         if (mask[i]) { f(dst_data1, dst_data2, src_data, i, p_offsets[i], p_offsets[i]); }
     });
@@ -668,7 +692,11 @@ void gatherParticles (PTile& dst, const PTile& src, N np, const Index* inds)
     const auto src_data = src.getConstParticleTileData();
           auto dst_data = dst.getParticleTileData();
 
+#if defined(AMREX_USE_GPU) && defined(_WIN32)
+    amrex::ParallelFor(np, [=] AMREX_GPU_DEVICE (N i)
+#else
     AMREX_HOST_DEVICE_FOR_1D( np, i,
+#endif
     {
         copyParticle(dst_data, src_data, inds[i], i);
     });
@@ -698,7 +726,11 @@ void scatterParticles (PTile& dst, const PTile& src, N np, const Index* inds)
     const auto src_data = src.getConstParticleTileData();
           auto dst_data = dst.getParticleTileData();
 
+#if defined(AMREX_USE_GPU) && defined(_WIN32)
+    amrex::ParallelFor(np, [=] AMREX_GPU_DEVICE (N i)
+#else
     AMREX_HOST_DEVICE_FOR_1D( np, i,
+#endif
     {
         copyParticle(dst_data, src_data, i, inds[i]);
     });

@@ -619,7 +619,11 @@ MLCellLinOpT<MF>::setLevelBC (int amrlev, const MF* a_levelbcdata, const MF* rob
                     Array4<RT> const& rbc = (*m_robin_bcval[amrlev])[mfi].array(icomp*3);
                     if (this->m_lobc_orig[icomp][idim] == LinOpBCType::Robin && outside_domain_lo)
                     {
+#if defined(AMREX_USE_GPU) && defined(_WIN32)
+                        amrex::ParallelFor(blo, [=] AMREX_GPU_DEVICE (int i, int j, int k)
+#else
                         AMREX_HOST_DEVICE_PARALLEL_FOR_3D(blo, i, j, k,
+#endif
                         {
                             rbc(i,j,k,0) = ra(i,j,k,icomp);
                             rbc(i,j,k,1) = rb(i,j,k,icomp);
@@ -628,7 +632,11 @@ MLCellLinOpT<MF>::setLevelBC (int amrlev, const MF* a_levelbcdata, const MF* rob
                     }
                     if (this->m_hibc_orig[icomp][idim] == LinOpBCType::Robin && outside_domain_hi)
                     {
+#if defined(AMREX_USE_GPU) && defined(_WIN32)
+                        amrex::ParallelFor(bhi, [=] AMREX_GPU_DEVICE (int i, int j, int k)
+#else
                         AMREX_HOST_DEVICE_PARALLEL_FOR_3D(bhi, i, j, k,
+#endif
                         {
                             rbc(i,j,k,0) = ra(i,j,k,icomp);
                             rbc(i,j,k,1) = rb(i,j,k,icomp);
@@ -987,7 +995,11 @@ MLCellLinOpT<MF>::interpolation (int amrlev, int fmglev, MF& fine, const MF& crs
             const Box& bx    = mfi.tilebox();
             Array4<RT const> const& cfab = crse.const_array(mfi);
             Array4<RT> const& ffab = fine.array(mfi);
+#if defined(AMREX_USE_GPU) && defined(_WIN32)
+            amrex::ParallelFor(bx, ncomp, [=] AMREX_GPU_DEVICE (int i, int j, int k, int n)
+#else
             AMREX_HOST_DEVICE_PARALLEL_FOR_4D ( bx, ncomp, i, j, k, n,
+#endif
             {
                 int ic = amrex::coarsen(i,ratio3.x);
                 int jc = amrex::coarsen(j,ratio3.y);
@@ -1378,7 +1390,11 @@ MLCellLinOpT<MF>::compFlux (int amrlev, const Array<MF*,AMREX_SPACEDIM>& fluxes,
                 const Box& nbx = mfi.nodaltilebox(idim);
                 auto const& dst = fluxes[idim]->array(mfi);
                 auto const& src =  pflux[idim]->const_array();
+#if defined(AMREX_USE_GPU) && defined(_WIN32)
+                amrex::ParallelFor(nbx, ncomp, [=] AMREX_GPU_DEVICE (int i, int j, int k, int n)
+#else
                 AMREX_HOST_DEVICE_PARALLEL_FOR_4D (nbx, ncomp, i, j, k, n,
+#endif
                 {
                     dst(i,j,k,n) = src(i,j,k,n);
                 });
@@ -1420,18 +1436,30 @@ MLCellLinOpT<MF>::compGrad (int amrlev, const Array<MF*,AMREX_SPACEDIM>& grad,
                      const auto& gy = grad[1]->array(mfi);,
                      const auto& gz = grad[2]->array(mfi););
 
+#if defined(AMREX_USE_GPU) && defined(_WIN32)
+        amrex::ParallelFor(xbx, ncomp, [=] AMREX_GPU_DEVICE (int i, int j, int k, int n)
+#else
         AMREX_HOST_DEVICE_PARALLEL_FOR_4D ( xbx, ncomp, i, j, k, n,
+#endif
         {
             gx(i,j,k,n) = dxi*(s(i,j,k,n) - s(i-1,j,k,n));
         });
 #if (AMREX_SPACEDIM >= 2)
+#if defined(AMREX_USE_GPU) && defined(_WIN32)
+        amrex::ParallelFor(ybx, ncomp, [=] AMREX_GPU_DEVICE (int i, int j, int k, int n)
+#else
         AMREX_HOST_DEVICE_PARALLEL_FOR_4D ( ybx, ncomp, i, j, k, n,
+#endif
         {
             gy(i,j,k,n) = dyi*(s(i,j,k,n) - s(i,j-1,k,n));
         });
 #endif
 #if (AMREX_SPACEDIM == 3)
+#if defined(AMREX_USE_GPU) && defined(_WIN32)
+        amrex::ParallelFor(zbx, ncomp, [=] AMREX_GPU_DEVICE (int i, int j, int k, int n)
+#else
         AMREX_HOST_DEVICE_PARALLEL_FOR_4D ( zbx, ncomp, i, j, k, n,
+#endif
         {
             gz(i,j,k,n) = dzi*(s(i,j,k,n) - s(i,j,k-1,n));
         });
@@ -1466,13 +1494,21 @@ MLCellLinOpT<MF>::applyMetricTerm (int amrlev, int mglev, MF& rhs) const
         auto const& rhsarr = rhs.array(mfi);
 #if (AMREX_SPACEDIM == 1)
         if (cc) {
+#if defined(AMREX_USE_GPU) && defined(_WIN32)
+            amrex::ParallelFor(tbx, ncomp, [=] AMREX_GPU_DEVICE (int i, int j, int k, int n)
+#else
             AMREX_HOST_DEVICE_PARALLEL_FOR_4D ( tbx, ncomp, i, j, k, n,
+#endif
             {
                 RT rc = probxlo + (i+RT(0.5))*dx;
                 rhsarr(i,j,k,n) *= rc*rc;
             });
         } else {
+#if defined(AMREX_USE_GPU) && defined(_WIN32)
+            amrex::ParallelFor(tbx, ncomp, [=] AMREX_GPU_DEVICE (int i, int j, int k, int n)
+#else
             AMREX_HOST_DEVICE_PARALLEL_FOR_4D ( tbx, ncomp, i, j, k, n,
+#endif
             {
                 RT re = probxlo + i*dx;
                 rhsarr(i,j,k,n) *= re*re;
@@ -1480,13 +1516,21 @@ MLCellLinOpT<MF>::applyMetricTerm (int amrlev, int mglev, MF& rhs) const
         }
 #elif (AMREX_SPACEDIM == 2)
         if (cc) {
+#if defined(AMREX_USE_GPU) && defined(_WIN32)
+            amrex::ParallelFor(tbx, ncomp, [=] AMREX_GPU_DEVICE (int i, int j, int k, int n)
+#else
             AMREX_HOST_DEVICE_PARALLEL_FOR_4D ( tbx, ncomp, i, j, k, n,
+#endif
             {
                 RT rc = probxlo + (i+RT(0.5))*dx;
                 rhsarr(i,j,k,n) *= rc;
             });
         } else {
+#if defined(AMREX_USE_GPU) && defined(_WIN32)
+            amrex::ParallelFor(tbx, ncomp, [=] AMREX_GPU_DEVICE (int i, int j, int k, int n)
+#else
             AMREX_HOST_DEVICE_PARALLEL_FOR_4D ( tbx, ncomp, i, j, k, n,
+#endif
             {
                 RT re = probxlo + i*dx;
                 rhsarr(i,j,k,n) *= re;
@@ -1522,13 +1566,21 @@ MLCellLinOpT<MF>::unapplyMetricTerm (int amrlev, int mglev, MF& rhs) const
         auto const& rhsarr = rhs.array(mfi);
 #if (AMREX_SPACEDIM == 1)
         if (cc) {
+#if defined(AMREX_USE_GPU) && defined(_WIN32)
+            amrex::ParallelFor(tbx, ncomp, [=] AMREX_GPU_DEVICE (int i, int j, int k, int n)
+#else
             AMREX_HOST_DEVICE_PARALLEL_FOR_4D ( tbx, ncomp, i, j, k, n,
+#endif
             {
                 RT rcinv = RT(1.0)/(probxlo + (i+RT(0.5))*dx);
                 rhsarr(i,j,k,n) *= rcinv*rcinv;
             });
         } else {
+#if defined(AMREX_USE_GPU) && defined(_WIN32)
+            amrex::ParallelFor(tbx, ncomp, [=] AMREX_GPU_DEVICE (int i, int j, int k, int n)
+#else
             AMREX_HOST_DEVICE_PARALLEL_FOR_4D ( tbx, ncomp, i, j, k, n,
+#endif
             {
                 RT re = probxlo + i*dx;
                 RT reinv = (re==RT(0.0)) ? RT(0.0) : RT(1.)/re;
@@ -1537,13 +1589,21 @@ MLCellLinOpT<MF>::unapplyMetricTerm (int amrlev, int mglev, MF& rhs) const
         }
 #elif (AMREX_SPACEDIM == 2)
         if (cc) {
+#if defined(AMREX_USE_GPU) && defined(_WIN32)
+            amrex::ParallelFor(tbx, ncomp, [=] AMREX_GPU_DEVICE (int i, int j, int k, int n)
+#else
             AMREX_HOST_DEVICE_PARALLEL_FOR_4D ( tbx, ncomp, i, j, k, n,
+#endif
             {
                 RT rcinv = RT(1.0)/(probxlo + (i+RT(0.5))*dx);
                 rhsarr(i,j,k,n) *= rcinv;
             });
         } else {
+#if defined(AMREX_USE_GPU) && defined(_WIN32)
+            amrex::ParallelFor(tbx, ncomp, [=] AMREX_GPU_DEVICE (int i, int j, int k, int n)
+#else
             AMREX_HOST_DEVICE_PARALLEL_FOR_4D ( tbx, ncomp, i, j, k, n,
+#endif
             {
                 RT re = probxlo + i*dx;
                 RT reinv = (re==RT(0.0)) ? RT(0.0) : RT(1.)/re;
@@ -1648,7 +1708,11 @@ MLCellLinOpT<MF>::prepareForSolve ()
             if (Gpu::inLaunchRegion()) {
 #ifdef AMREX_USE_EB
                 if (factory && !factory->isAllRegular()) {
+#if defined(AMREX_USE_GPU) && defined(_WIN32)
+                    if           (!std::is_same<MF,MultiFab>()) {
+#else
                     if constexpr (!std::is_same<MF,MultiFab>()) {
+#endif
                         amrex::Abort("MLCellLinOp with EB only works with MultiFab");
                     } else {
                         Vector<MLMGPSEBTag<RT>> tags;
@@ -2011,7 +2075,11 @@ MLCellLinOpT<MF>::normInf (int amrlev, MF const& mf, bool local) const -> RT
 #ifdef AMREX_USE_EB
     const auto *factory = dynamic_cast<EBFArrayBoxFactory const*>(this->Factory(amrlev));
     if (factory && !factory->isAllRegular()) {
+#if defined(AMREX_USE_GPU) && defined(_WIN32)
+        if           (!std::is_same<MF,MultiFab>()) {
+#else
         if constexpr (!std::is_same<MF,MultiFab>()) {
+#endif
             amrex::Abort("MLCellLinOpT with EB only works with MultiFab");
         } else {
             const MultiFab& vfrac = factory->getVolFrac();

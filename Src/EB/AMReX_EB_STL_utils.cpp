@@ -7,6 +7,10 @@
 
 #include <cstring>
 
+#if defined(_WIN32) && defined(small)
+#undef small
+#endif
+
 // Reference for BVH: https://rmrsk.github.io/EBGeometry/Concepts.html#bounding-volume-hierarchies
 
 namespace amrex

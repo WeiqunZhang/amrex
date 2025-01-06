@@ -1,5 +1,9 @@
 #include <AMReX_EB2_C.H>
 
+#if defined(_WIN32) && defined(small)
+#undef small
+#endif
+
 namespace amrex::EB2 {
 
 namespace {

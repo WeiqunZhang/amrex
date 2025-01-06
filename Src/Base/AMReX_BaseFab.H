@@ -108,7 +108,11 @@ template <typename T>
 std::enable_if_t<!std::is_trivially_default_constructible_v<T>>
 placementNew (T* const ptr, Long n)
 {
+#if defined(AMREX_USE_GPU) && defined(_WIN32)
+    amrex::ParallelFor(n, [=] AMREX_GPU_DEVICE (Long i)
+#else
     AMREX_HOST_DEVICE_FOR_1D ( n, i,
+#endif
     {
         new (ptr+i) T;
     });
@@ -123,7 +127,11 @@ template <typename T>
 std::enable_if_t<!std::is_trivially_destructible_v<T>>
 placementDelete (T* const ptr, Long n)
 {
+#if defined(AMREX_USE_GPU) && defined(_WIN32)
+    amrex::ParallelFor(n, [=] AMREX_GPU_DEVICE (Long i)
+#else
     AMREX_HOST_DEVICE_FOR_1D (n, i,
+#endif
     {
         (ptr+i)->~T();
     });

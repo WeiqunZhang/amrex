@@ -218,7 +218,11 @@ MLCellABecLapT<MF>::define (const Vector<Geometry>& a_geom,
                     const Box& bx = mfi.tilebox();
                     Array4<int> const& cmsk = this->m_overset_mask[amrlev][mglev]->array(mfi);
                     Array4<int const> const fmsk = this->m_overset_mask[amrlev][mglev-1]->const_array(mfi);
+#if defined(AMREX_USE_GPU) && defined(_WIN32)
+                    amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE (int i, int j, int k)
+#else
                     AMREX_HOST_DEVICE_PARALLEL_FOR_3D(bx, i, j, k,
+#endif
                     {
                         coarsen_overset_mask(i,j,k, cmsk, fmsk);
                     });
@@ -366,7 +370,11 @@ MLCellABecLapT<MF>::applyInhomogNeumannTerm (int amrlev, MF& rhs) const
                             fac *= static_cast<RT>(problo[0]);
 #endif
                         }
+#if defined(AMREX_USE_GPU) && defined(_WIN32)
+                        amrex::ParallelFor(blo, [=] AMREX_GPU_DEVICE (int i, int j, int k)
+#else
                         AMREX_HOST_DEVICE_FOR_3D(blo, i, j, k,
+#endif
                         {
                             mllinop_apply_innu_xlo(i,j,k, rhsfab, mlo, bfab,
                                                    bctlo, bcllo, bvlo,
@@ -375,7 +383,11 @@ MLCellABecLapT<MF>::applyInhomogNeumannTerm (int amrlev, MF& rhs) const
                     } else if (idim == 1) {
                         RT fac = beta*dyi;
                         if (this->m_has_metric_term && !has_bcoef) {
+#if defined(AMREX_USE_GPU) && defined(_WIN32)
+                            amrex::ParallelFor(blo, [=] AMREX_GPU_DEVICE (int i, int j, int k)
+#else
                             AMREX_HOST_DEVICE_FOR_3D(blo, i, j, k,
+#endif
                             {
                                 mllinop_apply_innu_ylo_m(i,j,k, rhsfab, mlo,
                                                          bctlo, bcllo, bvlo,
@@ -383,7 +395,11 @@ MLCellABecLapT<MF>::applyInhomogNeumannTerm (int amrlev, MF& rhs) const
                             });
                         }
                         else {
+#if defined(AMREX_USE_GPU) && defined(_WIN32)
+                            amrex::ParallelFor(blo, [=] AMREX_GPU_DEVICE (int i, int j, int k)
+#else
                             AMREX_HOST_DEVICE_FOR_3D(blo, i, j, k,
+#endif
                             {
                                 mllinop_apply_innu_ylo(i,j,k, rhsfab, mlo, bfab,
                                                        bctlo, bcllo, bvlo,
@@ -392,7 +408,11 @@ MLCellABecLapT<MF>::applyInhomogNeumannTerm (int amrlev, MF& rhs) const
                         }
                     } else {
                         RT fac = beta*dzi;
+#if defined(AMREX_USE_GPU) && defined(_WIN32)
+                        amrex::ParallelFor(blo, [=] AMREX_GPU_DEVICE (int i, int j, int k)
+#else
                         AMREX_HOST_DEVICE_FOR_3D(blo, i, j, k,
+#endif
                         {
                             mllinop_apply_innu_zlo(i,j,k, rhsfab, mlo, bfab,
                                                    bctlo, bcllo, bvlo,
@@ -411,7 +431,11 @@ MLCellABecLapT<MF>::applyInhomogNeumannTerm (int amrlev, MF& rhs) const
                             fac *= static_cast<RT>(probhi[0]);
 #endif
                         }
+#if defined(AMREX_USE_GPU) && defined(_WIN32)
+                        amrex::ParallelFor(bhi, [=] AMREX_GPU_DEVICE (int i, int j, int k)
+#else
                         AMREX_HOST_DEVICE_FOR_3D(bhi, i, j, k,
+#endif
                         {
                             mllinop_apply_innu_xhi(i,j,k, rhsfab, mhi, bfab,
                                                    bcthi, bclhi, bvhi,
@@ -420,14 +444,22 @@ MLCellABecLapT<MF>::applyInhomogNeumannTerm (int amrlev, MF& rhs) const
                     } else if (idim == 1) {
                         RT fac = beta*dyi;
                         if (this->m_has_metric_term && !has_bcoef) {
+#if defined(AMREX_USE_GPU) && defined(_WIN32)
+                            amrex::ParallelFor(bhi, [=] AMREX_GPU_DEVICE (int i, int j, int k)
+#else
                             AMREX_HOST_DEVICE_FOR_3D(bhi, i, j, k,
+#endif
                             {
                                 mllinop_apply_innu_yhi_m(i,j,k, rhsfab, mhi,
                                                          bcthi, bclhi, bvhi,
                                                          fac, xlo, dx, icomp);
                             });
                         } else {
+#if defined(AMREX_USE_GPU) && defined(_WIN32)
+                            amrex::ParallelFor(bhi, [=] AMREX_GPU_DEVICE (int i, int j, int k)
+#else
                             AMREX_HOST_DEVICE_FOR_3D(bhi, i, j, k,
+#endif
                             {
                                 mllinop_apply_innu_yhi(i,j,k, rhsfab, mhi, bfab,
                                                        bcthi, bclhi, bvhi,
@@ -436,7 +468,11 @@ MLCellABecLapT<MF>::applyInhomogNeumannTerm (int amrlev, MF& rhs) const
                         }
                     } else {
                         RT fac = beta*dzi;
+#if defined(AMREX_USE_GPU) && defined(_WIN32)
+                        amrex::ParallelFor(bhi, [=] AMREX_GPU_DEVICE (int i, int j, int k)
+#else
                         AMREX_HOST_DEVICE_FOR_3D(bhi, i, j, k,
+#endif
                         {
                             mllinop_apply_innu_zhi(i,j,k, rhsfab, mhi, bfab,
                                                    bcthi, bclhi, bvhi,
@@ -453,7 +489,11 @@ MLCellABecLapT<MF>::applyInhomogNeumannTerm (int amrlev, MF& rhs) const
                     {
                         if (idim == 0) {
                             RT fac = beta*dxi*dxi;
+#if defined(AMREX_USE_GPU) && defined(_WIN32)
+                            amrex::ParallelFor(blo, [=] AMREX_GPU_DEVICE (int i, int j, int k)
+#else
                             AMREX_HOST_DEVICE_FOR_3D(blo, i, j, k,
+#endif
                             {
                                 RT A = rbc(i,j,k,2)
                                     / (rbc(i,j,k,1)*dxi + rbc(i,j,k,0)*RT(0.5));
@@ -461,7 +501,11 @@ MLCellABecLapT<MF>::applyInhomogNeumannTerm (int amrlev, MF& rhs) const
                             });
                         } else if (idim == 1) {
                             RT fac = beta*dyi*dyi;
+#if defined(AMREX_USE_GPU) && defined(_WIN32)
+                            amrex::ParallelFor(blo, [=] AMREX_GPU_DEVICE (int i, int j, int k)
+#else
                             AMREX_HOST_DEVICE_FOR_3D(blo, i, j, k,
+#endif
                             {
                                 RT A = rbc(i,j,k,2)
                                     / (rbc(i,j,k,1)*dyi + rbc(i,j,k,0)*RT(0.5));
@@ -469,7 +513,11 @@ MLCellABecLapT<MF>::applyInhomogNeumannTerm (int amrlev, MF& rhs) const
                             });
                         } else {
                             RT fac = beta*dzi*dzi;
+#if defined(AMREX_USE_GPU) && defined(_WIN32)
+                            amrex::ParallelFor(blo, [=] AMREX_GPU_DEVICE (int i, int j, int k)
+#else
                             AMREX_HOST_DEVICE_FOR_3D(blo, i, j, k,
+#endif
                             {
                                 RT A = rbc(i,j,k,2)
                                     / (rbc(i,j,k,1)*dzi + rbc(i,j,k,0)*RT(0.5));
@@ -481,7 +529,11 @@ MLCellABecLapT<MF>::applyInhomogNeumannTerm (int amrlev, MF& rhs) const
                     {
                         if (idim == 0) {
                             RT fac = beta*dxi*dxi;
+#if defined(AMREX_USE_GPU) && defined(_WIN32)
+                            amrex::ParallelFor(bhi, [=] AMREX_GPU_DEVICE (int i, int j, int k)
+#else
                             AMREX_HOST_DEVICE_FOR_3D(bhi, i, j, k,
+#endif
                             {
                                 RT A = rbc(i,j,k,2)
                                     / (rbc(i,j,k,1)*dxi + rbc(i,j,k,0)*RT(0.5));
@@ -489,7 +541,11 @@ MLCellABecLapT<MF>::applyInhomogNeumannTerm (int amrlev, MF& rhs) const
                             });
                         } else if (idim == 1) {
                             RT fac = beta*dyi*dyi;
+#if defined(AMREX_USE_GPU) && defined(_WIN32)
+                            amrex::ParallelFor(bhi, [=] AMREX_GPU_DEVICE (int i, int j, int k)
+#else
                             AMREX_HOST_DEVICE_FOR_3D(bhi, i, j, k,
+#endif
                             {
                                 RT A = rbc(i,j,k,2)
                                     / (rbc(i,j,k,1)*dyi + rbc(i,j,k,0)*RT(0.5));
@@ -497,7 +553,11 @@ MLCellABecLapT<MF>::applyInhomogNeumannTerm (int amrlev, MF& rhs) const
                             });
                         } else {
                             RT fac = beta*dzi*dzi;
+#if defined(AMREX_USE_GPU) && defined(_WIN32)
+                            amrex::ParallelFor(bhi, [=] AMREX_GPU_DEVICE (int i, int j, int k)
+#else
                             AMREX_HOST_DEVICE_FOR_3D(bhi, i, j, k,
+#endif
                             {
                                 RT A = rbc(i,j,k,2)
                                     / (rbc(i,j,k,1)*dzi + rbc(i,j,k,0)*RT(0.5));
@@ -569,7 +629,11 @@ MLCellABecLapT<MF>::addInhomogNeumannFlux (
                     if (ori.isLow()) {
                         if (this->m_lobc_orig[icomp][idim] ==
                             LinOpBCType::inhomogNeumann) {
+#if defined(AMREX_USE_GPU) && defined(_WIN32)
+                            amrex::ParallelFor(ccb, [=] AMREX_GPU_DEVICE (int i, int j, int k)
+#else
                             AMREX_HOST_DEVICE_FOR_3D(ccb, i, j, k,
+#endif
                             {
                                 int ii = i+os.x;
                                 int jj = j+os.y;
@@ -580,7 +644,11 @@ MLCellABecLapT<MF>::addInhomogNeumannFlux (
                         } else if (this->m_lobc_orig[icomp][idim] ==
                                    LinOpBCType::Robin) {
                             auto const& rbc = (*this->m_robin_bcval[amrlev])[mfi].const_array(icomp*3);
+#if defined(AMREX_USE_GPU) && defined(_WIN32)
+                            amrex::ParallelFor(ccb, [=] AMREX_GPU_DEVICE (int i, int j, int k)
+#else
                             AMREX_HOST_DEVICE_FOR_3D(ccb, i, j, k,
+#endif
                             {
                                 int ii = i+os.x;
                                 int jj = j+os.y;
@@ -596,7 +664,11 @@ MLCellABecLapT<MF>::addInhomogNeumannFlux (
                     } else {
                         if (this->m_hibc_orig[icomp][idim] ==
                             LinOpBCType::inhomogNeumann) {
+#if defined(AMREX_USE_GPU) && defined(_WIN32)
+                            amrex::ParallelFor(ccb, [=] AMREX_GPU_DEVICE (int i, int j, int k)
+#else
                             AMREX_HOST_DEVICE_FOR_3D(ccb, i, j, k,
+#endif
                             {
                                 RT b = bc ? bc(i,j,k) : RT(1.0);
                                 f(i,j,k) = fac*b*bv(i,j,k);
@@ -604,7 +676,11 @@ MLCellABecLapT<MF>::addInhomogNeumannFlux (
                         } else if (this->m_hibc_orig[icomp][idim] ==
                                    LinOpBCType::Robin) {
                             auto const& rbc = (*this->m_robin_bcval[amrlev])[mfi].const_array(icomp*3);
+#if defined(AMREX_USE_GPU) && defined(_WIN32)
+                            amrex::ParallelFor(ccb, [=] AMREX_GPU_DEVICE (int i, int j, int k)
+#else
                             AMREX_HOST_DEVICE_FOR_3D(ccb, i, j, k,
+#endif
                             {
                                 RT tmp = RT(1.0) /
                                     (rbc(i,j,k,1)*dxi + rbc(i,j,k,0)*RT(0.5));
@@ -651,7 +727,11 @@ MLCellABecLapT<MF>::applyOverset (int amrlev, MF& rhs) const
                 const Box& bx = mfi.tilebox();
                 auto const& rfab = rhs.array(mfi);
                 auto const& osm = m_overset_mask[amrlev][0]->const_array(mfi);
+#if defined(AMREX_USE_GPU) && defined(_WIN32)
+                amrex::ParallelFor(bx, ncomp, [=] AMREX_GPU_DEVICE (int i, int j, int k, int n)
+#else
                 AMREX_HOST_DEVICE_PARALLEL_FOR_4D(bx, ncomp, i, j, k, n,
+#endif
                 {
                     if (osm(i,j,k) == 0) { rfab(i,j,k,n) = RT(0.0); }
                 });

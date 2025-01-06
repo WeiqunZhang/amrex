@@ -1223,11 +1223,19 @@ ParticleContainer_impl<ParticleType, NArrayReal, NArrayInt, Allocator, CellAssig
             auto* paos = (tmp_t*)(ptile.getParticleTileData().m_aos);
             for (std::size_t ichunk = 0; ichunk < nchunks; ++ichunk) {
                 // Do not need to reorder neighbor particles
+#if defined(AMREX_USE_GPU) && defined(_WIN32)
+                amrex::ParallelFor(np, [=] AMREX_GPU_DEVICE (std::size_t i)
+#else
                 AMREX_HOST_DEVICE_FOR_1D(np, i,
+#endif
                 {
                     ptmp[i] = paos[permutations[i]*nchunks+ichunk];
                 });
+#if defined(AMREX_USE_GPU) && defined(_WIN32)
+                amrex::ParallelFor(np, [=] AMREX_GPU_DEVICE (std::size_t i)
+#else
                 AMREX_HOST_DEVICE_FOR_1D(np, i,
+#endif
                 {
                     paos[i*nchunks+ichunk] = ptmp[i];
                 });
@@ -1238,7 +1246,11 @@ ParticleContainer_impl<ParticleType, NArrayReal, NArrayInt, Allocator, CellAssig
 
             auto src = ptile.GetStructOfArrays().GetIdCPUData().data();
             uint64_t* dst = tmp_idcpu.data();
+#if defined(AMREX_USE_GPU) && defined(_WIN32)
+            amrex::ParallelFor(np_total, [=] AMREX_GPU_DEVICE (std::size_t i)
+#else
             AMREX_HOST_DEVICE_FOR_1D( np_total, i,
+#endif
             {
                 dst[i] = i < np ? src[permutations[i]] : src[i];
             });
@@ -1253,7 +1265,11 @@ ParticleContainer_impl<ParticleType, NArrayReal, NArrayInt, Allocator, CellAssig
             for (int comp = 0; comp < NArrayReal + m_num_runtime_real; ++comp) {
                 auto src = ptile.GetStructOfArrays().GetRealData(comp).data();
                 ParticleReal* dst = tmp_real.data();
+#if defined(AMREX_USE_GPU) && defined(_WIN32)
+                amrex::ParallelFor(np_total, [=] AMREX_GPU_DEVICE (std::size_t i)
+#else
                 AMREX_HOST_DEVICE_FOR_1D( np_total, i,
+#endif
                 {
                     dst[i] = i < np ? src[permutations[i]] : src[i];
                 });
@@ -1268,7 +1284,11 @@ ParticleContainer_impl<ParticleType, NArrayReal, NArrayInt, Allocator, CellAssig
         for (int comp = 0; comp < NArrayInt + m_num_runtime_int; ++comp) {
             auto src = ptile.GetStructOfArrays().GetIntData(comp).data();
             int* dst = tmp_int.data();
+#if defined(AMREX_USE_GPU) && defined(_WIN32)
+            amrex::ParallelFor(np_total, [=] AMREX_GPU_DEVICE (std::size_t i)
+#else
             AMREX_HOST_DEVICE_FOR_1D( np_total , i,
+#endif
             {
                 dst[i] = i < np ? src[permutations[i]] : src[i];
             });
@@ -2553,7 +2573,11 @@ AssignCellDensitySingleLevel (int rho_index,
 
             if (particle_lvl_offset == 0)
             {
+#if defined(AMREX_USE_GPU) && defined(_WIN32)
+                amrex::ParallelFor(np, [=] AMREX_GPU_DEVICE (Long i)
+#else
                 AMREX_HOST_DEVICE_FOR_1D( np, i,
+#endif
                 {
                     auto p = make_particle<ParticleType>{}(ptd,i);
                     amrex_deposit_cic(p, ncomp, rhoarr, plo, dxi);
@@ -2561,7 +2585,11 @@ AssignCellDensitySingleLevel (int rho_index,
             }
             else
             {
+#if defined(AMREX_USE_GPU) && defined(_WIN32)
+                amrex::ParallelFor(np, [=] AMREX_GPU_DEVICE (Long i)
+#else
                 AMREX_HOST_DEVICE_FOR_1D( np, i,
+#endif
                 {
                     auto p = make_particle<ParticleType>{}(ptd,i);
                     amrex_deposit_particle_dx_cic(p, ncomp, rhoarr, plo, dxi, pdxi);

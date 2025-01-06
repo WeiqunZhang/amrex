@@ -2,6 +2,10 @@
 #define AMREX_EB_FLUXREGISTER_3D_C_H_
 #include <AMReX_Config.H>
 
+#if defined(_WIN32) && defined(small)
+#undef small
+#endif
+
 namespace amrex {
 
 AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE

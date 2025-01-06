@@ -25,6 +25,10 @@
 #include <algorithm>
 #include <utility>
 
+#if defined(_WIN32) && defined(small)
+#undef small
+#endif
+
 namespace amrex {
 
 int FabArrayBase::MaxComp = 25;

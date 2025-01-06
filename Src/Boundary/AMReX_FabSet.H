@@ -177,7 +177,11 @@ FabSetT<MF>::copyFrom (const FabSetT<MF>& src, int scomp, int dcomp, int ncomp)
             const Box& bx = fsi.validbox();
             auto const srcfab =   src.array(fsi);
             auto       dstfab = this->array(fsi);
+#if defined(AMREX_USE_GPU) && defined(_WIN32)
+            amrex::ParallelFor(bx, ncomp, [=] AMREX_GPU_DEVICE (int i, int j, int k, int n)
+#else
             AMREX_HOST_DEVICE_PARALLEL_FOR_4D ( bx, ncomp, i, j, k, n,
+#endif
             {
                 dstfab(i,j,k,n+dcomp) = srcfab(i,j,k,n+scomp);
             });
@@ -210,7 +214,11 @@ FabSetT<MF>::plusFrom (const FabSetT<MF>& src, int scomp, int dcomp, int ncomp)
             const Box& bx = fsi.validbox();
             auto const srcfab =   src.array(fsi);
             auto       dstfab = this->array(fsi);
+#if defined(AMREX_USE_GPU) && defined(_WIN32)
+            amrex::ParallelFor(bx, ncomp, [=] AMREX_GPU_DEVICE (int i, int j, int k, int n)
+#else
             AMREX_HOST_DEVICE_PARALLEL_FOR_4D ( bx, ncomp, i, j, k, n,
+#endif
             {
                 dstfab(i,j,k,n+dcomp) += srcfab(i,j,k,n+scomp);
             });
@@ -260,7 +268,11 @@ FabSetT<MF>::setVal (value_type val)
     for (FabSetIter fsi(*this); fsi.isValid(); ++fsi) {
         const Box& bx = fsi.validbox();
         auto fab = this->array(fsi);
+#if defined(AMREX_USE_GPU) && defined(_WIN32)
+        amrex::ParallelFor(bx, ncomp, [=] AMREX_GPU_DEVICE (int i, int j, int k, int n)
+#else
         AMREX_HOST_DEVICE_PARALLEL_FOR_4D ( bx, ncomp, i, j, k, n,
+#endif
         {
             fab(i,j,k,n) = val;
         });
@@ -277,7 +289,11 @@ FabSetT<MF>::setVal (value_type val, int comp, int num_comp)
     for (FabSetIter fsi(*this); fsi.isValid(); ++fsi) {
         const Box& bx = fsi.validbox();
         auto fab = this->array(fsi);
+#if defined(AMREX_USE_GPU) && defined(_WIN32)
+        amrex::ParallelFor(bx, num_comp, [=] AMREX_GPU_DEVICE (int i, int j, int k, int n)
+#else
         AMREX_HOST_DEVICE_PARALLEL_FOR_4D ( bx, num_comp, i, j, k, n,
+#endif
         {
             fab(i,j,k,n+comp) = val;
         });
@@ -301,7 +317,11 @@ FabSetT<MF>::linComb (value_type a, value_type b, const FabSetT<MF>& src,
         const Box& bx = fsi.validbox();
         auto const srcfab =   src.array(fsi);
         auto       dstfab = this->array(fsi);
+#if defined(AMREX_USE_GPU) && defined(_WIN32)
+        amrex::ParallelFor(bx, ncomp, [=] AMREX_GPU_DEVICE (int i, int j, int k, int n)
+#else
         AMREX_HOST_DEVICE_PARALLEL_FOR_4D ( bx, ncomp, i, j, k, n,
+#endif
         {
             dstfab(i,j,k,n+dcomp) = a*dstfab(i,j,k,n+dcomp) + b*srcfab(i,j,k,n+scomp);
         });
@@ -335,7 +355,11 @@ FabSetT<MF>::linComb (value_type a, const MF& mfa, int a_comp,
         const Box& bx = mfi.validbox();
         auto afab = bdrya.array(mfi);
         auto bfab = bdryb.array(mfi);
+#if defined(AMREX_USE_GPU) && defined(_WIN32)
+        amrex::ParallelFor(bx, ncomp, [=] AMREX_GPU_DEVICE (int i, int j, int k, int n)
+#else
         AMREX_HOST_DEVICE_PARALLEL_FOR_4D ( bx, ncomp, i, j, k, n,
+#endif
         {
             afab(i,j,k,n) = huge;
             bfab(i,j,k,n) = huge;
@@ -354,7 +378,11 @@ FabSetT<MF>::linComb (value_type a, const MF& mfa, int a_comp,
         auto const afab = bdrya.array(fsi);
         auto const bfab = bdryb.array(fsi);
         auto       dfab = this->array(fsi);
+#if defined(AMREX_USE_GPU) && defined(_WIN32)
+        amrex::ParallelFor(bx, ncomp, [=] AMREX_GPU_DEVICE (int i, int j, int k, int n)
+#else
         AMREX_HOST_DEVICE_PARALLEL_FOR_4D ( bx, ncomp, i, j, k, n,
+#endif
         {
             dfab(i,j,k,n+dcomp) = a*afab(i,j,k,n) + b*bfab(i,j,k,n);
         });
@@ -398,7 +426,11 @@ FabSetT<MF>::Copy (FabSetT<MF>& dst, const FabSetT<MF>& src)
         const Box& bx = fsi.validbox();
         auto const srcfab = src.array(fsi);
         auto       dstfab = dst.array(fsi);
+#if defined(AMREX_USE_GPU) && defined(_WIN32)
+        amrex::ParallelFor(bx, ncomp, [=] AMREX_GPU_DEVICE (int i, int j, int k, int n)
+#else
         AMREX_HOST_DEVICE_PARALLEL_FOR_4D ( bx, ncomp, i, j, k, n,
+#endif
         {
             dstfab(i,j,k,n) = srcfab(i,j,k,n);
         });

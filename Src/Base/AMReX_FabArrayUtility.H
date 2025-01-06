@@ -1136,7 +1136,11 @@ Subtract (FabArray<FAB>& dst, FabArray<FAB> const& src, int srccomp, int dstcomp
             {
                 auto const srcFab = src.array(mfi);
                 auto       dstFab = dst.array(mfi);
+#if defined(AMREX_USE_GPU) && defined(_WIN32)
+                amrex::ParallelFor(bx, numcomp, [=] AMREX_GPU_DEVICE (int i, int j, int k, int n)
+#else
                 AMREX_HOST_DEVICE_PARALLEL_FOR_4D( bx, numcomp, i, j, k, n,
+#endif
                 {
                     dstFab(i,j,k,n+dstcomp) -= srcFab(i,j,k,n+srccomp);
                 });
@@ -1184,7 +1188,11 @@ Multiply (FabArray<FAB>& dst, FabArray<FAB> const& src, int srccomp, int dstcomp
             {
                 auto const srcFab = src.array(mfi);
                 auto       dstFab = dst.array(mfi);
+#if defined(AMREX_USE_GPU) && defined(_WIN32)
+                amrex::ParallelFor(bx, numcomp, [=] AMREX_GPU_DEVICE (int i, int j, int k, int n)
+#else
                 AMREX_HOST_DEVICE_PARALLEL_FOR_4D( bx, numcomp, i, j, k, n,
+#endif
                 {
                     dstFab(i,j,k,n+dstcomp) *= srcFab(i,j,k,n+srccomp);
                 });
@@ -1232,7 +1240,11 @@ Divide (FabArray<FAB>& dst, FabArray<FAB> const& src, int srccomp, int dstcomp, 
             {
                 auto const srcFab = src.array(mfi);
                 auto       dstFab = dst.array(mfi);
+#if defined(AMREX_USE_GPU) && defined(_WIN32)
+                amrex::ParallelFor(bx, numcomp, [=] AMREX_GPU_DEVICE (int i, int j, int k, int n)
+#else
                 AMREX_HOST_DEVICE_PARALLEL_FOR_4D( bx, numcomp, i, j, k, n,
+#endif
                 {
                     dstFab(i,j,k,n+dstcomp) /= srcFab(i,j,k,n+srccomp);
                 });
@@ -1277,7 +1289,11 @@ Abs (FabArray<FAB>& fa, int icomp, int numcomp, const IntVect& nghost)
             if (bx.ok())
             {
                 auto const& fab = fa.array(mfi);
+#if defined(AMREX_USE_GPU) && defined(_WIN32)
+                amrex::ParallelFor(bx, numcomp, [=] AMREX_GPU_DEVICE (int i, int j, int k, int n)
+#else
                 AMREX_HOST_DEVICE_PARALLEL_FOR_4D( bx, numcomp, i, j, k, n,
+#endif
                 {
                     fab(i,j,k,n+icomp) = std::abs(fab(i,j,k,n+icomp));
                 });
@@ -1364,7 +1380,11 @@ OverrideSync_nowait (FabArray<FAB> & fa, FabArray<IFAB> const& msk, const Period
             const Box& bx = mfi.tilebox();
             auto fab = fa.array(mfi);
             auto const ifab = msk.array(mfi);
+#if defined(AMREX_USE_GPU) && defined(_WIN32)
+            amrex::ParallelFor(bx, ncomp, [=] AMREX_GPU_DEVICE (int i, int j, int k, int n)
+#else
             AMREX_HOST_DEVICE_PARALLEL_FOR_4D( bx, ncomp, i, j, k, n,
+#endif
             {
                 if (!ifab(i,j,k)) { fab(i,j,k,n) = 0; }
             });

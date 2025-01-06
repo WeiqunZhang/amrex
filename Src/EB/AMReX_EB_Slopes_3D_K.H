@@ -7,6 +7,10 @@
 #include <AMReX_EBFArrayBox.H>
 #include <AMReX_EBCellFlag.H>
 
+#if defined(_WIN32) && defined(small)
+#undef small
+#endif
+
 // amrex_calc_slopes_eb calculates the slope in each coordinate direction using a
 // least squares linear fit to the 26 nearest neighbors, with the function
 // going through the centroid of cell(i,j,k).  This does not assume that the cell centroids,

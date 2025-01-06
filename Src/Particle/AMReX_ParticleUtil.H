@@ -17,6 +17,10 @@
 
 #include <limits>
 
+#if defined(_WIN32) && defined(small)
+#undef small
+#endif
+
 namespace amrex {
 
 /**

@@ -1,6 +1,10 @@
 #ifndef AMREX_EB_STATE_REDIST_SLOPE_LIMITER_K_H_
 #define AMREX_EB_STATE_REDIST_SLOPE_LIMITER_K_H_
 
+#if defined(_WIN32) && defined(small)
+#undef small
+#endif
+
 namespace amrex {
 
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE

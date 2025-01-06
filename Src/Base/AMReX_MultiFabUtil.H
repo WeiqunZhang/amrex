@@ -251,7 +251,11 @@ namespace amrex
             const Long n = mfi.fabbox().numPts() * mf_in.nComp();
             auto      * pdst = mf_out[mfi].dataPtr();
             auto const* psrc = mf_in [mfi].dataPtr();
+#if defined(AMREX_USE_GPU) && defined(_WIN32)
+            amrex::ParallelFor(n, [=] AMREX_GPU_DEVICE (Long i)
+#else
             AMREX_HOST_DEVICE_PARALLEL_FOR_1D ( n, i,
+#endif
             {
                 pdst[i] = static_cast<typename U::value_type>(psrc[i]); // NOLINT(bugprone-signed-char-misuse)
             });
@@ -576,12 +580,20 @@ void average_down (const FabArray<FAB>& S_fine, FabArray<FAB>& S_crse,
                 Array4<value_type const> const& finearr = S_fine.const_array(mfi);
 
                 if (is_cell_centered) {
+#if defined(AMREX_USE_GPU) && defined(_WIN32)
+                    amrex::ParallelFor(bx, ncomp, [=] AMREX_GPU_DEVICE (int i, int j, int k, int n)
+#else
                     AMREX_HOST_DEVICE_PARALLEL_FOR_4D(bx, ncomp, i, j, k, n,
+#endif
                                                       {
                                                           amrex_avgdown(i,j,k,n,crsearr,finearr,scomp,scomp,ratio);
                                                       });
                 } else {
+#if defined(AMREX_USE_GPU) && defined(_WIN32)
+                    amrex::ParallelFor(bx, ncomp, [=] AMREX_GPU_DEVICE (int i, int j, int k, int n)
+#else
                     AMREX_HOST_DEVICE_PARALLEL_FOR_4D(bx, ncomp, i, j, k, n,
+#endif
                                                       {
                                                           amrex_avgdown_nodes(i,j,k,n,crsearr,finearr,scomp,scomp,ratio);
                                                       });
@@ -631,12 +643,20 @@ void average_down (const FabArray<FAB>& S_fine, FabArray<FAB>& S_crse,
                 //        not part of the actual crse multifab which came in.
 
                 if (is_cell_centered) {
+#if defined(AMREX_USE_GPU) && defined(_WIN32)
+                    amrex::ParallelFor(bx, ncomp, [=] AMREX_GPU_DEVICE (int i, int j, int k, int n)
+#else
                     AMREX_HOST_DEVICE_PARALLEL_FOR_4D(bx, ncomp, i, j, k, n,
+#endif
                                                       {
                                                           amrex_avgdown(i,j,k,n,crsearr,finearr,0,scomp,ratio);
                                                       });
                 } else {
+#if defined(AMREX_USE_GPU) && defined(_WIN32)
+                    amrex::ParallelFor(bx, ncomp, [=] AMREX_GPU_DEVICE (int i, int j, int k, int n)
+#else
                     AMREX_HOST_DEVICE_PARALLEL_FOR_4D(bx, ncomp, i, j, k, n,
+#endif
                                                       {
                                                           amrex_avgdown_nodes(i,j,k,n,crsearr,finearr,0,scomp,ratio);
                                                       });
@@ -831,14 +851,22 @@ void average_face_to_cellcenter (CMF& cc, int dcomp,
                          auto const& fzarr = fc[2]->const_array(mfi););
 
 #if (AMREX_SPACEDIM == 1)
+#if defined(AMREX_USE_GPU) && defined(_WIN32)
+            amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE (int i, int j, int k)
+#else
             AMREX_HOST_DEVICE_PARALLEL_FOR_3D( bx, i, j, k,
+#endif
             {
                 GeometryData gd;
                 gd.coord = 0;
                 amrex_avg_fc_to_cc(i,j,k, ccarr, fxarr, dcomp, gd);
             });
 #else
+#if defined(AMREX_USE_GPU) && defined(_WIN32)
+            amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE (int i, int j, int k)
+#else
             AMREX_HOST_DEVICE_PARALLEL_FOR_3D( bx, i, j, k,
+#endif
             {
                 amrex_avg_fc_to_cc(i,j,k, ccarr, AMREX_D_DECL(fxarr,fyarr,fzarr), dcomp);
             });
@@ -929,7 +957,11 @@ void average_down_faces (const FabArray<FAB>& fine, FabArray<FAB>& crse,
                 const Box& bx = mfi.growntilebox(ngcrse);
                 auto const& crsearr = crse.array(mfi);
                 auto const& finearr = fine.const_array(mfi);
+#if defined(AMREX_USE_GPU) && defined(_WIN32)
+                amrex::ParallelFor(bx, ncomp, [=] AMREX_GPU_DEVICE (int i, int j, int k, int n)
+#else
                 AMREX_HOST_DEVICE_PARALLEL_FOR_4D(bx, ncomp, i, j, k, n,
+#endif
                 {
                     amrex_avgdown_faces(i,j,k,n, crsearr, finearr, 0, 0, ratio, dir);
                 });
