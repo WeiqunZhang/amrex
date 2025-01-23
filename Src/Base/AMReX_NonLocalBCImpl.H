@@ -550,11 +550,7 @@ Rotate90 (FabArray<FAB>& mf, int scomp, int ncomp, IntVect const& nghost, Box co
         Box const& bx = corner & mfi.fabbox();
         if (bx.ok()) {
             auto const& fab = mf.array(mfi);
-#if defined(AMREX_USE_GPU) && defined(_WIN32)
-            amrex::ParallelFor(bx, ncomp, [=] AMREX_GPU_DEVICE (int i, int j, int k, int n)
-#else
             AMREX_HOST_DEVICE_PARALLEL_FOR_4D(bx,ncomp,i,j,k,n,
-#endif
             {
                 fab(i,j,k,n) = fab(-i-1,-j-1,k,n);
             });

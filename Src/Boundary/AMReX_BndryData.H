@@ -295,11 +295,7 @@ BndryDataT<MF>::setValue (Orientation face, int n, Real val) noexcept
     auto arr = fab.array();
     const Box& bx = fab.box();
     const int ncomp = m_ncomp;
-#if defined(AMREX_USE_GPU) && defined(_WIN32)
-    amrex::ParallelFor(bx, ncomp, [=] AMREX_GPU_DEVICE (int i, int j, int k, int m)
-#else
     AMREX_HOST_DEVICE_PARALLEL_FOR_4D ( bx, ncomp, i, j, k, m,
-#endif
     {
         arr(i,j,k,m) = val;
     });

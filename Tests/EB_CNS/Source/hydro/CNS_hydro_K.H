@@ -6,10 +6,6 @@
 #include <AMReX_FArrayBox.H>
 #include <cmath>
 
-#if defined(_WIN32) && defined(small)
-#undef small
-#endif
-
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE
 void
 cns_ctoprim (int i, int j, int k,
@@ -244,7 +240,7 @@ riemann (const amrex::Real gamma, const amrex::Real smallp, const amrex::Real /*
 #endif
 
     constexpr Real weakwv = Real(1.e-3);
-    constexpr Real small = Real(1.e-6);
+    constexpr Real sml = Real(1.e-6);
 
     Real clsql = gamma*pl*rl;
     Real clsqr = gamma*pr*rr;
@@ -252,7 +248,7 @@ riemann (const amrex::Real gamma, const amrex::Real smallp, const amrex::Real /*
     Real wr = std::sqrt(clsqr);
     Real cleft = wl/rl;
     Real cright = wr/rr;
-    Real ccsmall = small*(cleft+cright);
+    Real ccsmall = sml*(cleft+cright);
 
     Real pstar = (wl*pr + wr*pl - wr*wl*(ur-ul))/(wl+wr);
     pstar = amrex::max(pstar,smallp);

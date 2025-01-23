@@ -2,10 +2,6 @@
 #define AMREX_EB_FLUXREGISTER_3D_C_H_
 #include <AMReX_Config.H>
 
-#if defined(_WIN32) && defined(small)
-#undef small
-#endif
-
 namespace amrex {
 
 AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
@@ -61,7 +57,7 @@ void eb_flux_reg_crseadd_va(int i, int j, int k, Array4<Real> const& d,
 
 AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
 Real eb_flux_reg_cvol (int i, int j, int k, Array4<Real const> const& vfrac,
-                       Dim3 const& ratio, Real small) noexcept
+                       Dim3 const& ratio, Real sml) noexcept
 {
     Real cvol = Real(0.0);
     for         (int kk = k*ratio.z; kk < (k+1)*ratio.z; ++kk) {
@@ -71,7 +67,7 @@ Real eb_flux_reg_cvol (int i, int j, int k, Array4<Real const> const& vfrac,
             }
         }
     }
-    return (cvol > small) ? Real(1.0)/cvol : Real(0.0);
+    return (cvol > sml) ? Real(1.0)/cvol : Real(0.0);
 }
 
 AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE

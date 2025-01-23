@@ -147,11 +147,7 @@ InterpBndryDataT<MF>::setPhysBndryValues (const MF& mf, int mf_start, int bnd_st
                 auto const& bnd_array = bnd_fab.array();
                 auto const& src_array = src_fab.const_array();
                 const Box& b = src_fab.box() & bnd_fab.box();
-#if defined(AMREX_USE_GPU) && defined(_WIN32)
-                amrex::ParallelFor(b, num_comp, [=] AMREX_GPU_DEVICE (int i, int j, int k, int n)
-#else
                 AMREX_HOST_DEVICE_PARALLEL_FOR_4D ( b, num_comp, i, j, k, n,
-#endif
                 {
                     bnd_array(i,j,k,n+bnd_start) = src_array(i,j,k,n+mf_start);
                 });
@@ -192,11 +188,7 @@ InterpBndryDataT<MF>::setBndryValues (BndryRegisterT<MF> const& crse, int c_star
 
                     if (max_order == 1)
                     {
-#if defined(AMREX_USE_GPU) && defined(_WIN32)
-                        amrex::ParallelFor(b, num_comp, [=] AMREX_GPU_DEVICE (int it, int jt, int kt, int n)
-#else
                         AMREX_HOST_DEVICE_FOR_4D ( b, num_comp, it, jt, kt, n,
-#endif
                         {
                             interpbndrydata_o1(it,jt,kt,n,bdry_array,bnd_start,
                                                crse_array,c_start,rr);
@@ -209,11 +201,7 @@ InterpBndryDataT<MF>::setBndryValues (BndryRegisterT<MF> const& crse, int c_star
                         switch (dir) {
                         case 0:
                         {
-#if defined(AMREX_USE_GPU) && defined(_WIN32)
-                            amrex::ParallelFor(b, num_comp, [=] AMREX_GPU_DEVICE (int it, int jt, int kt, int n)
-#else
                             AMREX_HOST_DEVICE_FOR_4D ( b, num_comp, it, jt, kt, n,
-#endif
                             {
                                 interpbndrydata_x_o3(it,jt,kt,n,bdry_array,bnd_start,
                                                      crse_array,c_start,rr,
@@ -224,11 +212,7 @@ InterpBndryDataT<MF>::setBndryValues (BndryRegisterT<MF> const& crse, int c_star
 #if (AMREX_SPACEDIM >= 2)
                         case 1:
                         {
-#if defined(AMREX_USE_GPU) && defined(_WIN32)
-                            amrex::ParallelFor(b, num_comp, [=] AMREX_GPU_DEVICE (int it, int jt, int kt, int n)
-#else
                             AMREX_HOST_DEVICE_FOR_4D ( b, num_comp, it, jt, kt, n,
-#endif
                             {
                                 interpbndrydata_y_o3(it,jt,kt,n,bdry_array,bnd_start,
                                                      crse_array,c_start,rr,
@@ -239,11 +223,7 @@ InterpBndryDataT<MF>::setBndryValues (BndryRegisterT<MF> const& crse, int c_star
 #if (AMREX_SPACEDIM == 3)
                         case 2:
                         {
-#if defined(AMREX_USE_GPU) && defined(_WIN32)
-                            amrex::ParallelFor(b, num_comp, [=] AMREX_GPU_DEVICE (int it, int jt, int kt, int n)
-#else
                             AMREX_HOST_DEVICE_FOR_4D ( b, num_comp, it, jt, kt, n,
-#endif
                             {
                                 interpbndrydata_z_o3(it,jt,kt,n,bdry_array,bnd_start,
                                                      crse_array,c_start,rr,
@@ -264,11 +244,7 @@ InterpBndryDataT<MF>::setBndryValues (BndryRegisterT<MF> const& crse, int c_star
                     auto const& bnd_array = bnd_fab.array();
                     auto const& src_array = src_fab.const_array();
                     const Box& b = bnd_fab.box() & src_fab.box();
-#if defined(AMREX_USE_GPU) && defined(_WIN32)
-                    amrex::ParallelFor(b, num_comp, [=] AMREX_GPU_DEVICE (int ii, int jj, int kk, int nn)
-#else
                     AMREX_HOST_DEVICE_FOR_4D ( b, num_comp, ii, jj, kk, nn,
-#endif
                     {
                         bnd_array(ii,jj,kk,nn+bnd_start) = src_array(ii,jj,kk,nn+f_start);
                     });

@@ -7,10 +7,6 @@
 #include <AMReX_EBFArrayBox.H>
 #include <AMReX_EBCellFlag.H>
 
-#if defined(_WIN32) && defined(small)
-#undef small
-#endif
-
 // amrex_calc_slopes_eb calculates the slope in each coordinate direction using a
 // least squares linear fit to the 8 nearest neighbors, with the function
 // going through the centroid of cell(i,j,k).  This does not assume that the cell centroids,
@@ -670,11 +666,11 @@ amrex_calc_alpha_stencil(amrex::Real q_hat, amrex::Real q_max,
     using namespace amrex::literals;
 
     auto alpha_temp = 0.0_rt;
-    auto small  = 1.0e-13_rt;
+    auto sml  = 1.0e-13_rt;
 
-    if ((q_hat-state) > small) {
+    if ((q_hat-state) > sml) {
         alpha_temp = amrex::min(1.0_rt,(q_max-state)/(q_hat-state));
-    } else if ((q_hat-state) < -small) {
+    } else if ((q_hat-state) < -sml) {
         alpha_temp = amrex::min(1.0_rt,(q_min-state)/(q_hat-state));
     } else {
         alpha_temp = 1.0_rt;

@@ -167,10 +167,10 @@ jobs:
               -DAMReX_GPU_BACKEND=CUDA            `
               -DAMReX_CUDA_ARCH="8.0"             `
               -DAMReX_ENABLE_TESTS=ON             `
-              -DAMReX_EB=OFF                      `
-              -DAMReX_FFT=OFF                     `
-              -DAMReX_LINEAR_SOLVERS=OFF          `
-              -DAMReX_PARTICLES=OFF               `
+              -DAMReX_EB=ON                       `
+              -DAMReX_FFT=ON                      `
+              -DAMReX_LINEAR_SOLVERS=ON           `
+              -DAMReX_PARTICLES=ON                `
               -DAMReX_FORTRAN=OFF                 `
               -DAMReX_MPI=OFF
         cmake --build build --config Release -j 4

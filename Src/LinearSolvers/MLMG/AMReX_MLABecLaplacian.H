@@ -539,11 +539,7 @@ void applyRobinBCTermsCoeffs (LP& linop)
                     {
                         if (idim == 0) {
                             RT fac = bovera*dxi*dxi;
-#if defined(AMREX_USE_GPU) && defined(_WIN32)
-                            amrex::ParallelFor(blo, [=] AMREX_GPU_DEVICE (int i, int j, int k)
-#else
                             AMREX_HOST_DEVICE_FOR_3D(blo, i, j, k,
-#endif
                             {
                                 RT B = (rbc(i,j,k,1)*dxi - rbc(i,j,k,0)*RT(0.5))
                                   /    (rbc(i,j,k,1)*dxi + rbc(i,j,k,0)*RT(0.5));
@@ -551,11 +547,7 @@ void applyRobinBCTermsCoeffs (LP& linop)
                             });
                         } else if (idim == 1) {
                             RT fac = bovera*dyi*dyi;
-#if defined(AMREX_USE_GPU) && defined(_WIN32)
-                            amrex::ParallelFor(blo, [=] AMREX_GPU_DEVICE (int i, int j, int k)
-#else
                             AMREX_HOST_DEVICE_FOR_3D(blo, i, j, k,
-#endif
                             {
                                 RT B = (rbc(i,j,k,1)*dyi - rbc(i,j,k,0)*RT(0.5))
                                   /    (rbc(i,j,k,1)*dyi + rbc(i,j,k,0)*RT(0.5));
@@ -563,11 +555,7 @@ void applyRobinBCTermsCoeffs (LP& linop)
                             });
                         } else {
                             RT fac = bovera*dzi*dzi;
-#if defined(AMREX_USE_GPU) && defined(_WIN32)
-                            amrex::ParallelFor(blo, [=] AMREX_GPU_DEVICE (int i, int j, int k)
-#else
                             AMREX_HOST_DEVICE_FOR_3D(blo, i, j, k,
-#endif
                             {
                                 RT B = (rbc(i,j,k,1)*dzi - rbc(i,j,k,0)*RT(0.5))
                                   /    (rbc(i,j,k,1)*dzi + rbc(i,j,k,0)*RT(0.5));
@@ -579,11 +567,7 @@ void applyRobinBCTermsCoeffs (LP& linop)
                     {
                         if (idim == 0) {
                             RT fac = bovera*dxi*dxi;
-#if defined(AMREX_USE_GPU) && defined(_WIN32)
-                            amrex::ParallelFor(bhi, [=] AMREX_GPU_DEVICE (int i, int j, int k)
-#else
                             AMREX_HOST_DEVICE_FOR_3D(bhi, i, j, k,
-#endif
                             {
                                 RT B = (rbc(i,j,k,1)*dxi - rbc(i,j,k,0)*RT(0.5))
                                   /    (rbc(i,j,k,1)*dxi + rbc(i,j,k,0)*RT(0.5));
@@ -591,11 +575,7 @@ void applyRobinBCTermsCoeffs (LP& linop)
                             });
                         } else if (idim == 1) {
                             RT fac = bovera*dyi*dyi;
-#if defined(AMREX_USE_GPU) && defined(_WIN32)
-                            amrex::ParallelFor(bhi, [=] AMREX_GPU_DEVICE (int i, int j, int k)
-#else
                             AMREX_HOST_DEVICE_FOR_3D(bhi, i, j, k,
-#endif
                             {
                                 RT B = (rbc(i,j,k,1)*dyi - rbc(i,j,k,0)*RT(0.5))
                                   /    (rbc(i,j,k,1)*dyi + rbc(i,j,k,0)*RT(0.5));
@@ -603,11 +583,7 @@ void applyRobinBCTermsCoeffs (LP& linop)
                             });
                         } else {
                             RT fac = bovera*dzi*dzi;
-#if defined(AMREX_USE_GPU) && defined(_WIN32)
-                            amrex::ParallelFor(bhi, [=] AMREX_GPU_DEVICE (int i, int j, int k)
-#else
                             AMREX_HOST_DEVICE_FOR_3D(bhi, i, j, k,
-#endif
                             {
                                 RT B = (rbc(i,j,k,1)*dzi - rbc(i,j,k,0)*RT(0.5))
                                   /    (rbc(i,j,k,1)*dzi + rbc(i,j,k,0)*RT(0.5));
@@ -861,21 +837,13 @@ MLABecLaplacianT<MF>::Fapply (int amrlev, int mglev, MF& out, const MF& in) cons
                          const auto& bzfab = bzcoef.array(mfi););
             if (this->m_overset_mask[amrlev][mglev]) {
                 const auto& osm = this->m_overset_mask[amrlev][mglev]->const_array(mfi);
-#if defined(AMREX_USE_GPU) && defined(_WIN32)
-                amrex::ParallelFor(bx, ncomp, [=] AMREX_GPU_DEVICE (int i, int j, int k, int n)
-#else
                 AMREX_HOST_DEVICE_PARALLEL_FOR_4D(bx, ncomp, i, j, k, n,
-#endif
                 {
                     mlabeclap_adotx_os(i,j,k,n, yfab, xfab, afab, AMREX_D_DECL(bxfab,byfab,bzfab),
                                        osm, dxinv, ascalar, bscalar);
                 });
             } else {
-#if defined(AMREX_USE_GPU) && defined(_WIN32)
-                amrex::ParallelFor(bx, ncomp, [=] AMREX_GPU_DEVICE (int i, int j, int k, int n)
-#else
                 AMREX_HOST_DEVICE_PARALLEL_FOR_4D(bx, ncomp, i, j, k, n,
-#endif
                 {
                     mlabeclap_adotx(i,j,k,n, yfab, xfab, afab, AMREX_D_DECL(bxfab,byfab,bzfab),
                                     dxinv, ascalar, bscalar);
@@ -1297,11 +1265,7 @@ MLABecLaplacianT<MF>::normalize (int amrlev, int mglev, MF& mf) const
                          const auto& byfab = bycoef.array(mfi);,
                          const auto& bzfab = bzcoef.array(mfi););
 
-#if defined(AMREX_USE_GPU) && defined(_WIN32)
-                amrex::ParallelFor(bx, ncomp, [=] AMREX_GPU_DEVICE (int i, int j, int k, int n)
-#else
             AMREX_HOST_DEVICE_PARALLEL_FOR_4D(bx, ncomp, i, j, k, n,
-#endif
             {
                 mlabeclap_normalize(i,j,k,n, fab, afab, AMREX_D_DECL(bxfab,byfab,bzfab),
                                     dxinv, ascalar, bscalar);
@@ -1409,11 +1373,7 @@ MLABecLaplacianT<MF>::makeNLinOp (int /*grid_size*/) const
             auto const& a = alpha.array(mfi);
             auto const& abot = alpha_bottom.const_array(mfi);
             auto const& m = osm_bottom.const_array(mfi);
-#if defined(AMREX_USE_GPU) && defined(_WIN32)
-            amrex::ParallelFor(bx, ncomp, [=] AMREX_GPU_DEVICE (int i, int j, int k, int n)
-#else
             AMREX_HOST_DEVICE_PARALLEL_FOR_4D(bx, ncomp, i, j, k, n,
-#endif
             {
                 if (m(i,j,k)) {
                     a(i,j,k,n) = abot(i,j,k,n);
@@ -1464,11 +1424,7 @@ MLABecLaplacianT<MF>::copyNSolveSolution (MF& dst, MF const& src) const
             auto const& dfab = dst.array(mfi);
             auto const& sfab = src.const_array(mfi);
             auto const& m = this->m_overset_mask[0].back()->const_array(mfi);
-#if defined(AMREX_USE_GPU) && defined(_WIN32)
-            amrex::ParallelFor(bx, ncomp, [=] AMREX_GPU_DEVICE (int i, int j, int k, int n)
-#else
             AMREX_HOST_DEVICE_PARALLEL_FOR_4D(bx, ncomp, i, j, k, n,
-#endif
             {
                 if (m(i,j,k)) {
                     dfab(i,j,k,n) = sfab(i,j,k,n);

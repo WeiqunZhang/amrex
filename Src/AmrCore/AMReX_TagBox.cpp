@@ -43,11 +43,7 @@ TagBox::coarsen (const IntVect& ratio, const Box& cbox) noexcept
     Dim3 r{1,1,1};
     AMREX_D_TERM(r.x = ratio[0];, r.y = ratio[1];, r.z = ratio[2]);
 
-#if defined(AMREX_USE_GPU) && defined(_WIN32)
-    amrex::ParallelFor(cbox, [=] AMREX_GPU_DEVICE (int i, int j, int k)
-#else
     AMREX_HOST_DEVICE_FOR_3D(cbox, i, j, k,
-#endif
     {
         TagType t = TagBox::CLEAR;
         for (int koff = 0; koff < r.z; ++koff) {
@@ -87,11 +83,7 @@ TagBox::buffer (const IntVect& a_nbuff, const IntVect& a_nwid) noexcept
         Box const& interiorplusbuf = amrex::grow(interior, a_nbuff);
         const auto lo = amrex::lbound(interiorplusbuf);
         const auto hi = amrex::ubound(interiorplusbuf);
-#if defined(AMREX_USE_GPU) && defined(_WIN32)
-        amrex::ParallelFor(interiorplusbuf, [=] AMREX_GPU_DEVICE (int i, int j, int k)
-#else
         AMREX_HOST_DEVICE_FOR_3D(interiorplusbuf, i, j, k,
-#endif
         {
             if (a(i,j,k) == TagBox::CLEAR) {
                 bool to_buf = false;
