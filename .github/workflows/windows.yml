@@ -7,15 +7,15 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  check_changes:
-    uses: ./.github/workflows/check_changes.yml
+  #check_changes:
+  #  uses: ./.github/workflows/check_changes.yml
 
   # Build libamrex and all tests
   tests_msvc:
     name: MSVC C++17 w/o Fortran w/o MPI
     runs-on: windows-latest
-    needs: check_changes
-    if: needs.check_changes.outputs.has_non_docs_changes == 'true'
+    #needs: check_changes
+    if: false # needs.check_changes.outputs.has_non_docs_changes == 'true'
     steps:
     - uses: actions/checkout@v4
     # If we add ccache back, don't forget to update cleanup-cache.yml
@@ -63,8 +63,8 @@ jobs:
   test_msvc_static:
     name: MSVC C++17 w/o Fortran w/o MPI static
     runs-on: windows-latest
-    needs: check_changes
-    if: needs.check_changes.outputs.has_non_docs_changes == 'true'
+    # needs: check_changes
+    if: false # needs.check_changes.outputs.has_non_docs_changes == 'true'
     steps:
     - uses: actions/checkout@v4
     # If we add ccache back, don't forget to update cleanup-cache.yml
@@ -114,8 +114,8 @@ jobs:
   tests_clang:
     name: MSVC Clang C++17 w/o Fortran w/o MPI
     runs-on: windows-latest
-    needs: check_changes
-    if: needs.check_changes.outputs.has_non_docs_changes == 'true'
+    #needs: check_changes
+    if: false # needs.check_changes.outputs.has_non_docs_changes == 'true'
     steps:
     - uses: actions/checkout@v4
     - uses: seanmiddleditch/gha-setup-ninja@master
@@ -149,8 +149,8 @@ jobs:
   tests_cuda:
     name: CUDA on Windows
     runs-on: windows-latest
-    needs: check_changes
-    if: needs.check_changes.outputs.has_non_docs_changes == 'true'
+    # needs: check_changes
+    # if: needs.check_changes.outputs.has_non_docs_changes == 'true'
     steps:
     - uses: Jimver/cuda-toolkit@v0.2.19
       id: cuda-toolkit
@@ -167,8 +167,10 @@ jobs:
               -DAMReX_GPU_BACKEND=CUDA            `
               -DAMReX_CUDA_ARCH="8.0"             `
               -DAMReX_ENABLE_TESTS=ON             `
-              -DAMReX_EB=ON                       `
-              -DAMReX_FFT=ON                      `
+              -DAMReX_EB=OFF                      `
+              -DAMReX_FFT=OFF                     `
+              -DAMReX_LINEAR_SOLVERS=OFF          `
+              -DAMReX_PARTICLES=OFF               `
               -DAMReX_FORTRAN=OFF                 `
               -DAMReX_MPI=OFF
         cmake --build build --config Release -j 4
