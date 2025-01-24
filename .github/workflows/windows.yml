@@ -158,10 +158,26 @@ jobs:
         cuda: '12.6.1'
         use-github-cache: 'false'
     - uses: actions/checkout@v4
-    - name: Set Up sccache
-      uses: mozilla-actions/sccache-action@v0.0.7
+    - name: Set Up Cache
+      uses: actions/cache@v4
+      with:
+        path: ~\AppData\Local\Mozilla\sccache
+        key: ccache-${{ github.workflow }}-${{ github.job }}-git-${{ github.sha }}
+        restore-keys: |
+             ccache-${{ github.workflow }}-${{ github.job }}-git-
+    - name: Install sccache
+      run: |
+        curl -L https://github.com/mozilla/sccache/releases/download/v0.9.1/sccache-v0.9.1-x86_64-pc-windows-msvc.tar.gz | tar xz
+        echo "$PWD/sccache-v0.9.1-x86_64-pc-windows-msvc" >> $GITHUB_PATH
+        echo "SCCACHE_DIR=~\AppData\Local\Mozilla\sccache" >> $GITHUB_ENV
+        echo "SCCACHE_CACHE_SIZE=800M" >> $GITHUB_ENV
+        echo "SCCACHE_COMPRESS=true" >> $GITHUB_ENV
+        echo "SCCACHE_CACHE_ZSTD_LEVEL=10" >> $GITHUB_ENV
+        #echo "SCCACHE_GHA_ENABLED=true" >> $GITHUB_ENV
     - name: Compile
       run: |
+        sscache --show-config
+        sscache --zero-stats
         cmake -S . -B build                       `
               -DCMAKE_VERBOSE_MAKEFILE=ON         `
               -DCMAKE_BUILD_TYPE=Release          `
@@ -175,8 +191,9 @@ jobs:
               -DAMReX_FORTRAN=OFF                 `
               -DAMReX_MPI=OFF                     `
               -DCMAKE_CUDA_COMPILER_LAUNCHER=sccache `
-              -DCMAKE_CXX_COMPILER_LAUNCHER=sccache
+              -DCMAKE_CXX_COMPILER_LAUNCHER=sccache  `
+              -DCMAKE_MSVC_DEBUG_INFORMATION_FORMAT=Embedded `
+              -DCMAKE_POLICY_CMP0141=NEW
         cmake --build build --config Release -j 4
         cmake --build build --config Release --target install
-
         sccache --show-stats
