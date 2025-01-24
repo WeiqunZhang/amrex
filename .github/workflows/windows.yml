@@ -158,29 +158,10 @@ jobs:
         cuda: '12.6.1'
         use-github-cache: 'false'
     - uses: actions/checkout@v4
-    - name: Set Up Cache
-      uses: actions/cache@v4
-      with:
-        path: ~/.ccache
-        key: ccache-${{ github.workflow }}-${{ github.job }}-git-${{ github.sha }}
-        restore-keys: |
-             ccache-${{ github.workflow }}-${{ github.job }}-git-
-    - name: Install Ccache
-      run: |
-        Invoke-WebRequest https://github.com/ccache/ccache/releases/download/v4.10.2/ccache-4.10.2-windows-x86_64.zip -OutFile ccache-4.10.2-windows-x86_64.zip
-        Expand-Archive ccache-4.10.2-windows-x86_64.zip
+    - name: Set Up sccache
+      uses: mozilla-actions/sccache-action@v0.0.7
     - name: Compile
       run: |
-        $ccachepath = Join-Path $pwd "ccache-4.10.2-windows-x86_64"
-        $Env:PATH += ";$ccachepath"
-        $ccachecachedir = Join-Path $HOME ".ccache"
-        $Env:CCACHE_DIR="$ccachecachedir"
-        $Env:CCACHE_DIR
-        $Env:CCACHE_COMPRESS='1'
-        $Env:CCACHE_COMPRESSLEVEL='10'
-        $Env:CCACHE_MAXSIZE='900M'
-        ccache -z
-
         cmake -S . -B build                       `
               -DCMAKE_VERBOSE_MAKEFILE=ON         `
               -DCMAKE_BUILD_TYPE=Release          `
@@ -193,9 +174,9 @@ jobs:
               -DAMReX_PARTICLES=ON                `
               -DAMReX_FORTRAN=OFF                 `
               -DAMReX_MPI=OFF                     `
-              -DCMAKE_CUDA_COMPILER_LAUNCHER=ccache `
-              -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
+              -DCMAKE_CUDA_COMPILER_LAUNCHER=sccache `
+              -DCMAKE_CXX_COMPILER_LAUNCHER=sccache
         cmake --build build --config Release -j 4
         cmake --build build --config Release --target install
 
-        ccache -s
+        sccache --show-stats
