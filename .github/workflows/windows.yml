@@ -203,8 +203,8 @@ jobs:
               -DAMReX_MPI=OFF                     `
               -DCMAKE_CXX_COMPILER=cl             `
               -DCMAKE_CUDA_COMPILER=nvcc          `
-              -DCMAKE_CUDA_COMPILER_LAUNCHER=sccache `
               -DCMAKE_CXX_COMPILER_LAUNCHER=sccache  `
+              -DCMAKE_CUDA_COMPILER_LAUNCHER=sccache `
               -DCMAKE_MSVC_DEBUG_INFORMATION_FORMAT=Embedded
         # Sometimes cmake fails, but powershell continues to run
         if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
