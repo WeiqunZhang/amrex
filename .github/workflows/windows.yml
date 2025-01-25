@@ -176,8 +176,8 @@ jobs:
         #echo "SCCACHE_GHA_ENABLED=true" >> $GITHUB_ENV
     - name: Compile
       run: |
-        sscache --show-config
-        sscache --zero-stats
+        sccache --show-config
+        sccache --zero-stats
         cmake -S . -B build                       `
               -DCMAKE_VERBOSE_MAKEFILE=ON         `
               -DCMAKE_BUILD_TYPE=Release          `
