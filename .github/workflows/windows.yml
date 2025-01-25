@@ -169,12 +169,12 @@ jobs:
         $cuda_ver_major_minor = $major_minor_patch[0..1] -join '.'
         curl.exe -L -o cuda_installer.exe https://developer.download.nvidia.com/compute/cuda/${cuda_ver_full}/network_installers/cuda_${cuda_ver_full}_windows_network.exe
         .\cuda_installer.exe -s nvcc_${cuda_ver_major_minor} `
-                             cudart_${cuda_ver_major_minor} `
-                          cufft_dev_${cuda_ver_major_minor} `
-                       cusparse_dev_${cuda_ver_major_minor} `
-                         curand_dev_${cuda_ver_major_minor}
+                              cudart_${cuda_ver_major_minor} `
+                           cufft_dev_${cuda_ver_major_minor} `
+                        cusparse_dev_${cuda_ver_major_minor} `
+                          curand_dev_${cuda_ver_major_minor}
         "CUDA_PATH=C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v${cuda_ver_major_minor}" | Out-File -FilePath $env:GITHUB_ENV -Append
-        echo "C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v${cuda_ver_major_minor}\bin" >> $env:GITHUB_PATH
+        echo "C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v${cuda_ver_major_minor}\bin" | Out-File -FilePath $env:GITHUB_PATH -Append
     - name: Install sccache
       run: |
         curl.exe -L -o sccache.zip https://github.com/mozilla/sccache/releases/download/v0.9.1/sccache-v0.9.1-x86_64-pc-windows-msvc.zip
