@@ -161,17 +161,17 @@ jobs:
     - uses: actions/checkout@v4
     - name: Intall CUDA Tookit
       run: |
-        $cuda_version = "12.6.1"
-        $words = $cuda_version.Split('.')
-        $cuda_version_2 = $words[0..1] -joing '.' # e.g., 12.6
-        curl.exe -L -o cuda_installer.exe https://developer.download.nvidia.com/compute/cuda/${cuda_version}/network_installers/cuda_${cuda_version}_windows_network.exe
-        cuda_installer.exe -s nvcc_${cuda_version_2} `
-                            cudart_${cuda_version_2} `
-                         cufft_dev_${cuda_version_2} `
-                      cusparse_dev_${cuda_version_2} `
-                        curand_dev_${cuda_version_2}
-        "CUDA_PATH=C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v${cuda_version_2}" | Out-File -FilePath $env:GITHUB_ENV -Append
-        echo "C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v${cuda_version_2}\bin" >> $env:GITHUB_PATH
+        $cuda_ver_full = "12.6.1"
+        $major_minor_patch = $cuda_ver_full.Split('.')
+        $cuda_ver_major_minor = $major_minor_patch[0..1] -join '.'
+        curl.exe -L -o cuda_installer.exe https://developer.download.nvidia.com/compute/cuda/${cuda_ver_full}/network_installers/cuda_${cuda_ver_full}_windows_network.exe
+        cuda_installer.exe -s nvcc_${cuda_ver_major_minor} `
+                            cudart_${cuda_ver_major_minor} `
+                         cufft_dev_${cuda_ver_major_minor} `
+                      cusparse_dev_${cuda_ver_major_minor} `
+                        curand_dev_${cuda_ver_major_minor}
+        "CUDA_PATH=C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v${cuda_ver_major_minor}" | Out-File -FilePath $env:GITHUB_ENV -Append
+        echo "C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v${cuda_ver_major_minor}\bin" >> $env:GITHUB_PATH
     - name: Set Up Cache
       uses: actions/cache@v4
       with:
