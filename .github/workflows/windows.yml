@@ -214,6 +214,10 @@ jobs:
               -DCMAKE_CUDA_COMPILER_LAUNCHER=sccache `
               -DCMAKE_CXX_COMPILER_LAUNCHER=sccache  `
               -DCMAKE_MSVC_DEBUG_INFORMATION_FORMAT=Embedded
+        # Sometimes cmake fails, but powershell continues to run
+        if ($LASTEXITCODE -ne 0) {
+           exit $LASTEXITCODE
+        }
         cmake --build build --config Release -j 4
         cmake --build build --config Release --target install
         sccache --show-stats
