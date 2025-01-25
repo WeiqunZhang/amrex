@@ -180,7 +180,6 @@ jobs:
     - name: Compile
       run: |
         Get-Command sccache -ErrorAction Stop
-        sccache --show-config
         sccache --zero-stats
         cmake -S . -B build                       `
               -DCMAKE_VERBOSE_MAKEFILE=ON         `
@@ -196,8 +195,7 @@ jobs:
               -DAMReX_MPI=OFF                     `
               -DCMAKE_CUDA_COMPILER_LAUNCHER=sccache `
               -DCMAKE_CXX_COMPILER_LAUNCHER=sccache  `
-              -DCMAKE_MSVC_DEBUG_INFORMATION_FORMAT=Embedded `
-              -DCMAKE_POLICY_CMP0141=NEW
+              -DCMAKE_MSVC_DEBUG_INFORMATION_FORMAT=Embedded
         cmake --build build --config Release -j 4
         cmake --build build --config Release --target install
         sccache --show-stats
