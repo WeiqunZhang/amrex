@@ -175,9 +175,9 @@ jobs:
 
         "SCCACHE_DIR=$env:LOCALAPPDATA\Mozilla\sccache" | Out-File -FilePath $env:GITHUB_ENV -Append
         "SCCACHE_CACHE_ZSTD_LEVEL=10" | Out-File -FilePath $env:GITHUB_ENV -Append
-        "SCCACHE_CACHE_SIZE=600M" | Out-File -FilePath $env:GITHUB_ENV -Append
+        "SCCACHE_CACHE_SIZE=500M" | Out-File -FilePath $env:GITHUB_ENV -Append
 
-        Get-ChildItem -Path "$env:LOCALAPPDATA\Mozilla\sccache"
+        #Get-ChildItem -Path "$env:LOCALAPPDATA\Mozilla\sccache"
     - name: Install Ninja
       run: |
         curl.exe -L -o ninja-win.zip https://github.com/ninja-build/ninja/releases/download/v1.11.1/ninja-win.zip
