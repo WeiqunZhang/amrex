@@ -156,8 +156,7 @@ jobs:
       id: cuda-toolkit
       with:
         cuda: '12.6.1'
-        sub-packages: '["nvcc", "cudart"]'
-        non-cuda-sub-packages: '["libcufft_dev", "libcusparse_dev", "libcurand_dev"]'
+        sub-packages: '["nvcc", "cudart", "cufft_dev", "cusparse_dev", "curand_dev"]'
         use-github-cache: 'false'
     - uses: actions/checkout@v4
     - name: Set Up Cache
