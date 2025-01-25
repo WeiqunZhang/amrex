@@ -152,26 +152,7 @@ jobs:
     needs: check_changes
     if: needs.check_changes.outputs.has_non_docs_changes == 'true'
     steps:
-    #- uses: Jimver/cuda-toolkit@v0.2.19
-    #  id: cuda-toolkit
-    #  with:
-    #    cuda: '12.6.1'
-    #    sub-packages: '["nvcc", "cudart", "cufft_dev", "cusparse_dev", "curand_dev"]'
-    #    use-github-cache: 'false'
     - uses: actions/checkout@v4
-    - name: Intall CUDA Tookit
-      run: |
-        $cuda_ver_full = "12.6.1"
-        $major_minor_patch = $cuda_ver_full.Split('.')
-        $cuda_ver_major_minor = $major_minor_patch[0..1] -join '.'
-        curl.exe -L -o cuda_installer.exe https://developer.download.nvidia.com/compute/cuda/${cuda_ver_full}/network_installers/cuda_${cuda_ver_full}_windows_network.exe
-        cuda_installer.exe -s nvcc_${cuda_ver_major_minor} `
-                            cudart_${cuda_ver_major_minor} `
-                         cufft_dev_${cuda_ver_major_minor} `
-                      cusparse_dev_${cuda_ver_major_minor} `
-                        curand_dev_${cuda_ver_major_minor}
-        "CUDA_PATH=C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v${cuda_ver_major_minor}" | Out-File -FilePath $env:GITHUB_ENV -Append
-        echo "C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v${cuda_ver_major_minor}\bin" >> $env:GITHUB_PATH
     - name: Set Up Cache
       uses: actions/cache@v4
       with:
@@ -179,6 +160,21 @@ jobs:
         key: ccache-${{ github.workflow }}-${{ github.job }}-git-${{ github.sha }}
         restore-keys: |
              ccache-${{ github.workflow }}-${{ github.job }}-git-
+    - name: Add cl.exe to path
+      uses: ilammy/msvc-dev-cmd@v1
+    - name: Intall CUDA Tookit
+      run: |
+        $cuda_ver_full = "12.6.1"
+        $major_minor_patch = $cuda_ver_full.Split('.')
+        $cuda_ver_major_minor = $major_minor_patch[0..1] -join '.'
+        curl.exe -L -o cuda_installer.exe https://developer.download.nvidia.com/compute/cuda/${cuda_ver_full}/network_installers/cuda_${cuda_ver_full}_windows_network.exe
+        .\cuda_installer.exe -s nvcc_${cuda_ver_major_minor} `
+                             cudart_${cuda_ver_major_minor} `
+                          cufft_dev_${cuda_ver_major_minor} `
+                       cusparse_dev_${cuda_ver_major_minor} `
+                         curand_dev_${cuda_ver_major_minor}
+        "CUDA_PATH=C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v${cuda_ver_major_minor}" | Out-File -FilePath $env:GITHUB_ENV -Append
+        echo "C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v${cuda_ver_major_minor}\bin" >> $env:GITHUB_PATH
     - name: Install sccache
       run: |
         curl.exe -L -o sccache.zip https://github.com/mozilla/sccache/releases/download/v0.9.1/sccache-v0.9.1-x86_64-pc-windows-msvc.zip
@@ -195,8 +191,6 @@ jobs:
         curl.exe -L -o ninja-win.zip https://github.com/ninja-build/ninja/releases/download/v1.11.1/ninja-win.zip
         Expand-Archive -Path ninja-win.zip -DestinationPath .
         echo "$pwd" >> $env:GITHUB_PATH
-    - name: Add cl.exe to path
-      uses: ilammy/msvc-dev-cmd@v1
     - name: Compile
       run: |
         sccache --zero-stats
