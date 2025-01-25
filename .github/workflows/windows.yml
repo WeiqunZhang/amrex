@@ -152,13 +152,26 @@ jobs:
     needs: check_changes
     if: needs.check_changes.outputs.has_non_docs_changes == 'true'
     steps:
-    - uses: Jimver/cuda-toolkit@v0.2.19
-      id: cuda-toolkit
-      with:
-        cuda: '12.6.1'
-        sub-packages: '["nvcc", "cudart", "cufft_dev", "cusparse_dev", "curand_dev"]'
-        use-github-cache: 'false'
+    #- uses: Jimver/cuda-toolkit@v0.2.19
+    #  id: cuda-toolkit
+    #  with:
+    #    cuda: '12.6.1'
+    #    sub-packages: '["nvcc", "cudart", "cufft_dev", "cusparse_dev", "curand_dev"]'
+    #    use-github-cache: 'false'
     - uses: actions/checkout@v4
+    - name: Intall CUDA Tookit
+      run: |
+        $cuda_version = "12.6.1"
+        $words = $cuda_version.Split('.')
+        $cuda_version_2 = $words[0..1] -joing '.' # e.g., 12.6
+        curl.exe -L -o cuda_installer.exe https://developer.download.nvidia.com/compute/cuda/${cuda_version}/network_installers/cuda_${cuda_version}_windows_network.exe
+        cuda_installer.exe -s nvcc_${cuda_version_2} `
+                            cudart_${cuda_version_2} `
+                         cufft_dev_${cuda_version_2} `
+                      cusparse_dev_${cuda_version_2} `
+                        curand_dev_${cuda_version_2}
+        "CUDA_PATH=C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v${cuda_version_2}" | Out-File -FilePath $env:GITHUB_ENV -Append
+        echo "C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v${cuda_version_2}\bin" >> $env:GITHUB_PATH
     - name: Set Up Cache
       uses: actions/cache@v4
       with:
