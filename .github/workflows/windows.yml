@@ -156,6 +156,8 @@ jobs:
       id: cuda-toolkit
       with:
         cuda: '12.6.1'
+        sub-packages: '["nvcc", "cudart"]'
+        non-cuda-sub-packages: '["libcufft_dev", "libcusparse_dev", "libcurand_dev"]'
         use-github-cache: 'false'
     - uses: actions/checkout@v4
     - name: Set Up Cache
@@ -176,8 +178,6 @@ jobs:
         "SCCACHE_DIR=$env:LOCALAPPDATA\Mozilla\sccache" | Out-File -FilePath $env:GITHUB_ENV -Append
         "SCCACHE_CACHE_ZSTD_LEVEL=10" | Out-File -FilePath $env:GITHUB_ENV -Append
         "SCCACHE_CACHE_SIZE=500M" | Out-File -FilePath $env:GITHUB_ENV -Append
-
-        #Get-ChildItem -Path "$env:LOCALAPPDATA\Mozilla\sccache"
     - name: Install Ninja
       run: |
         curl.exe -L -o ninja-win.zip https://github.com/ninja-build/ninja/releases/download/v1.11.1/ninja-win.zip
@@ -209,4 +209,3 @@ jobs:
         cmake --build build --config Release -j 4
         cmake --build build --config Release --target install
         sccache --show-stats
-        Get-ChildItem -Path "$env:LOCALAPPDATA\Mozilla\sccache"
