@@ -178,18 +178,17 @@ jobs:
     #    "SCCACHE_DIR=$env:LOCALAPPDATA\Mozilla\sccache" | Out-File -FilePath $env:GITHUB_ENV -Append
     #    "SCCACHE_CACHE_ZSTD_LEVEL=10" | Out-File -FilePath $env:GITHUB_ENV -Append
     #    "SCCACHE_CACHE_SIZE=500M" | Out-File -FilePath $env:GITHUB_ENV -Append
-    - name: Install Ninja
-      run: |
-        curl.exe -L -o ninja-win.zip https://github.com/ninja-build/ninja/releases/download/v1.11.1/ninja-win.zip
-        Expand-Archive -Path ninja-win.zip -DestinationPath .
-        echo "$pwd" >> $env:GITHUB_PATH
-    - name: Add cl.exe to path
-      uses: ilammy/msvc-dev-cmd@v1
+    #- name: Install Ninja
+    #  run: |
+    #    curl.exe -L -o ninja-win.zip https://github.com/ninja-build/ninja/releases/download/v1.11.1/ninja-win.zip
+    #    Expand-Archive -Path ninja-win.zip -DestinationPath .
+    #    echo "$pwd" >> $env:GITHUB_PATH
+    #- name: Add cl.exe to path
+    #  uses: ilammy/msvc-dev-cmd@v1
     - name: Compile
       run: |
         #sccache --zero-stats
         cmake -S . -B build                       `
-              -G "Ninja"                          `
               -DCMAKE_VERBOSE_MAKEFILE=ON         `
               -DCMAKE_BUILD_TYPE=Release          `
               -DAMReX_GPU_BACKEND=CUDA            `
@@ -201,8 +200,8 @@ jobs:
               -DAMReX_PARTICLES=ON                `
               -DAMReX_FORTRAN=OFF                 `
               -DAMReX_MPI=OFF                     `
-              -DCMAKE_CXX_COMPILER=cl             `
               -DCMAKE_CUDA_COMPILER=nvcc
+              #-DCMAKE_CXX_COMPILER=cl             `
               #-DCMAKE_CXX_COMPILER_LAUNCHER=sccache  `
               #-DCMAKE_CUDA_COMPILER_LAUNCHER=sccache `
               #-DCMAKE_MSVC_DEBUG_INFORMATION_FORMAT=Embedded
