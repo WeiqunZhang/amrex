@@ -183,7 +183,7 @@ jobs:
         curl.exe -L -o ninja-win.zip https://github.com/ninja-build/ninja/releases/download/v1.11.1/ninja-win.zip
         Expand-Archive -Path ninja-win.zip -DestinationPath .
         echo "$pwd" >> $env:GITHUB_PATH
-    - name: Add cl.exe to path
+    - name: Set Up MSVC
       uses: ilammy/msvc-dev-cmd@v1
     - name: Compile
       run: |
