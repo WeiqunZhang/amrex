@@ -1222,6 +1222,9 @@ void MLMGT<MF>::oneIter (int iter)
 {
     BL_PROFILE("MLMG::oneIter()");
 
+    Gpu::NoSyncRegion no_sync{};
+    Gpu::SingleStreamRegion single_stream{};
+    
     for (int alev = finest_amr_lev; alev > 0; --alev)
     {
         miniCycle(alev);
