@@ -150,7 +150,148 @@ void mlpoisson_flux_zface (Box const& box, Array4<T> const& fz,
     }
 }
 
-template <typename T>
+template <typename T, typename BCTL>
+AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+void mlpoisson_gsrb_bctl (int i, int j, int k, Array4<T> const& phi,
+			  Array4<T const> const& rhs,
+			  Array4<T const> const& f0, Array4<int const> const& m0,
+			  Array4<T const> const& f1, Array4<int const> const& m1,
+			  Array4<T const> const& f2, Array4<int const> const& m2,
+			  Array4<T const> const& f3, Array4<int const> const& m3,
+			  Array4<T const> const& f4, Array4<int const> const& m4,
+			  Array4<T const> const& f5, Array4<int const> const& m5,
+			  Box const& vbox, int redblack,
+			  GpuArray<Real,AMREX_SPACEDIM> const& dxinv,
+			  GpuArray<BCTL,2*AMREX_SPACEDIM> const& bctl) noexcept
+{
+    const auto vlo = amrex::lbound(vbox);
+    const auto vhi = amrex::ubound(vbox);
+
+    constexpr T omega = T(1.15);
+
+    auto const dhx = T(dxinv[0]*dxinv[0]);
+    auto const dhy = T(dxinv[1]*dxinv[1]);
+    auto const dhz = T(dxinv[2]*dxinv[2]);
+    const T gamma = T(-2.)*(dhx+dhy+dhz);
+
+    if ((i+j+k+redblack)%2 == 0) {
+        T g_m_d = gamma;
+
+	T ppx;
+	if (i == vlo.x && m0(vlo.x-1,j,k) > 0) {
+	  g_m_d += dhx * f0(vlo.x,j,k);
+	  if (bctl[0].type == AMREX_LO_NEUMANN) {
+	    ppx = phi(i,j,k) + phi(i+1,j,k);
+	  } else {
+	    constexpr int NX = 3;
+	    GpuArray<T,NX> x{{-bctl[0].location * T(dxinv[0]), T(0.5), T(1.5)}};
+	    GpuArray<T,NX> coef{};
+	    poly_interp_coeff(-T(0.5), x.data(), NX, coef.data());
+	    T tmp = T(0.0);
+	    for (int m = 1; m < NX; ++m) {
+	      tmp += phi(i-1+m,j,k) * coef[m];
+	    }
+	    ppx = tmp + phi(i+1,j,k);
+	  }
+	} else if (i == vhi.x && m3(vhi.x+1,j,k) > 0) {
+	  g_m_d += dhx * f3(vhi.x,j,k);
+	  if (bctl[3].type == AMREX_LO_NEUMANN) {
+	    ppx = phi(i-1,j,k) + phi(i,j,k);
+	  } else {
+	    constexpr int NX = 3;
+	    GpuArray<T,NX> x{{-bctl[3].location * T(dxinv[0]), T(0.5), T(1.5)}};
+	    GpuArray<T,NX> coef{};
+	    poly_interp_coeff(T(-0.5), x.data(), NX, coef.data());
+	    T tmp = T(0);
+	    for (int m = 1; m < NX; ++m) {
+	      tmp += phi(i+1-m,j,k) * coef[m];
+	    }
+	    ppx = tmp + phi(i-1,j,k);
+	  }
+	} else {
+	  ppx = phi(i-1,j,k) + phi(i+1,j,k);
+	}     
+
+	  T ppy;
+	if (j == vlo.y && m1(i,vlo.y-1,k) > 0) {
+	  g_m_d += dhy * f1(i,vlo.y,k);
+	  if (bctl[1].type == AMREX_LO_NEUMANN) {
+	    ppy = phi(i,j,k) + phi(i,j+1,k);
+	  } else {
+	    constexpr int NX = 3;
+	    GpuArray<T,NX> x{{-bctl[1].location * T(dxinv[1]), T(0.5), T(1.5)}};
+	    GpuArray<T,NX> coef{};
+	    poly_interp_coeff(T(-0.5), x.data(), NX, coef.data());
+	    T tmp = T(0);
+	    for (int m = 1; m < NX; ++m) {
+	      tmp += phi(i,j-1+m,k) * coef[m];
+	    }
+	    ppy = tmp + phi(i,j+1,k);
+	  }
+	} else if (j == vhi.y && m4(i,vhi.y+1,k) > 0) {
+	  g_m_d += dhy * f4(i,vhi.y,k);
+	  if (bctl[4].type == AMREX_LO_NEUMANN) {
+	    ppy = phi(i,j-1,k) + phi(i,j,k);
+	  } else {
+	    constexpr int NX = 3;
+	    GpuArray<T,NX> x{{-bctl[4].location * T(dxinv[1]), T(0.5), T(1.5)}};
+	    GpuArray<T,NX> coef{};
+	    poly_interp_coeff(T(-0.5), x.data(), NX, coef.data());
+	    T tmp = T(0);
+	    for (int m = 1; m < NX; ++m) {
+	      tmp += phi(i,j+1-m,k) * coef[m];
+	    }
+	    ppy = tmp + phi(i,j-1,k);
+	  }
+	} else {
+	    ppy = phi(i,j-1,k) + phi(i,j+1,k);
+	}
+
+	  T ppz;
+	if (k == vlo.z && m2(i,j,vlo.z-1) > 0) {
+	  g_m_d += dhz * f2(i,j,vlo.z);
+	  if (bctl[2].type == AMREX_LO_NEUMANN) {
+	    ppz = phi(i,j,k) + phi(i,j,k+1);
+	  } else {
+	    constexpr int NX = 3;
+	    GpuArray<T,NX> x{{-bctl[2].location * T(dxinv[2]), T(0.5), T(1.5)}};
+	    GpuArray<T,NX> coef{};
+	    poly_interp_coeff(T(-0.5), x.data(), NX, coef.data());
+	    T tmp = T(0);
+	    for (int m = 1; m < NX; ++m) {
+	      tmp += phi(i,j,k-1+m) * coef[m];
+	    }
+	    ppz = tmp + phi(i,j,k+1);
+	  }
+	} else if (k == vhi.z && m5(i,j,vhi.z+1) > 0) {
+	  g_m_d += dhz * f5(i,j,vhi.z);
+	  if (bctl[5].type == AMREX_LO_NEUMANN) {
+	    ppz = phi(i,j,k-1) + phi(i,j,k);
+	  } else {
+	    constexpr int NX = 3;
+	    GpuArray<T,NX> x{{-bctl[5].location * T(dxinv[2]), T(0.5), T(1.5)}};
+	    GpuArray<T,NX> coef{};
+	    poly_interp_coeff(T(-0.5), x.data(), NX, coef.data());
+	    T tmp = T(0);
+	    for (int m = 1; m < NX; ++m) {
+	      tmp += phi(i,j,k+1-m) * coef[m];
+	    }
+	    ppz = tmp + phi(i,j,k-1);
+	  }
+	} else {
+	  ppz = phi(i,j,k-1) + phi(i,j,k+1);
+	}
+	
+        T res = rhs(i,j,k) - gamma*phi(i,j,k)
+            - dhx*ppx
+            - dhy*ppy
+            - dhz*ppz;
+
+        phi(i,j,k) = phi(i,j,k) + omega/g_m_d * res;
+    }
+}
+
+  template <typename T>
 AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
 void mlpoisson_gsrb (int i, int j, int k, Array4<T> const& phi,
                      Array4<T const> const& rhs,

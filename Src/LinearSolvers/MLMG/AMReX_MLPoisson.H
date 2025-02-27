@@ -375,6 +375,7 @@ MLPoissonT<MF>::Fsmooth (int amrlev, int mglev, MF& sol, const MF& rhs, int redb
 
     const auto& undrrelxr = this->m_undrrelxr[amrlev][mglev];
     const auto& maskvals  = this->m_maskvals [amrlev][mglev];
+    const auto& bcondloc = *(this->m_bcondloc[amrlev][mglev]);
 
     OrientationIter oitr;
 
@@ -400,7 +401,7 @@ MLPoissonT<MF>::Fsmooth (int amrlev, int mglev, MF& sol, const MF& rhs, int redb
 #endif
 #endif
 
-    const Real* dxinv = this->m_geom[amrlev][mglev].InvCellSize();
+    const auto dxinv = this->m_geom[amrlev][mglev].InvCellSizeArray();
     AMREX_D_TERM(const RT dhx = RT(dxinv[0]*dxinv[0]);,
                  const RT dhy = RT(dxinv[1]*dxinv[1]);,
                  const RT dhz = RT(dxinv[2]*dxinv[2]););
@@ -450,6 +451,7 @@ MLPoissonT<MF>::Fsmooth (int amrlev, int mglev, MF& sol, const MF& rhs, int redb
 #endif
 
         if (this->m_overset_mask[amrlev][mglev]) {
+	  amrex::Abort("xxxxx-os");
             AMREX_ASSERT(!this->m_has_metric_term);
             const auto& osmma = this->m_overset_mask[amrlev][mglev]->const_arrays();
             if (this->m_use_gauss_seidel) {
@@ -496,6 +498,7 @@ MLPoissonT<MF>::Fsmooth (int amrlev, int mglev, MF& sol, const MF& rhs, int redb
         }
 #if (AMREX_SPACEDIM < 3)
         else if (this->m_has_metric_term) {
+	  amrex::Abort("xxxxx-metric");
             if (this->m_use_gauss_seidel) {
                 ParallelFor(sol,
                 [=] AMREX_GPU_DEVICE (int box_no, int i, int j, int k) noexcept
@@ -533,12 +536,13 @@ MLPoissonT<MF>::Fsmooth (int amrlev, int mglev, MF& sol, const MF& rhs, int redb
 #endif
         else {
             if (this->m_use_gauss_seidel) {
+	      auto* bctl = bcondloc.getBCTLDevPtr();
+
                 ParallelFor(sol,
                 [=] AMREX_GPU_DEVICE (int box_no, int i, int j, int k) noexcept
                 {
                     Box vbx(rhsma[box_no]);
-                    mlpoisson_gsrb(i, j, k, solnma[box_no], rhsma[box_no],
-                                   AMREX_D_DECL(dhx, dhy, dhz),
+                    mlpoisson_gsrb_bctl(i, j, k, solnma[box_no], rhsma[box_no],
                                    f0ma[box_no], m0ma[box_no],
                                    f1ma[box_no], m1ma[box_no],
 #if (AMREX_SPACEDIM > 1)
@@ -549,9 +553,10 @@ MLPoissonT<MF>::Fsmooth (int amrlev, int mglev, MF& sol, const MF& rhs, int redb
                                    f5ma[box_no], m5ma[box_no],
 #endif
 #endif
-                                   vbx, redblack);
+                                   vbx, redblack, dxinv, bctl[box_no]);
                 });
             } else {
+	      amrex::Abort("xxxxx-here-1-jacobi");
                 const auto& axma = Ax.const_arrays();
                 ParallelFor(sol,
                 [=] AMREX_GPU_DEVICE (int box_no, int i, int j, int k) noexcept
@@ -581,6 +586,8 @@ MLPoissonT<MF>::Fsmooth (int amrlev, int mglev, MF& sol, const MF& rhs, int redb
 #endif
         for (MFIter mfi(sol,mfi_info); mfi.isValid(); ++mfi)
         {
+	  //	  amrex::Abort("xxxxx");
+	  
             const auto& m0 = mm0.array(mfi);
             const auto& m1 = mm1.array(mfi);
 #if (AMREX_SPACEDIM > 1)
@@ -820,18 +827,25 @@ MLPoissonT<MF>::Fsmooth (int amrlev, int mglev, MF& sol, const MF& rhs, int redb
                 }
             } else {
                 if (this->m_use_gauss_seidel) {
+
+		  auto* bctl = bcondloc.getBCTLDevPtr() + mfi.LocalIndex();
+		  
                     AMREX_HOST_DEVICE_PARALLEL_FOR_3D ( tbx, i, j, k,
                     {
-                        mlpoisson_gsrb(i, j, k, solnfab, rhsfab, dhx, dhy, dhz,
-                                       f0fab, m0,
-                                       f1fab, m1,
-                                       f2fab, m2,
-                                       f3fab, m3,
-                                       f4fab, m4,
-                                       f5fab, m5,
-                                       vbx, redblack);
+                        mlpoisson_gsrb_bctl(i, j, k, solnfab, rhsfab,
+					    f0fab, m0,
+					    f1fab, m1,
+					    f2fab, m2,
+					    f3fab, m3,
+					    f4fab, m4,
+					    f5fab, m5,
+					    vbx, redblack, dxinv, *bctl);
                     });
+
+		    Gpu::synchronize();
+		    AMREX_GPU_ERROR_CHECK();
                 } else {
+		  amrex::Abort("xxxxx-jacobi");
                     const auto& axfab = Ax.const_array(mfi);
                     AMREX_HOST_DEVICE_PARALLEL_FOR_3D ( tbx, i, j, k,
                     {

@@ -410,6 +410,7 @@ MLNodeLaplacian::Fsmooth (int amrlev, int mglev, MultiFab& sol, const MultiFab& 
         {
             Real const_sigma = m_const_sigma;
 #ifdef AMREX_USE_GPU
+	    //	    BL_PROFILE("gscolor-"+std::to_string(amrlev)+std::to_sting(mglev));
             if (Gpu::inLaunchRegion()) {
                 for (int color = 0; color < AMREX_D_TERM(2,*2,*2); ++color)
                 {

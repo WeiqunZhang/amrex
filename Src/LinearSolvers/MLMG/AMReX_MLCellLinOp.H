@@ -191,6 +191,8 @@ protected:
         GpuArray<BCTL,2*AMREX_SPACEDIM> const* getBCTLPtr (const MFIter& mfi) const noexcept {
             return bctl[mfi];
         }
+
+      GpuArray<BCTL,2*AMREX_SPACEDIM> const* getBCTLDevPtr () const noexcept { return bctl_dv.data(); }
     private:
         LayoutData<Vector<BCTuple> >   bcond;
         LayoutData<Vector<RealTuple> > bcloc;
@@ -703,6 +705,10 @@ MLCellLinOpT<MF>::applyBC (int amrlev, int mglev, MF& in, BCMode bc_mode, StateM
         in.FillBoundary(0, ncomp, this->m_geom[amrlev][mglev].periodicity(), cross);
     }
 
+    if (dynamic_cast<MLPoissonT<MF> const*>(this)) {
+      if (bc_mode == BCMode::Homogeneous) { return; }
+    }
+    
     int flagbc = bc_mode == BCMode::Inhomogeneous;
     const int imaxorder = this->maxorder;
 
