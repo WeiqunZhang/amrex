@@ -279,6 +279,9 @@ public:
     static bool GetUseDynamicSetSelection () { return useDynamicSetSelection; }
     static void SetUseDynamicSetSelection (bool usedss) { useDynamicSetSelection = usedss; }
 
+    static bool GetUseNewReader () { return useNewReader; }
+    static void SetUseNewReader (bool b) { useNewReader = b; }
+
     static std::string DirName (const std::string& filename);
     static std::string BaseName (const std::string& filename);
 
@@ -353,6 +356,7 @@ private:
     static AMREX_EXPORT bool useSynchronousReads;
     static AMREX_EXPORT bool useDynamicSetSelection;
     static AMREX_EXPORT bool allowSparseWrites;
+    static AMREX_EXPORT bool useNewReader;
 };
 
 //! Write a FabOnDisk to an ostream in ASCII.

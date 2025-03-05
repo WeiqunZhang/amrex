@@ -36,6 +36,8 @@ bool VisMF::allowSparseWrites(true);
 
 Long VisMFBuffer::ioBufferSize(VisMF::IO_Buffer_Size);
 
+bool VisMF::useNewReader = false;
+
 //
 // Set these in Initialize().
 //
@@ -137,6 +139,7 @@ VisMF::Initialize ()
     pp.query("usedynamicsetselection", useDynamicSetSelection);
     pp.query("iobuffersize", ioBufferSize);
     pp.query("allowsparsewrites", allowSparseWrites);
+    pp.query("usenewreader", useNewReader);
 
     initialized = true;
 }
@@ -1531,6 +1534,44 @@ VisMF::readFAB (FabArray<FArrayBox> &mf,
     VisMF::CloseStream(FullName);
 }
 
+#ifdef AMREX_USE_MPI
+namespace {
+void NewRead (FabArray<FArrayBox>& mf, const VisMF::Header& hdr)
+{
+    std::map<std::string,std::vector<std::pair<int,Long>>> files_map;
+    auto nboxes = int(hdr.m_ba.size());
+    for (int ibox = 0; ibox < nboxes; ++ibox) {
+        files_map[hdr.m_fod[ibox].m_name].emplace_back(ibox,hdr.m_fod[ibox].m_head);
+    }
+    auto nfiles = int(files_map.size());
+    std::vector<std::tuple<std::string,int,Long>> files_vec;
+    for (auto const& [k,v] : files_map) {
+        files_vec.emplace_back(k,v.first,v.second);
+    }
+    int nprocs = ParallelDescriptor::NProcs();
+    int myproc = ParallelDescriptor::MyProc();
+    FabArray<FArrayBox> tmp;
+    if (nprocs <= nfiles) {
+        Vector<int> procmap(nboxes);
+        int iproc = 0;
+        // need to have std::vector<int> boxids(nfiles);
+        for (int ifile = 0; ifile < nfiles; ++ifile) {
+            procmap[std::get<1>(files_vec[ifile])] = iproc;
+            if (iproc == nprocs-1) {
+                iproc = 0;
+            } else {
+                ++iproc;
+            }
+        }
+        DistributionMapping dm(std::move(procmap));
+        tmp.define(hdr.m_ba, dm, hdr.m_ncomp, hdr.m_ngrow);
+
+    } else {
+        amrex::Abort("xxxxx NewRead todo");
+    }
+}
+}
+#endif
 
 void
 VisMF::Read (FabArray<FArrayBox> &mf,
@@ -1591,6 +1632,10 @@ VisMF::Read (FabArray<FArrayBox> &mf,
     }
 
 #ifdef BL_USE_MPI
+
+    if (useNewReader && (ParallelDescriptor::NProcs() > 1)) {
+        NewRead(mf,hdr);
+    }
 
   // ---- This limits the number of concurrent readers per file.
   int nOpensPerFile(nMFFileInStreams);
