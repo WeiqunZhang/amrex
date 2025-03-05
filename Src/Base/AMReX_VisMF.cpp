@@ -1536,39 +1536,43 @@ VisMF::readFAB (FabArray<FArrayBox> &mf,
 
 #ifdef AMREX_USE_MPI
 namespace {
-void NewRead (FabArray<FArrayBox>& mf, const VisMF::Header& hdr)
+void NewRead (FabArray<FArrayBox>& mf, const std::string& name, const VisMF::Header& hdr)
 {
-    std::map<std::string,std::vector<std::pair<int,Long>>> files_map;
-    auto nboxes = int(hdr.m_ba.size());
-    for (int ibox = 0; ibox < nboxes; ++ibox) {
-        files_map[hdr.m_fod[ibox].m_name].emplace_back(ibox,hdr.m_fod[ibox].m_head);
-    }
-    auto nfiles = int(files_map.size());
-    std::vector<std::tuple<std::string,int,Long>> files_vec;
-    for (auto const& [k,v] : files_map) {
-        files_vec.emplace_back(k,v.first,v.second);
-    }
     int nprocs = ParallelDescriptor::NProcs();
     int myproc = ParallelDescriptor::MyProc();
+
+    auto nboxes = int(hdr.m_ba.size());
+
+    std::map<std::string,Vector<int>> files_map;
+    for (int ibox = 0; ibox < nboxes; ++ibox) {
+        files_map[hdr.m_fod[ibox].m_name].push_back(ibox);
+    }
+    auto nfiles = int(files_map.size());
+
+    amrex::Print() << "xxxxx User new reader\n";
+
     FabArray<FArrayBox> tmp;
     if (nprocs <= nfiles) {
         Vector<int> procmap(nboxes);
-        int iproc = 0;
-        // need to have std::vector<int> boxids(nfiles);
-        for (int ifile = 0; ifile < nfiles; ++ifile) {
-            procmap[std::get<1>(files_vec[ifile])] = iproc;
-            if (iproc == nprocs-1) {
-                iproc = 0;
-            } else {
-                ++iproc;
+        int ifile = 0;
+        for (auto const& [k,v] : files_map) {
+            amrex::ignore_unused(k);
+            int iproc = ifile % nprocs;
+            for (auto ibox : v) {
+                procmap[ibox] = iproc;
             }
+            ++ifile;
         }
-        DistributionMapping dm(std::move(procmap));
+        DistributionMapping dm{std::move(procmap)};
         tmp.define(hdr.m_ba, dm, hdr.m_ncomp, hdr.m_ngrow);
-
+        for (MFIter mfi(tmp); mfi.isValid(); ++mfi) {
+            detail::read_fab(tmp[mfi], hdr.m_fod[mfi.index()], name);
+        }
     } else {
         amrex::Abort("xxxxx NewRead todo");
     }
+
+    mf.Redistribute(tmp, 0, 0, hdr.m_ncomp, hdr.m_ngrow);
 }
 }
 #endif
@@ -1634,7 +1638,7 @@ VisMF::Read (FabArray<FArrayBox> &mf,
 #ifdef BL_USE_MPI
 
     if (useNewReader && (ParallelDescriptor::NProcs() > 1)) {
-        NewRead(mf,hdr);
+        NewRead(mf,mf_name,hdr);
     }
 
   // ---- This limits the number of concurrent readers per file.
