@@ -1,5 +1,5 @@
 <div align="center">
-<img src="https://github.com/amrex-codes/amrex-codes.github.io/blob/main/images/AMReX-horizontal-color.png" alt="AMReX Logo">
+<img src="https://github.com/amrex-codes/amrex-codes.github.io/blob/main/images/AMReX-horizontal-color.png" alt="AMReX Logo" style="background:white;">
 
 <p align="center">
   <a href="https://doi.org/10.21105/joss.01370">
