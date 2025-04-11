@@ -74,8 +74,8 @@ ParallelFor (MF const& mf, IntVect const& nghost, int ncomp, IntVect const&, boo
             parfor_mf_detail::call_f(f, 0, i, j, k, ncomp);
         });
     } else {
-        auto const& parforinfo = mf.getParForInfo(nghost,MT);
-        auto nblocks_per_box = parforinfo.getNBlocksPerBox();
+        auto const& parforinfo = mf.getParForInfo(nghost);
+        auto nblocks_per_box = parforinfo.getNBlocksPerBox(MT);
         AMREX_ASSERT(Long(nblocks_per_box)*Long(nboxes) < Long(std::numeric_limits<int>::max()));
         const int nblocks = nblocks_per_box * nboxes;
         const BoxIndexer* dp_boxes = parforinfo.getBoxes();
