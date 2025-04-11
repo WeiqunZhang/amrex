@@ -113,14 +113,14 @@ template <typename MF, typename F>
 std::enable_if_t<IsFabArray<MF>::value>
 ParallelFor (MF const& mf, IntVect const& nghost, int ncomp, IntVect const& ts, bool dynamic, F&& f)
 {
-    ParallelFor<AMREX_GPU_MAX_THREADS>(mf, nghost, ncomp, ts, dynamic, std::forward<F>(f));
+    ParallelFor<128>(mf, nghost, ncomp, ts, dynamic, std::forward<F>(f));
 }
 
 template <typename MF, typename F>
 std::enable_if_t<IsFabArray<MF>::value>
 ParallelFor (MF const& mf, IntVect const& nghost, IntVect const& ts, bool dynamic, F&& f)
 {
-    ParallelFor<AMREX_GPU_MAX_THREADS>(mf, nghost, 1, ts, dynamic, std::forward<F>(f));
+    ParallelFor<128>(mf, nghost, 1, ts, dynamic, std::forward<F>(f));
 }
 
 }
