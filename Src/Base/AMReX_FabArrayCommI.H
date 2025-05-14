@@ -940,7 +940,7 @@ FillBoundary (Vector<MF*> const& mf, Vector<int> const& scomp,
               Vector<Periodicity> const& period, Vector<int> const& cross = {})
 {
     BL_PROFILE("FillBoundary(Vector)");
-#if 1
+  if (mf.size() != 3 || ParallelDescriptor::MyProc() != 1) {
     const int N = mf.size();
     for (int i = 0; i < N; ++i) {
         mf[i]->FillBoundary_nowait(scomp[i], ncomp[i], nghost[i], period[i],
@@ -949,8 +949,10 @@ FillBoundary (Vector<MF*> const& mf, Vector<int> const& scomp,
     for (int i = 0; i < N; ++i) {
         mf[i]->FillBoundary_finish();
     }
+  } else {
 
-#else
+    amrex::Abort("xxxxx: FillBoundary(Vector) todo");
+
     using FAB = typename MF::FABType::value_type;
     using T   = typename FAB::value_type;
 
@@ -994,197 +996,7 @@ FillBoundary (Vector<MF*> const& mf, Vector<int> const& scomp,
         return;
     }
 
-#ifdef AMREX_USE_MPI
-    //
-    // Do this before prematurely exiting if running in parallel.
-    // Otherwise sequence numbers will not match across MPI processes.
-    //
-    int SeqNum = ParallelDescriptor::SeqNum();
-    MPI_Comm comm = ParallelContext::CommunicatorSub();
-
-    if (N_locs == 0 && N_rcvs == 0 && N_snds == 0) { return; } // No work to do
-
-    char* the_recv_data = nullptr;
-    Vector<int> recv_from;
-    Vector<std::size_t> recv_size;
-    Vector<MPI_Request> recv_reqs;
-    Vector<MPI_Status> recv_stat;
-    Vector<TagT> recv_tags;
-
-    if (N_rcvs > 0) {
-
-        for (int imf = 0; imf < nmfs; ++imf) {
-            if (cmds[imf]) {
-                auto const& tags = *(cmds[imf]->m_RcvTags);
-                for (const auto& kv : tags) {
-                    recv_from.push_back(kv.first);
-                }
-            }
-        }
-        amrex::RemoveDuplicates(recv_from);
-        const int nrecv = recv_from.size();
-
-        recv_reqs.resize(nrecv, MPI_REQUEST_NULL);
-        recv_stat.resize(nrecv);
-
-        recv_tags.reserve(N_rcvs);
-
-        Vector<Vector<std::size_t> > recv_offset(nrecv);
-        Vector<std::size_t> offset;
-        recv_size.reserve(nrecv);
-        offset.reserve(nrecv);
-        std::size_t TotalRcvsVolume = 0;
-        for (int i = 0; i < nrecv; ++i) {
-            std::size_t nbytes = 0;
-            for (int imf = 0; imf < nmfs; ++imf) {
-                if (cmds[imf]) {
-                    auto const& tags = *(cmds[imf]->m_RcvTags);
-                    auto it = tags.find(recv_from[i]);
-                    if (it != tags.end()) {
-                        for (auto const& cct : it->second) {
-                            auto& dfab = (*mf[imf])[cct.dstIndex];
-                            recv_offset[i].push_back(nbytes);
-                            recv_tags.push_back({dfab.array(scomp[imf],ncomp[imf]),
-                                                 makeArray4<T const>(nullptr,cct.dbox,ncomp[imf]),
-                                                 cct.dbox, Dim3{0,0,0}});
-                            nbytes += dfab.nBytes(cct.dbox,ncomp[imf]);
-                        }
-                    }
-                }
-            }
-
-            std::size_t acd = ParallelDescriptor::sizeof_selected_comm_data_type(nbytes);
-            nbytes = amrex::aligned_size(acd, nbytes); // so that nbytes are aligned
-
-            // Also need to align the offset properly
-            TotalRcvsVolume = amrex::aligned_size(std::max(alignof(T),acd), TotalRcvsVolume);
-
-            offset.push_back(TotalRcvsVolume);
-            TotalRcvsVolume += nbytes;
-
-            recv_size.push_back(nbytes);
-        }
-
-        the_recv_data = static_cast<char*>(amrex::The_Comms_Arena()->alloc(TotalRcvsVolume));
-
-        int k = 0;
-        for (int i = 0; i < nrecv; ++i) {
-            char* p = the_recv_data + offset[i];
-            const int rank = ParallelContext::global_to_local_rank(recv_from[i]);
-            recv_reqs[i] = ParallelDescriptor::Arecv
-                (p, recv_size[i], rank, SeqNum, comm).req();
-            for (int j = 0, nj = recv_offset[i].size(); j < nj; ++j) {
-                recv_tags[k++].sfab.p = (T const*)(p + recv_offset[i][j]);
-            }
-        }
-    }
-
-    char* the_send_data = nullptr;
-    Vector<int> send_rank;
-    Vector<char*> send_data;
-    Vector<std::size_t> send_size;
-    Vector<MPI_Request> send_reqs;
-    if (N_snds > 0) {
-        for (int imf = 0; imf < nmfs; ++imf) {
-            if (cmds[imf]) {
-                auto const& tags = *(cmds[imf]->m_SndTags);
-                for (auto const& kv : tags) {
-                    send_rank.push_back(kv.first);
-                }
-            }
-        }
-        amrex::RemoveDuplicates(send_rank);
-        const int nsend = send_rank.size();
-
-        send_data.resize(nsend, nullptr);
-        send_reqs.resize(nsend, MPI_REQUEST_NULL);
-
-        Vector<TagT> send_tags;
-        send_tags.reserve(N_snds);
-
-        Vector<Vector<std::size_t> > send_offset(nsend);
-        Vector<std::size_t> offset;
-        send_size.reserve(nsend);
-        offset.reserve(nsend);
-        std::size_t TotalSndsVolume = 0;
-        for (int i = 0; i < nsend; ++i) {
-            std::size_t nbytes = 0;
-            for (int imf = 0; imf < nmfs; ++imf) {
-                if (cmds[imf]) {
-                    auto const& tags = *(cmds[imf]->m_SndTags);
-                    auto it = tags.find(send_rank[i]);
-                    if (it != tags.end()) {
-                        for (auto const& cct : it->second) {
-                            auto const& sfab = (*mf[imf])[cct.srcIndex];
-                            send_offset[i].push_back(nbytes);
-                            send_tags.push_back({amrex::makeArray4<T>(nullptr,cct.sbox,ncomp[imf]),
-                                                 sfab.const_array(scomp[imf],ncomp[imf]),
-                                                 cct.sbox, Dim3{0,0,0}});
-                            nbytes += sfab.nBytes(cct.sbox,ncomp[imf]);
-                        }
-                    }
-                }
-            }
-
-            std::size_t acd = ParallelDescriptor::sizeof_selected_comm_data_type(nbytes);
-            nbytes = amrex::aligned_size(acd, nbytes); // so that bytes are aligned
-
-            // Also need to align the offset properly
-            TotalSndsVolume = amrex::aligned_size(std::max(alignof(T),acd), TotalSndsVolume);
-
-            offset.push_back(TotalSndsVolume);
-            TotalSndsVolume += nbytes;
-
-            send_size.push_back(nbytes);
-        }
-
-        the_send_data = static_cast<char*>(amrex::The_Comms_Arena()->alloc(TotalSndsVolume));
-        int k = 0;
-        for (int i = 0; i < nsend; ++i) {
-            send_data[i] = the_send_data + offset[i];
-            for (int j = 0, nj = send_offset[i].size(); j < nj; ++j) {
-                send_tags[k++].dfab.p = (T*)(send_data[i] + send_offset[i][j]);
-            }
-        }
-
-        detail::fbv_copy(send_tags);
-
-        FabArray<FAB>::PostSnds(send_data, send_size, send_rank, send_reqs, SeqNum);
-    }
-
-#if !defined(AMREX_DEBUG)
-    int recv_flag;
-    ParallelDescriptor::Test(recv_reqs, recv_flag, recv_stat);
-#endif
-
-    if (N_locs > 0) {
-        detail::fbv_copy(local_tags);
-#if !defined(AMREX_DEBUG)
-        ParallelDescriptor::Test(recv_reqs, recv_flag, recv_stat);
-#endif
-    }
-
-    if (N_rcvs > 0) {
-        ParallelDescriptor::Waitall(recv_reqs, recv_stat);
-#ifdef AMREX_DEBUG
-        if (!FabArrayBase::CheckRcvStats(recv_stat, recv_size, SeqNum)) {
-            amrex::Abort("FillBoundary(vector) failed with wrong message size");
-        }
-#endif
-
-        detail::fbv_copy(recv_tags);
-
-        amrex::The_Comms_Arena()->free(the_recv_data);
-    }
-
-    if (N_snds > 0) {
-        Vector<MPI_Status> stats(send_reqs.size());
-        ParallelDescriptor::Waitall(send_reqs, stats);
-        amrex::The_Comms_Arena()->free(the_send_data);
-    }
-
-#endif  // #ifdef AMREX_USE_MPI
-#endif  // #if 1 #else
+  }
 }
 
 template <class MF>
