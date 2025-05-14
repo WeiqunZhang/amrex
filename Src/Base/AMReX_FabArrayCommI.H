@@ -951,52 +951,27 @@ FillBoundary (Vector<MF*> const& mf, Vector<int> const& scomp,
     }
   } else {
 
-    amrex::Abort("xxxxx: FillBoundary(Vector) todo");
+#ifdef AMREX_USE_GPU
 
-    using FAB = typename MF::FABType::value_type;
-    using T   = typename FAB::value_type;
+      auto const& TheFB_0 = mf[0]->getFB(nghost[0], period[0],
+                                         cross.empty() ? 0 : cross[0]);
+      auto const& TheFB_1 = mf[1]->getFB(nghost[1], period[1],
+                                         cross.empty() ? 0 : cross[1]);
+      auto const& TheFB_2 = mf[2]->getFB(nghost[2], period[2],
+                                         cross.empty() ? 0 : cross[2]);
 
-    const int nmfs = mf.size();
-    Vector<FabArrayBase::CommMetaData const*> cmds;
-    int N_locs = 0;
-    int N_rcvs = 0;
-    int N_snds = 0;
-    for (int imf = 0; imf < nmfs; ++imf) {
-        if (nghost[imf].max() > 0) {
-            auto const& TheFB = mf[imf]->getFB(nghost[imf], period[imf],
-                                               cross.empty() ? 0 : cross[imf]);
-            // The FB is cached.  Therefore it's safe take its address for later use.
-            cmds.push_back(static_cast<FabArrayBase::CommMetaData const*>(&TheFB));
-            N_locs += TheFB.m_LocTags->size();
-            N_rcvs += TheFB.m_RcvTags->size();
-            N_snds += TheFB.m_SndTags->size();
-        } else {
-            cmds.push_back(nullptr);
-        }
-    }
+      FB_local_copy_gpu(The_FB_0, scomp[0], ncomp[0],
+                        The_FB_1, scomp[1], ncomp[1],
+                        The_FB_2, scomp[2], ncomp[2]);
+      if (!Gpu::inNoSyncRegion()) {
+          Gpu::streamSynchronize();
+      }
 
-    using TagT = Array4CopyTag<T>;
-    Vector<TagT> local_tags;
-    local_tags.reserve(N_locs);
-    static_assert(amrex::IsStoreAtomic<T>::value, "FillBoundary(Vector): storing T is not atomic");
-    for (int imf = 0; imf < nmfs; ++imf) {
-        if (cmds[imf]) {
-            auto const& tags = *(cmds[imf]->m_LocTags);
-            for (auto const& tag : tags) {
-                local_tags.push_back({(*mf[imf])[tag.dstIndex].array      (scomp[imf],ncomp[imf]),
-                                      (*mf[imf])[tag.srcIndex].const_array(scomp[imf],ncomp[imf]),
-                                      tag.dbox,
-                                      (tag.sbox.smallEnd()-tag.dbox.smallEnd()).dim3()});
-            }
-        }
-    }
+#else
 
-    if (ParallelContext::NProcsSub() == 1) {
-        detail::fbv_copy(local_tags);
-        return;
-    }
+      amrex::Abort("FillBoundary(Vector): todo");
 
-  }
+#endif
 }
 
 template <class MF>
