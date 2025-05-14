@@ -940,7 +940,7 @@ FillBoundary (Vector<MF*> const& mf, Vector<int> const& scomp,
               Vector<Periodicity> const& period, Vector<int> const& cross = {})
 {
     BL_PROFILE("FillBoundary(Vector)");
-  if (mf.size() != 3 || ParallelDescriptor::MyProc() != 1) {
+  if (mf.size() != 3 || ParallelDescriptor::NProcs() != 1) {
     const int N = mf.size();
     for (int i = 0; i < N; ++i) {
         mf[i]->FillBoundary_nowait(scomp[i], ncomp[i], nghost[i], period[i],
