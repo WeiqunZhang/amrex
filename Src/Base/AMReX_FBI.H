@@ -351,7 +351,6 @@ FB_local_copy_gpu (MF& mf0, FabArrayBase::FB const& FB0, int scomp0, int ncomp0,
                    MF& mf1, FabArrayBase::FB const& FB1, int scomp1, int ncomp1,
                    MF& mf2, FabArrayBase::FB const& FB2, int scomp2, int ncomp2)
 {
-#if 0
     using T = typename MF::value_type;
     using TagType = Array4CopyTag<T>;
     auto* tv0 = mf0.FB_get_local_copy_tag_vector(FB0);
@@ -359,13 +358,16 @@ FB_local_copy_gpu (MF& mf0, FabArrayBase::FB const& FB0, int scomp0, int ncomp0,
     auto* tv2 = mf2.FB_get_local_copy_tag_vector(FB2);
 
     constexpr auto nthreads = TagVector<TagType>::nthreads;
-    GpuArray<TagType*,3> d_tags{tv0.d_tags, tv1.d_tags, tv2.d_tags};
-    GpuArray<int*,3> d_nwarps{tv0.d_nwarps, tv1.d_nwarps, tv2.d_nwarps};
-    GpuArray<int,3> ntags{tv0.ntags, tv1.ntags, tv2.ntags};
-    GpuArray<int,3> ntotwarps{tv0.ntotwarps, tv1.ntotwarps, tv2.ntotwarps};
+    GpuArray<TagType*,3> da_tags{tv0->d_tags, tv1->d_tags, tv2->d_tags};
+    GpuArray<int*,3> da_nwarps{tv0->d_nwarps, tv1->d_nwarps, tv2->d_nwarps};
+    GpuArray<int,3> da_ntags{tv0->ntags, tv1->ntags, tv2->ntags};
+    GpuArray<int,3> da_ntotwarps{tv0->ntotwarps, tv1->ntotwarps, tv2->ntotwarps};
+
+    GpuArray<int,3> scomps{scomp0, scomp1, scomp2};
+    GpuArray<int,3> ncomps{ncomp0, ncomp1, ncomp2};
 
     dim3 blocks, threads;
-    blocks.x = std::max({tv0.nblocks,tv1.nblocks,tv2.nblocks});
+    blocks.x = std::max({tv0->nblocks,tv1->nblocks,tv2->nblocks});
     blocks.y = 3;
     blocks.z = 1;
     threads.x = nthreads;
@@ -377,21 +379,38 @@ FB_local_copy_gpu (MF& mf0, FabArrayBase::FB const& FB0, int scomp0, int ncomp0,
         {
             auto g_tid = std::size_t(blockDim.x)*blockIdx.x + threadIdx.x;
             auto g_wid = int(g_tid / Gpu::Device::warp_size);
-            auto f = [&] (auto d_tags, auto d_nwarps, auto d_ntags, auto ntotwarps)
+            auto f = [&] (auto d_tags, auto d_nwarps, auto d_ntags,
+                          auto ntotwarps, int scomp, int ncomp)
             {
                 if (g_wid >= ntotwarps) { return; }
 
-                int tag_id = amrex::bisect(d_nwarps, 0, ntags, g_wid);
+                int tag_id = amrex::bisect(d_nwarps, 0, d_ntags, g_wid);
 
                 int b_wid = g_wid - d_nwarps[tag_id]; // b_wid'th warp on this box
                 int lane = threadIdx.x % Gpu::Device::warp_size;
                 int icell = b_wid*Gpu::Device::warp_size + lane;
-            };
-            f(d_tags[blockIdx.y], d_nwarps[blockIdx.y], d_ntags[blockIdx.y],
-              ntotwarps[blockIdx.y]);
-        });
+                auto const& tag = d_tags[tag_id];
 
-#endif
+                int ncells = tag.box().numPts();
+                if (icell < ncells) {
+                    const auto len = amrex::length(tag.box());
+                    const auto lo  = amrex::lbound(tag.box());
+                    int k =  icell /   (len.x*len.y);
+                    int j = (icell - k*(len.x*len.y)) /   len.x;
+                    int i = (icell - k*(len.x*len.y)) - j*len.x;
+                    i += lo.x;
+                    j += lo.y;
+                    k += lo.z;
+                    for (int n = 0; n < ncomp; ++n) {
+                        tag.dfab(i,j,k,n+scomp) = tag.sfab(i+tag.offset.x,
+                                                           j+tag.offset.y,
+                                                           k+tag.offset.z,n+scomp);
+                    }
+                }
+            };
+            f(da_tags[blockIdx.y], da_nwarps[blockIdx.y], da_ntags[blockIdx.y],
+              da_ntotwarps[blockIdx.y], scomps[blockIdx.y], ncomps[blockIdx.y]);
+        });
 }
 
 template <class FAB>
