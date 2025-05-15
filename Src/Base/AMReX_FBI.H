@@ -345,6 +345,55 @@ FabArray<FAB>::FB_local_copy_gpu (const FB& TheFB, int scomp, int ncomp)
         });
 }
 
+template <class MF>
+std::enable_if_t<IsFabArray<MF>::value>
+FB_local_copy_gpu (MF& mf0, FabArrayBase::FB const& FB0, int scomp0, int ncomp0,
+                   MF& mf1, FabArrayBase::FB const& FB1, int scomp1, int ncomp1,
+                   MF& mf2, FabArrayBase::FB const& FB2, int scomp2, int ncomp2)
+{
+#if 0
+    using T = typename MF::value_type;
+    using TagType = Array4CopyTag<T>;
+    auto* tv0 = mf0.FB_get_local_copy_tag_vector(FB0);
+    auto* tv1 = mf1.FB_get_local_copy_tag_vector(FB1);
+    auto* tv2 = mf2.FB_get_local_copy_tag_vector(FB2);
+
+    constexpr auto nthreads = TagVector<TagType>::nthreads;
+    GpuArray<TagType*,3> d_tags{tv0.d_tags, tv1.d_tags, tv2.d_tags};
+    GpuArray<int*,3> d_nwarps{tv0.d_nwarps, tv1.d_nwarps, tv2.d_nwarps};
+    GpuArray<int,3> ntags{tv0.ntags, tv1.ntags, tv2.ntags};
+    GpuArray<int,3> ntotwarps{tv0.ntotwarps, tv1.ntotwarps, tv2.ntotwarps};
+
+    dim3 blocks, threads;
+    blocks.x = std::max({tv0.nblocks,tv1.nblocks,tv2.nblocks});
+    blocks.y = 3;
+    blocks.z = 1;
+    threads.x = nthreads;
+    threads.y = 1;
+    threads.z = 1;
+
+    launch_global<nthreads><<<blocks, threads, 0, Gpu::gpuStream()>>>(
+        [=] AMREX_GPU_DEVICE ()
+        {
+            auto g_tid = std::size_t(blockDim.x)*blockIdx.x + threadIdx.x;
+            auto g_wid = int(g_tid / Gpu::Device::warp_size);
+            auto f = [&] (auto d_tags, auto d_nwarps, auto d_ntags, auto ntotwarps)
+            {
+                if (g_wid >= ntotwarps) { return; }
+
+                int tag_id = amrex::bisect(d_nwarps, 0, ntags, g_wid);
+
+                int b_wid = g_wid - d_nwarps[tag_id]; // b_wid'th warp on this box
+                int lane = threadIdx.x % Gpu::Device::warp_size;
+                int icell = b_wid*Gpu::Device::warp_size + lane;
+            };
+            f(d_tags[blockIdx.y], d_nwarps[blockIdx.y], d_ntags[blockIdx.y],
+              ntotwarps[blockIdx.y]);
+        });
+
+#endif
+}
+
 template <class FAB>
 void
 FabArray<FAB>::CMD_local_setVal_gpu (typename FabArray<FAB>::value_type x,

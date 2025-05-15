@@ -960,9 +960,9 @@ FillBoundary (Vector<MF*> const& mf, Vector<int> const& scomp,
       auto const& TheFB_2 = mf[2]->getFB(nghost[2], period[2],
                                          cross.empty() ? 0 : cross[2]);
 
-      FB_local_copy_gpu(The_FB_0, scomp[0], ncomp[0],
-                        The_FB_1, scomp[1], ncomp[1],
-                        The_FB_2, scomp[2], ncomp[2]);
+      FB_local_copy_gpu(*mf[0], TheFB_0, scomp[0], ncomp[0],
+                        *mf[1], TheFB_1, scomp[1], ncomp[1],
+                        *mf[2], TheFB_2, scomp[2], ncomp[2]);
       if (!Gpu::inNoSyncRegion()) {
           Gpu::streamSynchronize();
       }
@@ -972,6 +972,7 @@ FillBoundary (Vector<MF*> const& mf, Vector<int> const& scomp,
       amrex::Abort("FillBoundary(Vector): todo");
 
 #endif
+  }
 }
 
 template <class MF>
