@@ -248,10 +248,17 @@ bool NFilesIter::ReadyToWrite (bool appendFirst) {
 
             for(int iSet(0); iSet < nSets; ++iSet) {
                 if(mySetPosition == iSet) {
+//                    amrex::AllPrint() << "xxxxx Proc. " << ParallelDescriptor::MyProc()
+//                        << " is ready to write\n";
                     if(iSet == 0 && ! appendFirst) {   // ---- first set
                         fileStream.open(fullFileName.c_str(),
                                         std::ios::out | std::ios::trunc | std::ios::binary);
                     } else {
+//                        amrex::AllPrint() << "xxxxx Proc. " << ParallelDescriptor::MyProc()
+//                                          << ": does " << fullFileName << " exist?\n";
+//                        amrex::AllPrint() << "xxxxx Proc. " << ParallelDescriptor::MyProc()
+//                                          << ": exist? " << FileSystem::Exists(fullFileName) << "\n";
+
                         fileStream.open(fullFileName.c_str(),
                                         std::ios::out | std::ios::app | std::ios::binary);
                         fileStream.seekg(0, std::ios_base::end);
@@ -259,6 +266,10 @@ bool NFilesIter::ReadyToWrite (bool appendFirst) {
                             (file_size == Long(fileStream.tellg()),
                              "File size in incorrect");
                     }
+
+//                    amrex::AllPrint() << "xxxxx Proc. " << ParallelDescriptor::MyProc()
+//                        << " finished open\n";
+
                     if( ! fileStream.good()) {
                         amrex::FileOpenFailed(fullFileName);
                     }
@@ -391,6 +402,10 @@ NFilesIter &NFilesIter::operator++ () {
                 fileStream.seekg(0, std::ios_base::end);
                 auto file_size = (Long)fileStream.tellg();
                 fileStream.close();
+
+//                amrex::AllPrint() << "xxxxx Proc. " << ParallelDescriptor::MyProc()
+//                                  << " just finished writing " << file_size
+//                                  << " bytes\n";
 
                 int wakeUpPID(-1);
                 if(groupSets) {

@@ -87,7 +87,7 @@ private:
     bool m_append = false;
 
     std::unique_ptr<char[]> m_buffer;
-    Long m_buffer_size = 32*1024*1024; // 32MB
+    Long m_buffer_size = 16*1024*1024; // 32MB
     Long m_buffer_begin = 0;
     Long m_buffer_end = 0;
     enum class BufferMode { Read, Write, None};
