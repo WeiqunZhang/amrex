@@ -36,7 +36,7 @@ void* write_thread_func(void* arg)
     return nullptr;
 }
 
-ssize_t timed_write(int fd, const char* buf, size_t count, int timeout_sec)
+ssize_t timed_write(int fd, const char* buf, size_t count, int timeout_sec, std::string const& command)
 {
     WriteInfo info = {fd, buf, count, -1, false};
     pthread_t tid;
@@ -54,6 +54,10 @@ ssize_t timed_write(int fd, const char* buf, size_t count, int timeout_sec)
 
     if (!info.done) {
         std::cerr << "Timeout occurred, cancelling thread\n";
+        amrex::AllPrint() << "xxxxx Proc. " << ParallelDescriptor::MyProc()
+                          << ": ::write failed. About to run "
+                          << command <<"\n";
+        std::system(command.c_str());
         pthread_cancel(tid);
         pthread_join(tid, nullptr);
         errno = ETIMEDOUT;
@@ -508,7 +512,7 @@ void FileStream::file_write (char const* s, Long count)
 //                          << ": before ::write " << count-total_written << "\n";
 
         execute_with_retry([&]() {
-            nbytes_written = timed_write(m_fd, s + total_written, count - total_written, write_timeout);
+            nbytes_written = timed_write(m_fd, s + total_written, count - total_written, write_timeout, command);
             if (nbytes_written >= 0) {
                 return true;
             } else {
