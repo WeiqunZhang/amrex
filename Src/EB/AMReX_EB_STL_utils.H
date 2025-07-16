@@ -60,7 +60,7 @@ public:
     static constexpr int mixedcells = 0;
     static constexpr int allcovered = 1;
 
-    void setBVHOptimization (bool flag) { m_bvh_optimization = flag; }
+    void useWeightedPseudoNormal (bool flag) { m_use_pseudonormal = flag; }
 
     void read_stl_file (std::string const& fname, Real scale, Array<Real,3> const& center,
                         int reverse_normal);
@@ -90,7 +90,7 @@ public:
 
 private:
 
-    bool m_bvh_optimization = true;
+    bool m_use_pseudonormal = true;
 
     Gpu::DeviceVector<Triangle> m_tri_pts_d;
     Gpu::DeviceVector<XDim3> m_tri_normals_d;

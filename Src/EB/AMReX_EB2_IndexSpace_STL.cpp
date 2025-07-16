@@ -8,12 +8,12 @@ IndexSpaceSTL::IndexSpaceSTL (const std::string& stl_file, Real stl_scale,
                               int max_coarsening_level, int ngrow,
                               bool build_coarse_level_by_coarsening,
                               bool extend_domain_face, int num_coarsen_opt,
-                              bool bvh_optimization)
+                              bool use_weighted_pseudonormal)
 {
     Gpu::LaunchSafeGuard lsg(true); // Always use GPU
 
     STLtools stl_tools;
-    stl_tools.setBVHOptimization(bvh_optimization);
+    stl_tools.useWeightedPseudoNormal(use_weighted_pseudonormal);
     stl_tools.read_stl_file(stl_file, stl_scale, stl_center, stl_reverse_normal);
 
     // build finest level (i.e., level 0) first

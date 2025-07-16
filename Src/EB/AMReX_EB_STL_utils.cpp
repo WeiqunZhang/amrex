@@ -567,7 +567,7 @@ STLtools::prepare (Gpu::PinnedVector<Triangle> a_tri_pts)
     ParallelDescriptor::Bcast((char*)(a_tri_pts.dataPtr()), m_num_tri*sizeof(Triangle));
 
     Gpu::PinnedVector<Node> bvh_nodes;
-    if (m_bvh_optimization) {
+    {
         BL_PROFILE("STLtools::build_bvh");
         std::size_t nnodes = 0;
         bvh_size(int(a_tri_pts.size()), nnodes);
@@ -837,8 +837,6 @@ STLtools::fill (MultiFab& mf, IntVect const& nghost, Geometry const& geom,
 {
     BL_PROFILE("STLtools::fill");
 
-    int num_triangles = m_num_tri;
-
     const auto plo = geom.ProbLoArray();
     const auto dx  = geom.CellSizeArray();
 
@@ -847,7 +845,6 @@ STLtools::fill (MultiFab& mf, IntVect const& nghost, Geometry const& geom,
                                  ixt.cellCentered(1) ? 0.5_rt : 0.0_rt,
                                  ixt.cellCentered(2) ? 0.5_rt : 0.0_rt));
 
-    const Triangle* tri_pts = m_tri_pts_d.data();
     XDim3 ptmin = m_ptmin;
     XDim3 ptmax = m_ptmax;
     XDim3 ptref = m_ptref;
@@ -857,13 +854,8 @@ STLtools::fill (MultiFab& mf, IntVect const& nghost, Geometry const& geom,
     auto const& ma = mf.arrays();
     auto const* bvh_root = m_bvh_nodes.data();
 
-    enum bvh_opt_options : int { no_bvh, yes_bvh };
-    int bvh_opt_runtime_option = m_bvh_optimization ? yes_bvh : no_bvh;
-
-    AnyCTO(TypeList<CompileTimeOptions<no_bvh, yes_bvh>>{},
-           {bvh_opt_runtime_option},
-           [&] (auto cto_func) { ParallelFor(mf, nghost, cto_func); },
-           [=] AMREX_GPU_DEVICE (int box_no, int i, int j, int k, auto control) noexcept
+    ParallelFor(mf, nghost,
+           [=] AMREX_GPU_DEVICE (int box_no, int i, int j, int k) noexcept
     {
         Real coords[3];
         coords[0]=plo[0]+(static_cast<Real>(i)+offset[0])*dx[0];
@@ -879,28 +871,17 @@ STLtools::fill (MultiFab& mf, IntVect const& nghost, Geometry const& geom,
             coords[2] >= ptmin.z && coords[2] <= ptmax.z)
         {
             Real pr[]={ptref.x, ptref.y, ptref.z};
-#ifdef AMREX_USE_CUDA
-            amrex::ignore_unused(bvh_root, num_triangles, tri_pts);
-#endif
-            if constexpr (control == yes_bvh) {
-                bvh_line_tri_intersects(pr, coords, bvh_root,
-                                        [&] (int ntri, Triangle const* tri,
-                                             XDim3 const*) -> int
-                {
-                    for (int tr=0; tr < ntri; ++tr) {
-                        if (line_tri_intersects(pr, coords, tri[tr])) {
-                            ++num_intersects;
-                        }
-                    }
-                    return 0;
-                });
-            } else {
-                for (int tr=0; tr < num_triangles; ++tr) {
-                    if (line_tri_intersects(pr, coords, tri_pts[tr])) {
+            bvh_line_tri_intersects(pr, coords, bvh_root,
+                                    [&] (int ntri, Triangle const* tri,
+                                         XDim3 const*) -> int
+            {
+                for (int tr=0; tr < ntri; ++tr) {
+                    if (line_tri_intersects(pr, coords, tri[tr])) {
                         ++num_intersects;
                     }
                 }
-            }
+                return 0;
+            });
         }
         ma[box_no](i,j,k) = (num_intersects % 2 == 0) ? reference_value : other_value;
     });
@@ -940,8 +921,6 @@ STLtools::getBoxType (Box const& box, Geometry const& geom, RunOn) const
     }
     else
     {
-        int num_triangles = m_num_tri;
-        const Triangle* tri_pts = m_tri_pts_d.data();
         XDim3 ptmin = m_ptmin;
         XDim3 ptmax = m_ptmax;
         XDim3 ptref = m_ptref;
@@ -953,13 +932,8 @@ STLtools::getBoxType (Box const& box, Geometry const& geom, RunOn) const
         ReduceData<int> reduce_data(reduce_op);
         using ReduceTuple = typename decltype(reduce_data)::Type;
 
-        enum bvh_opt_options : int { no_bvh, yes_bvh };
-        int bvh_opt_runtime_option = m_bvh_optimization ? yes_bvh : no_bvh;
-
-        AnyCTO(TypeList<CompileTimeOptions<no_bvh, yes_bvh>>{},
-               {bvh_opt_runtime_option},
-               [&] (auto cto_func) { reduce_op.eval(box, reduce_data, cto_func); },
-               [=] AMREX_GPU_DEVICE (int i, int j, int k, auto control) -> ReduceTuple
+        reduce_op.eval(box, reduce_data,
+               [=] AMREX_GPU_DEVICE (int i, int j, int k) -> ReduceTuple
         {
             Real coords[3];
             coords[0]=plo[0]+static_cast<Real>(i)*dx[0];
@@ -976,28 +950,17 @@ STLtools::getBoxType (Box const& box, Geometry const& geom, RunOn) const
                 coords[2] >= ptmin.z && coords[2] <= ptmax.z)
             {
                 Real pr[]={ptref.x, ptref.y, ptref.z};
-#ifdef AMREX_USE_CUDA
-                amrex::ignore_unused(bvh_root,num_triangles,tri_pts);
-#endif
-                if constexpr (control == yes_bvh) {
-                    bvh_line_tri_intersects(pr, coords, bvh_root,
-                                            [&] (int ntri, Triangle const* tri,
-                                                 XDim3 const*) -> int
-                    {
-                        for (int tr=0; tr < ntri; ++tr) {
-                            if (line_tri_intersects(pr, coords, tri[tr])) {
-                                ++num_intersects;
-                            }
-                        }
-                        return 0;
-                    });
-                } else {
-                    for (int tr=0; tr < num_triangles; ++tr) {
-                        if (line_tri_intersects(pr, coords, tri_pts[tr])) {
+                bvh_line_tri_intersects(pr, coords, bvh_root,
+                                        [&] (int ntri, Triangle const* tri,
+                                             XDim3 const*) -> int
+                {
+                    for (int tr=0; tr < ntri; ++tr) {
+                        if (line_tri_intersects(pr, coords, tri[tr])) {
                             ++num_intersects;
                         }
                     }
-                }
+                    return 0;
+                });
             }
 
             return (num_intersects % 2 == 0) ? ref_value : 1-ref_value;
@@ -1018,12 +981,9 @@ STLtools::getBoxType (Box const& box, Geometry const& geom, RunOn) const
 void
 STLtools::fillFab (BaseFab<Real>& levelset, const Geometry& geom, RunOn, Box const&) const
 {
-    int num_triangles = m_num_tri;
-
     const auto plo = geom.ProbLoArray();
     const auto dx  = geom.CellSizeArray();
 
-    const Triangle* tri_pts = m_tri_pts_d.data();
     XDim3 ptmin = m_ptmin;
     XDim3 ptmax = m_ptmax;
     XDim3 ptref = m_ptref;
@@ -1035,12 +995,7 @@ STLtools::fillFab (BaseFab<Real>& levelset, const Geometry& geom, RunOn, Box con
     auto const& a = levelset.array();
     const Box& bx = levelset.box();
 
-    enum bvh_opt_options : int { no_bvh, yes_bvh };
-    int bvh_opt_runtime_option = m_bvh_optimization ? yes_bvh : no_bvh;
-
-    ParallelFor(TypeList<CompileTimeOptions<no_bvh, yes_bvh>>{},
-                {bvh_opt_runtime_option},
-                bx, [=] AMREX_GPU_DEVICE (int i, int j, int k, auto control) noexcept
+    ParallelFor(bx, [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
     {
         Real coords[3];
         coords[0]=plo[0]+static_cast<Real>(i)*dx[0];
@@ -1056,28 +1011,17 @@ STLtools::fillFab (BaseFab<Real>& levelset, const Geometry& geom, RunOn, Box con
             coords[2] >= ptmin.z && coords[2] <= ptmax.z)
         {
             Real pr[]={ptref.x, ptref.y, ptref.z};
-#ifdef AMREX_USE_CUDA
-            amrex::ignore_unused(bvh_root,num_triangles,tri_pts);
-#endif
-            if constexpr (control == yes_bvh) {
-                bvh_line_tri_intersects(pr, coords, bvh_root,
-                                        [&] (int ntri, Triangle const* tri,
-                                             XDim3 const*) -> int
-                {
-                    for (int tr=0; tr < ntri; ++tr) {
-                        if (line_tri_intersects(pr, coords, tri[tr])) {
-                            ++num_intersects;
-                        }
-                    }
-                    return 0;
-                });
-            } else {
-                for (int tr=0; tr < num_triangles; ++tr) {
-                    if (line_tri_intersects(pr, coords, tri_pts[tr])) {
+            bvh_line_tri_intersects(pr, coords, bvh_root,
+                                    [&] (int ntri, Triangle const* tri,
+                                         XDim3 const*) -> int
+            {
+                for (int tr=0; tr < ntri; ++tr) {
+                    if (line_tri_intersects(pr, coords, tri[tr])) {
                         ++num_intersects;
                     }
                 }
-            }
+                return 0;
+            });
         }
         a(i,j,k) = (num_intersects % 2 == 0) ? reference_value : other_value;
     });
@@ -1089,29 +1033,17 @@ STLtools::getIntercept (Array<Array4<Real>,AMREX_SPACEDIM> const& inter_arr,
                         Array4<Real const> const& lst ,Geometry const& geom,
                         RunOn, Box const&) const
 {
-    int num_triangles = m_num_tri;
-
     const auto plo = geom.ProbLoArray();
     const auto dx  = geom.CellSizeArray();
 
-    const Triangle* tri_pts = m_tri_pts_d.data();
-    const XDim3* tri_norm = m_tri_normals_d.data();
     const Node* bvh_root = m_bvh_nodes.data();
-
-    enum bvh_opt_options : int { no_bvh, yes_bvh };
-    int bvh_opt_runtime_option = m_bvh_optimization ? yes_bvh : no_bvh;
 
     for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
         Array4<Real> const& inter = inter_arr[idim];
         Array4<EB2::Type_t const> const& type = type_arr[idim];
         const Box bx{inter};
-        ParallelFor(TypeList<CompileTimeOptions<no_bvh, yes_bvh>>{},
-                    {bvh_opt_runtime_option},
-            bx, [=] AMREX_GPU_DEVICE (int i, int j, int k, auto bvh_control) noexcept
+        ParallelFor(bx, [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
         {
-#ifdef AMREX_USE_CUDA
-            amrex::ignore_unused(num_triangles,tri_pts,tri_norm,lst,bvh_root);
-#endif
             Real r = std::numeric_limits<Real>::quiet_NaN();
             if (type(i,j,k) == EB2::Type::irregular) {
                 XDim3 p1{plo[0]+static_cast<Real>(i)*dx[0],
@@ -1125,51 +1057,41 @@ STLtools::getIntercept (Array<Array4<Real>,AMREX_SPACEDIM> const& inter_arr,
                 if (idim == 0) {
                     Real x2 = plo[0]+static_cast<Real>(i+1)*dx[0];
                     bool found = false;
-                    if constexpr (bvh_control == no_bvh) {
-                        for (int it=0; it < num_triangles; ++it) {
-                            auto const& tri = tri_pts[it];
+                    Real a[3] = {p1.x , p1.y, p1.z};
+                    Real b[3] = {   x2, p1.y, p1.z};
+                    bvh_line_tri_intersects(a, b, bvh_root,
+                                            [&] (int ntri, Triangle const* ptri,
+                                                 XDim3 const* ptrinorm) -> int
+                    {
+                        for (int it=0; it < ntri; ++it) {
+                            auto const& tri = ptri[it];
                             auto tmp = edge_tri_intersects(p1.x, x2, p1.y, p1.z,
                                                            tri.v1, tri.v2, tri.v3,
-                                                           tri_norm[it],
+                                                           ptrinorm[it],
                                                            lst(i+1,j,k)-lst(i,j,k));
                             if (tmp.first) {
                                 r = tmp.second;
                                 found = true;
-                                break;
+                                return 1;
                             }
                         }
-                    } else {
-                        Real a[3] = {p1.x , p1.y, p1.z};
-                        Real b[3] = {   x2, p1.y, p1.z};
-                        bvh_line_tri_intersects(a, b, bvh_root,
-                                                [&] (int ntri, Triangle const* ptri,
-                                                     XDim3 const* ptrinorm) -> int
-                        {
-                            for (int it=0; it < ntri; ++it) {
-                                auto const& tri = ptri[it];
-                                auto tmp = edge_tri_intersects(p1.x, x2, p1.y, p1.z,
-                                                               tri.v1, tri.v2, tri.v3,
-                                                               ptrinorm[it],
-                                                               lst(i+1,j,k)-lst(i,j,k));
-                                if (tmp.first) {
-                                    r = tmp.second;
-                                    found = true;
-                                    return 1;
-                                }
-                            }
-                            return 0;
-                        });
-                    }
+                        return 0;
+                    });
                     if (!found) {
                         r = (lst(i,j,k) > 0._rt) ? p1.x : x2;
                     }
                 } else if (idim == 1) {
                     Real y2 = plo[1]+static_cast<Real>(j+1)*dx[1];
                     bool found = false;
-                    if constexpr (bvh_control == no_bvh) {
-                        for (int it=0; it < num_triangles; ++it) {
-                            auto const& tri = tri_pts[it];
-                            auto const& norm = tri_norm[it];
+                    Real a[3] = {p1.x, p1.y , p1.z};
+                    Real b[3] = {p1.x,    y2, p1.z};
+                    bvh_line_tri_intersects(a, b, bvh_root,
+                                            [&] (int ntri, Triangle const* ptri,
+                                                 XDim3 const* ptrinorm) -> int
+                    {
+                        for (int it=0; it < ntri; ++it) {
+                            auto const& tri = ptri[it];
+                            auto const& norm = ptrinorm[it];
                             auto tmp = edge_tri_intersects(p1.y, y2, p1.z, p1.x,
                                                            {tri.v1.y, tri.v1.z, tri.v1.x},
                                                            {tri.v2.y, tri.v2.z, tri.v2.x},
@@ -1179,34 +1101,11 @@ STLtools::getIntercept (Array<Array4<Real>,AMREX_SPACEDIM> const& inter_arr,
                             if (tmp.first) {
                                 r = tmp.second;
                                 found = true;
-                                break;
+                                return 1;
                             }
                         }
-                    } else {
-                        Real a[3] = {p1.x, p1.y , p1.z};
-                        Real b[3] = {p1.x,    y2, p1.z};
-                        bvh_line_tri_intersects(a, b, bvh_root,
-                                                [&] (int ntri, Triangle const* ptri,
-                                                     XDim3 const* ptrinorm) -> int
-                        {
-                            for (int it=0; it < ntri; ++it) {
-                                auto const& tri = ptri[it];
-                                auto const& norm = ptrinorm[it];
-                                auto tmp = edge_tri_intersects(p1.y, y2, p1.z, p1.x,
-                                                               {tri.v1.y, tri.v1.z, tri.v1.x},
-                                                               {tri.v2.y, tri.v2.z, tri.v2.x},
-                                                               {tri.v3.y, tri.v3.z, tri.v3.x},
-                                                               {  norm.y,   norm.z,   norm.x},
-                                                               lst(i,j+1,k)-lst(i,j,k));
-                                if (tmp.first) {
-                                    r = tmp.second;
-                                    found = true;
-                                    return 1;
-                                }
-                            }
-                            return 0;
-                        });
-                    }
+                        return 0;
+                    });
                     if (!found) {
                         r = (lst(i,j,k) > 0._rt) ? p1.y : y2;
                     }
@@ -1215,10 +1114,15 @@ STLtools::getIntercept (Array<Array4<Real>,AMREX_SPACEDIM> const& inter_arr,
                 else {
                     Real z2 = plo[2]+static_cast<Real>(k+1)*dx[2];
                     bool found = false;
-                    if constexpr (bvh_control == no_bvh) {
-                        for (int it=0; it < num_triangles; ++it) {
-                            auto const& tri = tri_pts[it];
-                            auto const& norm = tri_norm[it];
+                    Real a[3] = {p1.x, p1.y, p1.z };
+                    Real b[3] = {p1.x, p1.y,    z2};
+                    bvh_line_tri_intersects(a, b, bvh_root,
+                                            [&] (int ntri, Triangle const* ptri,
+                                                 XDim3 const* ptrinorm) -> int
+                    {
+                        for (int it=0; it < ntri; ++it) {
+                            auto const& tri = ptri[it];
+                            auto const& norm = ptrinorm[it];
                             auto tmp = edge_tri_intersects(p1.z, z2, p1.x, p1.y,
                                                            {tri.v1.z, tri.v1.x, tri.v1.y},
                                                            {tri.v2.z, tri.v2.x, tri.v2.y},
@@ -1228,34 +1132,11 @@ STLtools::getIntercept (Array<Array4<Real>,AMREX_SPACEDIM> const& inter_arr,
                             if (tmp.first) {
                                 r = tmp.second;
                                 found = true;
-                                break;
+                                return 1;
                             }
                         }
-                    } else {
-                        Real a[3] = {p1.x, p1.y, p1.z };
-                        Real b[3] = {p1.x, p1.y,    z2};
-                        bvh_line_tri_intersects(a, b, bvh_root,
-                                                [&] (int ntri, Triangle const* ptri,
-                                                     XDim3 const* ptrinorm) -> int
-                        {
-                            for (int it=0; it < ntri; ++it) {
-                                auto const& tri = ptri[it];
-                                auto const& norm = ptrinorm[it];
-                                auto tmp = edge_tri_intersects(p1.z, z2, p1.x, p1.y,
-                                                               {tri.v1.z, tri.v1.x, tri.v1.y},
-                                                               {tri.v2.z, tri.v2.x, tri.v2.y},
-                                                               {tri.v3.z, tri.v3.x, tri.v3.y},
-                                                               {  norm.z,   norm.x,   norm.y},
-                                                               lst(i,j,k+1)-lst(i,j,k));
-                                if (tmp.first) {
-                                    r = tmp.second;
-                                    found = true;
-                                    return 1;
-                                }
-                            }
-                            return 0;
-                        });
-                    }
+                        return 0;
+                    });
                     if (!found) {
                         r = (lst(i,j,k) > 0._rt) ? p1.z : z2;
                     }
@@ -1347,32 +1228,15 @@ STLtools::fillSignedDistance (MultiFab& mf, IntVect const& nghost, Geometry cons
 
     auto const& ma = mf.arrays();
 
-    if (m_bvh_optimization) {
-        auto const* bvh_root = m_bvh_nodes.data();
-        ParallelFor(mf, nghost, [=] AMREX_GPU_DEVICE (int b, int i, int j, int k)
-        {
-            XDim3 coords = {plo[0]+(static_cast<Real>(i)+offset[0])*dx[0],
-                            plo[1]+(static_cast<Real>(j)+offset[1])*dx[1],
-                            plo[2]+(static_cast<Real>(k)+offset[2])*dx[2]};
-            auto d2 = bvh_d2(coords, bvh_root);
-            ma[b](i,j,k) *= std::sqrt(d2);
-        });
-    } else {
-        auto const* tri_pts = m_tri_pts_d.data();
-        int num_triangles = m_num_tri;
-        ParallelFor(mf, nghost, [=] AMREX_GPU_DEVICE (int b, int i, int j, int k)
-        {
-            XDim3 coords = {plo[0]+(static_cast<Real>(i)+offset[0])*dx[0],
-                            plo[1]+(static_cast<Real>(j)+offset[1])*dx[1],
-                            plo[2]+(static_cast<Real>(k)+offset[2])*dx[2]};
-            auto d2 = std::numeric_limits<Real>::max();
-            for (int tr = 0; tr < num_triangles; ++tr) {
-                auto tmp = pt_tri_min_d2(coords, tri_pts[tr]);
-                d2 = std::min(d2, tmp);
-            }
-            ma[b](i,j,k) *= std::sqrt(d2);
-        });
-    }
+    auto const* bvh_root = m_bvh_nodes.data();
+    ParallelFor(mf, nghost, [=] AMREX_GPU_DEVICE (int b, int i, int j, int k)
+    {
+        XDim3 coords = {plo[0]+(static_cast<Real>(i)+offset[0])*dx[0],
+            plo[1]+(static_cast<Real>(j)+offset[1])*dx[1],
+            plo[2]+(static_cast<Real>(k)+offset[2])*dx[2]};
+        auto d2 = bvh_d2(coords, bvh_root);
+        ma[b](i,j,k) *= std::sqrt(d2);
+    });
     Gpu::streamSynchronize();
 #endif
 }
