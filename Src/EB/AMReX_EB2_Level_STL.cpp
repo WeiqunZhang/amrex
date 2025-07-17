@@ -9,6 +9,14 @@ STLLevel::STLLevel (IndexSpace const* is, STLtools const& stl_tools, const Geome
     BL_PROFILE("EB2::STLLevel()-fine");
 
     define_fine(stl_tools, geom, max_grid_size, ngrow, extend_domain_face, num_crse_opt);
+
+
+    // xxxxx STLLevel debug
+    BoxArray ba(geom.Domain());
+    ba.maxSize(32);
+    DistributionMapping dm(ba);
+    MultiFab mf(ba, dm, 1, 0);
+    stl_tools.fillSignedDistance(mf, mf.nGrowVect(), geom);
 }
 
 STLLevel::STLLevel (IndexSpace const* is, int ilev, int max_grid_size, int ngrow,

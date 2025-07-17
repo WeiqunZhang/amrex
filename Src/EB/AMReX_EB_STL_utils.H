@@ -8,6 +8,7 @@
 #include <AMReX_EB2_Graph.H>
 
 #include <algorithm>
+#include <cmath>
 #include <cstdint>
 #include <limits>
 #include <utility>
@@ -60,7 +61,7 @@ public:
     static constexpr int mixedcells = 0;
     static constexpr int allcovered = 1;
 
-    void useWeightedPseudoNormal (bool flag) { m_use_pseudonormal = flag; }
+    void usePseudoNormal (bool flag) { m_use_pseudonormal = flag; }
 
     void read_stl_file (std::string const& fname, Real scale, Array<Real,3> const& center,
                         int reverse_normal);

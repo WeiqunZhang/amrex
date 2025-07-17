@@ -1,3 +1,4 @@
+#include <AMReX_Algorithm.H>
 #include <AMReX_BLProfiler.H>
 #include <AMReX_EB_STL_utils.H>
 #include <AMReX_EB_triGeomOps_K.H>
@@ -8,6 +9,7 @@
 #include <cstring>
 
 // Reference for BVH: https://rmrsk.github.io/EBGeometry/Concepts.html#bounding-volume-hierarchies
+// Angle weighted pseudonormal: https://doi.org/10.1109/TVCG.2005.49 J.A. Baerentzen & H. Aanaes
 
 namespace amrex
 {
@@ -193,11 +195,11 @@ namespace {
 #if (AMREX_SPACEDIM == 3)
 
     AMREX_GPU_DEVICE AMREX_FORCE_INLINE
-    Real pt_segment_min_d2 (XDim3 const& pt, XDim3 const& a, XDim3 const& b)
+    Real pt_segment_min_d2 (XDim3 const& pt, XDim3 const& a, XDim3 const& b, Real& t)
     {
         auto ab = b - a;
         auto ap = pt - a;
-        auto t = dot_product(ab,ap) / dot_product(ab,ab);
+        t = dot_product(ab,ap) / dot_product(ab,ab);
         t = amrex::Clamp(t, Real(0), Real(1));
         return Math::powi<2>(t*ab.x-ap.x)
             +  Math::powi<2>(t*ab.y-ap.y)
@@ -205,7 +207,21 @@ namespace {
     }
 
     AMREX_GPU_DEVICE AMREX_FORCE_INLINE
-    Real pt_tri_min_d2 (XDim3 const& pt, STLtools::Triangle const& tri)
+    Real pt_pt_distance2 (XDim3 const& a, XDim3 const& b)
+    {
+        return Math::powi<2>(a.x-b.x)
+            +  Math::powi<2>(a.y-b.y)
+            +  Math::powi<2>(a.z-b.z);
+    }
+
+    // Returns type of nearest point
+    //   0: inside the triangle
+    //   1: vetex 1
+    //   2: vetex 2
+    //   3: vetex 3
+    //   4: edge
+    AMREX_GPU_DEVICE AMREX_FORCE_INLINE
+    int pt_tri_nearest_pt (XDim3 const& pt, STLtools::Triangle const& tri, XDim3& npt)
     {
         // We want to know whether the projection of the point onto the
         // triangle plane is inside the triangle. If so, the closest point
@@ -236,15 +252,90 @@ namespace {
             auto t = dot_product(vb, cross_product(rhs, n)) * detinv;
             auto c1 = Real(1) - s - t;
             if (t >= 0 && c1 >= 0) { // q is inside
-                auto dn = dot_product(vb, cross_product(vc, rhs));
-                return dn*dn*detinv;
+                npt.x = tri.v1.x + s*vb.x + t*vc.x;
+                npt.y = tri.v1.y + s*vb.y + t*vc.y;
+                npt.z = tri.v1.z + s*vb.z + t*vc.z;
+                return 0;
             }
         }
 
-        auto d2_1 = pt_segment_min_d2(pt, tri.v1, tri.v2);
-        auto d2_2 = pt_segment_min_d2(pt, tri.v1, tri.v3);
-        auto d2_3 = pt_segment_min_d2(pt, tri.v2, tri.v3);
-        return std::min({d2_1,d2_2,d2_3});
+        int type;
+        Real t1, t2, t3;
+        auto d2_1 = pt_segment_min_d2(pt, tri.v1, tri.v2, t1);
+        auto d2_2 = pt_segment_min_d2(pt, tri.v1, tri.v3, t2);
+        auto d2_3 = pt_segment_min_d2(pt, tri.v2, tri.v3, t3);
+        Real d2min;
+        if (d2_1 <= d2_2) {
+            d2min = d2_1;
+            if (t1 == Real(0)) {
+                type = 1;
+                npt = tri.v1;
+            } else if (t1 == Real(1)) {
+                type = 2;
+                npt = tri.v2;
+            } else {
+                type = 4;
+                Real ta = Real(1.0) - t1;
+                npt.x = ta * tri.v1.x + t1 * tri.v2.x;
+                npt.y = ta * tri.v1.y + t1 * tri.v2.y;
+                npt.z = ta * tri.v1.z + t1 * tri.v2.z;
+            }
+        } else {
+            d2min = d2_2;
+            if (t2 == Real(0)) {
+                type = 1;
+                npt = tri.v1;
+            } else if (t2 == Real(1)) {
+                type = 3;
+                npt = tri.v3;
+            } else {
+                type = 4;
+                Real ta = Real(1.0) - t2;
+                npt.x = ta * tri.v1.x + t2 * tri.v3.x;
+                npt.y = ta * tri.v1.y + t2 * tri.v3.y;
+                npt.z = ta * tri.v1.z + t2 * tri.v3.z;
+            }
+        }
+        if (d2_3 < d2min) {
+            if (t3 == Real(0)) {
+                type = 2;
+                npt = tri.v2;
+            } else if (t3 == Real(1)) {
+                type = 3;
+                npt = tri.v3;
+            } else {
+                type = 4;
+                Real ta = Real(1.0) - t3;
+                npt.x = ta * tri.v2.x + t3 * tri.v3.x;
+                npt.y = ta * tri.v2.y + t3 * tri.v3.y;
+                npt.z = ta * tri.v2.z + t3 * tri.v3.z;
+            }
+        }
+        return type;
+    }
+
+    AMREX_GPU_DEVICE AMREX_FORCE_INLINE
+    Real get_angle_degree (XDim3 const& a, XDim3 const& b)
+    {
+        double t = dot_product(a,b) / std::sqrt(dot_product(a,a) * dot_product(b,b));
+        t = amrex::Clamp(t, Real(-1.0), Real(1.0));
+        return std::acos(t) * (Real(180.0) / amrex::Math::pi<Real>());
+    }
+
+    AMREX_GPU_DEVICE AMREX_FORCE_INLINE
+    Real get_weight (STLtools::Triangle const& tri, int type)
+    {
+        if (type == 0) {
+            return Real(360.);
+        } else if (type == 1) {
+            return get_angle_degree(tri.v2 - tri.v1,  tri.v3 - tri.v1);
+        } else if (type == 2) {
+            return get_angle_degree(tri.v1 - tri.v2,  tri.v3 - tri.v2);
+        } else if (type == 3) {
+            return get_angle_degree(tri.v1 - tri.v3,  tri.v2 - tri.v3);
+        } else {
+            return Real(180.);
+        }
     }
 
     AMREX_GPU_DEVICE AMREX_FORCE_INLINE
@@ -355,24 +446,96 @@ namespace {
         }
     }
 
+    bool almost_equal (XDim3 const& p1, XDim3 const& p2, Real eps)
+    {
+        return amrex::almostEqual2(p1.x, p2.x, eps)
+            && amrex::almostEqual2(p1.y, p2.y, eps)
+            && amrex::almostEqual2(p1.z, p2.z, eps);
+    }
+
     template <int M, int N>
     AMREX_GPU_DEVICE AMREX_FORCE_INLINE
-    Real bvh_d2 (XDim3 const& pt, STLtools::BVHNodeT<M,N> const* root)
+    Real bvh_signed_distance (XDim3 const& pt, STLtools::BVHNodeT<M,N> const* root)
     {
         Stack<int, STLtools::m_bvh_max_stack_size> nodes_to_do;
         Stack<std::int8_t, STLtools::m_bvh_max_stack_size> nchildren_done;
         nodes_to_do.push(0);
         nchildren_done.push(0);
 
+#ifdef AMREX_USE_FLOAT
+        constexpr float eps = 1.e-5f;
+#else
+        constexpr double eps = 1.e-12;
+#endif
+
         Real d = std::numeric_limits<Real>::max();
+
+        // We want to avoid the worst case scenario.
+        int n0 = 0 ;
+        while (true) {
+            auto const& node = root[n0];
+            if (node.nchildren == 0) { // leaf node
+                for (std::int8_t it = 0; it < node.ntriangles; ++it) {
+                    XDim3 npttmp;
+                    pt_tri_nearest_pt(pt, node.triangles[it], npttmp);
+                    auto dtmp = pt_pt_distance2(pt, npttmp);
+                    if (dtmp < d) {
+                        d = dtmp;
+                        if (d == 0) { return 0; }
+                    }
+                }
+                break;
+            } else {
+                Real dmin = std::numeric_limits<Real>::max();
+                for (std::int8_t ichild = 0; ichild < node.nchildren; ++ichild) {
+                    int inode = node.children[ichild];
+                    auto dtmp = pt_box_min_d2(pt, root[inode].boundingbox);
+                    if (dtmp < dmin) {
+                        dmin = dtmp;
+                        n0 = inode;
+                    }
+                }
+            }
+        }
+
+        XDim3 npt{std::numeric_limits<Real>::max() * Real(0.01),
+                  std::numeric_limits<Real>::max() * Real(0.01),
+                  std::numeric_limits<Real>::max() * Real(0.01)};
+        XDim3 norm;
+        bool initialized = false;
 
         while (!nodes_to_do.empty()) {
             auto const& node = root[nodes_to_do.top()];
             if (node.nchildren == 0) { // leaf node
                 for (std::int8_t it = 0; it < node.ntriangles; ++it) {
-                    Real dmin = pt_tri_min_d2(pt, node.triangles[it]);
-                    d = std::min(d,dmin);
-                    if (d == 0) { return 0; }
+                    auto const& tri = node.triangles[it];
+                    XDim3 npttmp;
+                    int type = pt_tri_nearest_pt(pt, tri, npttmp);
+                    auto dtmp = pt_pt_distance2(pt, npttmp);
+                    bool ddeq = amrex::almostEqual2(dtmp, d, eps);
+                    if (dtmp == 0) {
+                        return 0;
+                    } else if (!initialized) {
+                        if ((dtmp < d) || ddeq) {
+                            initialized = true;
+                            d = dtmp;
+                            npt = npttmp;
+                            norm = node.trinorm[it] * get_weight(tri, type);
+                        }
+                    } else {
+                        if ((dtmp < d) && !ddeq) {
+                            d = dtmp;
+                            npt = npttmp;
+                            norm = node.trinorm[it] * get_weight(tri, type);
+                        } else if (ddeq) {
+                            if (almost_equal(npt, npttmp, eps)) {
+                                auto w = get_weight(tri, type);
+                                norm.x += node.trinorm[it].x * w;
+                                norm.y += node.trinorm[it].y * w;
+                                norm.z += node.trinorm[it].z * w;
+                            }
+                        }
+                    }
                 }
                 nodes_to_do.pop();
                 nchildren_done.pop();
@@ -382,8 +545,8 @@ namespace {
                     for (auto ichild = ndone; ichild < node.nchildren; ++ichild) {
                         ++ndone;
                         int inode = node.children[ichild];
-                        auto dmin = pt_box_min_d2(pt, root[inode].boundingbox);
-                        if (d > dmin) {
+                        auto dtmp = pt_box_min_d2(pt, root[inode].boundingbox);
+                        if (d > dtmp) {
                             nodes_to_do.push(inode);
                             nchildren_done.push(0);
                             break;
@@ -396,7 +559,17 @@ namespace {
             }
         }
 
-        return d;
+        npt.x = pt.x - npt.x;
+        npt.y = pt.y - npt.y;
+        npt.z = pt.z - npt.z;
+        auto sgn = dot_product(npt, norm);
+        if (sgn > 0) {
+            return std::sqrt(d);
+        } else if (sgn < 0) {
+            return -std::sqrt(d);
+        } else {
+            return 0;
+        }
     }
 
 #endif
@@ -716,18 +889,30 @@ STLtools::prepare (Gpu::PinnedVector<Triangle> a_tri_pts)
     // We now need to figure out if the boundary and the reference is
     // outside or inside the object.
     XDim3 ptref = m_ptref;
-    int num_isects = Reduce::Sum<int>(m_num_tri, [=] AMREX_GPU_DEVICE (int i) -> int
+    if (m_use_pseudonormal) {
+        auto const* bvh_root = m_bvh_nodes.data();
+        Gpu::PinnedVector<Real> hv(1);
+        auto* p = hv.data();
+        ParallelFor(1, [=] AMREX_GPU_DEVICE (int)
         {
-            if (i == 0) {
-                return 1-is_ref_positive;
-            } else {
-                Real p1[] = {ptref.x, ptref.y, ptref.z};
-                Real p2[] = {cent0.x, cent0.y, cent0.z};
-                return static_cast<int>(line_tri_intersects(p1, p2, tri_pts[i]));
-            }
+            *p = bvh_signed_distance(ptref, bvh_root);
         });
+        Gpu::streamSynchronize();
+        m_boundry_is_outside = (*p) > 0;
+    } else {
+        int num_isects = Reduce::Sum<int>(m_num_tri, [=] AMREX_GPU_DEVICE (int i) -> int
+            {
+                if (i == 0) {
+                    return 1-is_ref_positive;
+                } else {
+                    Real p1[] = {ptref.x, ptref.y, ptref.z};
+                    Real p2[] = {cent0.x, cent0.y, cent0.z};
+                    return static_cast<int>(line_tri_intersects(p1, p2, tri_pts[i]));
+                }
+            });
 
-    m_boundry_is_outside = num_isects % 2 == 0;
+        m_boundry_is_outside = num_isects % 2 == 0;
+    }
 }
 
 void
@@ -1232,12 +1417,18 @@ STLtools::fillSignedDistance (MultiFab& mf, IntVect const& nghost, Geometry cons
     ParallelFor(mf, nghost, [=] AMREX_GPU_DEVICE (int b, int i, int j, int k)
     {
         XDim3 coords = {plo[0]+(static_cast<Real>(i)+offset[0])*dx[0],
-            plo[1]+(static_cast<Real>(j)+offset[1])*dx[1],
-            plo[2]+(static_cast<Real>(k)+offset[2])*dx[2]};
-        auto d2 = bvh_d2(coords, bvh_root);
-        ma[b](i,j,k) *= std::sqrt(d2);
+                        plo[1]+(static_cast<Real>(j)+offset[1])*dx[1],
+                        plo[2]+(static_cast<Real>(k)+offset[2])*dx[2]};
+        auto d = bvh_signed_distance(coords, bvh_root);
+        if (std::copysign(1.0, ma[b](i,j,k)) !=
+            std::copysign(1.0, d)) {
+            amrex::Print() << "xxxxx iv = " << IntVect(i,j,k)
+                           << ": " << ma[b](i,j,k) << " " << d << std::endl;
+            amrex::Abort("xxxxx failed");
+        }
     });
     Gpu::streamSynchronize();
+    amrex::Print() << "                                          SUCCESS\n";
 #endif
 }
 

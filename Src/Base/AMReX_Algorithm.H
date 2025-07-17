@@ -99,6 +99,15 @@ namespace amrex
         || std::abs(x-y) < std::numeric_limits<T>::min();
     }
 
+    template <typename T>
+    AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+    std::enable_if_t<std::is_floating_point_v<T>,bool>
+    almostEqual2 (T x, T y, T eps = std::numeric_limits<T>::eps*2)
+    {
+        return std::abs(x-y) <= eps * std::abs(x+y)
+            || std::abs(x-y) < std::numeric_limits<T>::min();
+    }
+
     template <class T, class F,
               std::enable_if_t<std::is_floating_point_v<T>,int>FOO = 0>
     AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE

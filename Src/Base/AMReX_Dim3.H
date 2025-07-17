@@ -36,6 +36,12 @@ XDim3 operator- (XDim3 const& a, XDim3 const& b)
     return {a.x - b.x, a.y - b.y, a.z - b.z};
 }
 
+AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+XDim3 operator* (XDim3 const& a, Real b)
+{
+    return {a.x*b, a.y*b, a.z*b};
+}
+
 template <typename T,
           std::enable_if_t <std::is_same_v<T,  Dim3> ||
                                    std::is_same_v<T, XDim3>>* = nullptr>
