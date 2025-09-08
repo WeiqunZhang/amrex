@@ -83,7 +83,7 @@ jobs:
     - name: Dependencies
       run: |
         .github/workflows/dependencies/dependencies_clang_libc++.sh 18
-        .github/workflows/dependencies/dependencies_nvcc.sh 13.0
+        .github/workflows/dependencies/dependencies_nvcc_2404.sh 13.0
         .github/workflows/dependencies/dependencies_cmake.sh
         .github/workflows/dependencies/dependencies_ccache.sh
     - name: Set Up Cache
