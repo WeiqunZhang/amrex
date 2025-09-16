@@ -209,6 +209,10 @@ template <typename T0, typename T1, class F>
 void deterministic_fab_to_fab (Vector<Array4CopyTag<T0,T1>>& tags, int scomp,
                                int dcomp, int ncomp, F const& f)
 {
+    // Gpu::streamSynchronize();
+
+    // BL_PROFILE("deterministic_fab_to_fab()");
+
     if (tags.empty()) { return; }
 
     using TagType = Array4CopyTag<T0,T1>;
@@ -218,22 +222,126 @@ void deterministic_fab_to_fab (Vector<Array4CopyTag<T0,T1>>& tags, int scomp,
                   return a.dindex < b.dindex;
               });
 
-    Gpu::HostVector<unsigned int> h_ntags(1,0);
-    for (unsigned int itag = 1; itag < tags.size(); ++itag) {
-        if (tags[itag].dindex != tags[itag-1].dindex) {
-            h_ntags.push_back(itag);
+    Vector<TagType> intersecting;
+    Vector<TagType> non_intersecting;
+
+    for (unsigned int itag1 = 0; itag1 < tags.size(); ++itag1) {
+
+        Box bx = tags[itag1].box();
+        BoxList bl_intersecting;
+
+        for (unsigned int itag2 = 0; itag2 < tags.size(); ++itag2) {
+            if (itag1 != itag2 && tags[itag1].dindex == tags[itag2].dindex) {
+                Box bx_intersect = bx & tags[itag2].box();
+                if (!bx_intersect.isEmpty()) {
+                    Long max_pts = 0;
+                    Box bx_new;
+                    Box bx_isect_new;
+                    for (int i=0; i<bx_intersect.indims(); ++i) {
+                        Box cut_lo = bx;
+                        Box cut_hi = bx;
+                        cut_lo.setBig(i, bx_intersect.smallEnd(i)-1);
+                        cut_hi.setSmall(i, bx_intersect.smallEnd(i));
+                        if (cut_lo.ok() && cut_lo.numPts() > max_pts) {
+                            max_pts = cut_lo.numPts();
+                            bx_new = cut_lo;
+                            bx_isect_new = cut_hi;
+                        }
+                        cut_lo = bx;
+                        cut_hi = bx;
+                        cut_lo.setBig(i, bx_intersect.bigEnd(i));
+                        cut_hi.setSmall(i, bx_intersect.bigEnd(i)+1);
+                        if (cut_hi.ok() && cut_hi.numPts() > max_pts) {
+                            max_pts = cut_hi.numPts();
+                            bx_new = cut_hi;
+                            bx_isect_new = cut_lo;
+                        }
+                    }
+                    if (max_pts > 0) {
+                        AMREX_ALWAYS_ASSERT((bx_new & tags[itag2].box()).isEmpty());
+                        bx = bx_new;
+                        bl_intersecting.push_back(bx_isect_new);
+                    } else {
+                        bx = Box();
+                        break;
+                    }
+                }
+            }
+        }
+
+        if (bx.ok()) {
+            BoxList bl_non_intersecting{bx};
+            bl_non_intersecting.maxSize(64);
+            for (Box& b : bl_non_intersecting) {
+                auto new_tag = tags[itag1];
+                new_tag.dbox &= b;
+                non_intersecting.push_back(new_tag);
+            }
+            // bl_intersecting.simplify();
+            for (Box& b : bl_intersecting) {
+                auto new_tag = tags[itag1];
+                new_tag.dbox &= b;
+                intersecting.push_back(new_tag);
+            }
+        } else {
+            intersecting.push_back(tags[itag1]);
         }
     }
-    h_ntags.push_back((unsigned int)tags.size());
 
-    Gpu::DeviceVector<TagType> d_tags(tags.size());
+    // for (unsigned int itag1 = 0; itag1 < non_intersecting.size(); ++itag1) {
+    //     for (unsigned int itag2 = 0; itag2 < non_intersecting.size(); ++itag2) {
+    //         if (itag1 != itag2) {
+    //             AMREX_ALWAYS_ASSERT(
+    //                 !non_intersecting[itag1].box().intersects(non_intersecting[itag2].box()));
+    //         }
+    //     }
+    //     for (unsigned int itag2 = 0; itag2 < intersecting.size(); ++itag2) {
+    //         AMREX_ALWAYS_ASSERT(
+    //                 !non_intersecting[itag1].box().intersects(intersecting[itag2].box()));
+    //     }
+    // }
+
+    // std::cout << "New tags, intersecting:\n";
+    // for (auto& t : intersecting) {
+    //     std::cout << t.box() << "\n";
+    // }
+    // std::cout << "non_intersecting:\n";
+    // for (auto& t : non_intersecting) {
+    //     std::cout << t.box() << "\n";
+    // }
+    // std::cout << std::endl;
+
+    Gpu::HostVector<TagType> tags2;
+    Gpu::HostVector<unsigned int> h_ntags;
+
+    for (unsigned int itag = 0; itag < non_intersecting.size(); ++itag) {
+        tags2.push_back(non_intersecting[itag]);
+        h_ntags.push_back(itag);
+    }
+    h_ntags.push_back((unsigned int)non_intersecting.size());
+
+    for (unsigned int itag = 0; itag < intersecting.size(); ++itag) {
+        tags2.push_back(intersecting[itag]);
+        if (itag > 0 && intersecting[itag].dindex != intersecting[itag-1].dindex) {
+            h_ntags.push_back((unsigned int)non_intersecting.size()+itag);
+        }
+    }
+    h_ntags.push_back((unsigned int)non_intersecting.size()+(unsigned int)intersecting.size());
+
+    Gpu::DeviceVector<TagType> d_tags(tags2.size());
     Gpu::DeviceVector<unsigned int> d_ntags(h_ntags.size());
-    Gpu::copyAsync(Gpu::hostToDevice,tags.begin(),tags.end(),d_tags.begin());
+    Gpu::copyAsync(Gpu::hostToDevice,tags2.begin(),tags2.end(),d_tags.begin());
     Gpu::copyAsync(Gpu::hostToDevice,h_ntags.begin(),h_ntags.end(),d_ntags.begin());
     auto const* ptag = d_tags.data();
     auto const* pntags = d_ntags.data();
     auto const nblocks = int(h_ntags.size()-1);
     constexpr auto nthreads = 256;
+    // std::cout << "deterministic_fab_to_fab nblocks " << nblocks << " tags.size() " << tags.size() << " dcomp " << dcomp << " ncomp " << ncomp << std::endl;
+
+    Gpu::streamSynchronize();
+
+    BL_PROFILE("deterministic_fab_to_fab() no copy");
+
     amrex::launch<nthreads>(nblocks, Gpu::gpuStream(),
 #ifdef AMREX_USE_SYCL
         [=] AMREX_GPU_DEVICE (sycl::nd_item<1> const& item) noexcept
@@ -248,7 +356,7 @@ void deterministic_fab_to_fab (Vector<Array4CopyTag<T0,T1>>& tags, int scomp,
 #endif
 
         for (unsigned int itag = pntags[blockIdx.x]; itag < pntags[blockIdx.x+1]; ++itag) {
-            auto const& tag = ptag[itag];
+            auto const tag = ptag[itag];
             auto ncells = int(tag.dbox.numPts());
             const auto len = amrex::length(tag.dbox);
             const auto lo  = amrex::lbound(tag.dbox);
