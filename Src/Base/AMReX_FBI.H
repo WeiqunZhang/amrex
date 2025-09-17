@@ -225,15 +225,35 @@ void deterministic_fab_to_fab (Vector<Array4CopyTag<T0,T1>> const& a_tags, int s
     };
     Vector<TiledTag> tiled_tags;
 
-    IntVect const tile_size(64);
+    auto const ixtype = a_tags[0].dbox.ixType();
+
+    constexpr int tile_size = 64;
     for (int itag = 0; itag < a_tags.size(); ++itag) {
         auto const& tag = a_tags[itag];
-        Box fabbox(tag.dfab);
-        fabbox.convert(tag.dbox.ixType());
-        BoxList bl(fabbox, tile_size);
-        for (auto const& b : bl) {
-            if (b.intersects(tag.dbox)) {
-                tiled_tags.push_back(TiledTag{itag, std::make_pair(tag.dindex,b)});
+        auto const& dlo = tag.dbox.smallEnd();
+        auto const& dhi = tag.dbox.bigEnd();
+        IntVect tlo(AMREX_D_DECL(amrex::coarsen<tile_size>(dlo[0]),
+                                 amrex::coarsen<tile_size>(dlo[1]),
+                                 amrex::coarsen<tile_size>(dlo[2])));
+        IntVect thi(AMREX_D_DECL(amrex::coarsen<tile_size>(dhi[0]),
+                                 amrex::coarsen<tile_size>(dhi[1]),
+                                 amrex::coarsen<tile_size>(dhi[2])));
+#if (AMREX_SPACEDIM == 3)
+        for (int kt = tlo[2]; kt <= thi[2]; ++kt)
+#endif
+        {
+#if (AMREX_SPACEDIM >= 2)
+            for (int jt = tlo[1]; jt <= thi[1]; ++jt)
+            {
+#endif
+                for (int it = tlo[0]; it <= thi[0]; ++it)
+                {
+                    IntVect lo(AMREX_D_DECL(it*tile_size,
+                                            jt*tile_size,
+                                            kt*tile_size));
+                    tiled_tags.push_back(TiledTag{itag, std::make_pair
+                            (tag.dindex, Box(lo, lo+(tile_size-1), ixtype))});
+                }
             }
         }
     }
