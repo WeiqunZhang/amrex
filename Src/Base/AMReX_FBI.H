@@ -226,17 +226,22 @@ void deterministic_fab_to_fab (Vector<Array4CopyTag<T0,T1>> const& a_tags, int s
     Vector<TiledTag> tiled_tags;
 
     IntVect const tile_size(64);
+    std::map<Box,BoxArray> bamap;
     for (int itag = 0; itag < a_tags.size(); ++itag) {
         auto const& tag = a_tags[itag];
         Box fabbox(tag.dfab);
         fabbox.convert(tag.dbox.ixType());
-        BoxList bl(fabbox, tile_size);
-        for (auto const& b : bl) {
-            if (b.intersects(tag.dbox)) {
-                tiled_tags.push_back(TiledTag{itag, std::make_pair(tag.dindex,b)});
-            }
+        auto& ba = bamap[fabbox];
+        if (ba.empty()) {
+            ba.define(BoxList(fabbox, tile_size));
+        }
+        auto const& isects = ba.intersections(tag.dbox);
+        for (auto const& [k, tmp] : isects) {
+            amrex::ignore_unused(tmp);
+            tiled_tags.push_back(TiledTag{itag, std::make_pair(tag.dindex,ba[k])});
         }
     }
+    bamap.clear();
 
     std::sort(tiled_tags.begin(), tiled_tags.end());
 
@@ -279,7 +284,7 @@ void deterministic_fab_to_fab (Vector<Array4CopyTag<T0,T1>> const& a_tags, int s
 #endif
 
         for (unsigned int itag = pntags[blockIdx.x]; itag < pntags[blockIdx.x+1]; ++itag) {
-            auto const& tag = ptag[itag];
+            auto const tag = ptag[itag];
             auto ncells = int(tag.dbox.numPts());
             const auto len = amrex::length(tag.dbox);
             const auto lo  = amrex::lbound(tag.dbox);
