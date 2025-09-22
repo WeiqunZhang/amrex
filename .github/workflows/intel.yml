@@ -46,6 +46,7 @@ jobs:
             -DAMReX_EB=OFF                                 \
             -DAMReX_ENABLE_TESTS=ON                        \
             -DAMReX_FORTRAN=ON                             \
+            -DAMReX_FORTRAN_INTERFACES=ON                  \
             -DAMReX_GPU_BACKEND=SYCL                       \
             -DAMReX_SYCL_AOT=ON                            \
             -DAMReX_INTEL_ARCH=pvc                         \
