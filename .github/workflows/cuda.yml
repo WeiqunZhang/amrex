@@ -55,6 +55,7 @@ jobs:
             -DCMAKE_Fortran_COMPILER=$(which gfortran-10)   \
             -DCMAKE_CUDA_STANDARD=17    \
             -DCMAKE_CXX_STANDARD=17     \
+            -DAMReX_PIC=ON \
             -DAMReX_CUDA_ARCH="7.0"                      \
             -DAMReX_CUDA_ERROR_CROSS_EXECUTION_SPACE_CALL=ON \
             -DAMReX_CUDA_ERROR_CAPTURE_THIS=ON           \
