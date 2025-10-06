@@ -48,6 +48,17 @@ struct CellAtomicAdd
     }
 };
 
+struct TiledTag {
+    int tag_index;
+    std::pair<int,Box> dindex_tilebox;
+    bool operator< (TiledTag const& rhs) const noexcept {
+        return this->dindex_tilebox < rhs.dindex_tilebox;
+    }
+    bool operator!= (TiledTag const& rhs) const noexcept {
+        return this->dindex_tilebox != rhs.dindex_tilebox;
+    }
+};
+
 template <class T0, class T1, class F>
 void
 fab_to_fab (Vector<Array4CopyTag<T0, T1> > const& copy_tags, int scomp, int dcomp, int ncomp,
@@ -220,16 +231,6 @@ void deterministic_fab_to_fab (Vector<Array4CopyTag<T0,T1>> const& a_tags, int s
 
     using TagType = Array4CopyTag<T0,T1>;
 
-    struct TiledTag {
-        int tag_index;
-        std::pair<int,Box> dindex_tilebox;
-        bool operator< (TiledTag const& rhs) const noexcept {
-            return this->dindex_tilebox < rhs.dindex_tilebox;
-        }
-        bool operator!= (TiledTag const& rhs) const noexcept {
-            return this->dindex_tilebox != rhs.dindex_tilebox;
-        }
-    };
     Vector<TiledTag> tiled_tags;
 
     auto const ixtype = a_tags[0].dbox.ixType();
