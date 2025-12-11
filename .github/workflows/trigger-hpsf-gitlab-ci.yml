@@ -40,13 +40,13 @@ jobs:
           GITHUB_PIPELINE_NAME="GitHub #${{ github.event.issue.number }}: ${{ steps.setref.outputs.pr_title }}"
 
           RESPONSE=$(curl -s -X POST \
-            -F token=${{ secrets.HPSF_GITLAB_TRIGGER_TOKEN }} \
-            -F ref=development \
-            -F "variables[GITHUB_PR_NUMBER]=${{ github.event.issue.number }}" \
-            -F "variables[GITHUB_MERGE_REF]=refs/pull/${{ github.event.issue.number }}/merge" \
-            -F "variables[GITHUB_TRIGGER_ACTOR]=${{ github.actor }}" \
-            -F "variables[GITHUB_PR_TITLE]=${{ steps.setref.outputs.pr_title }}" \
-            -F "variables[GITHUB_PIPELINE_NAME]=${GITHUB_PIPELINE_NAME}" \
+            --data-urlencode "token=${{ secrets.HPSF_GITLAB_TRIGGER_TOKEN }}" \
+            --data-urlencode "ref=development" \
+            --data-urlencode "variables[GITHUB_PR_NUMBER]=${{ github.event.issue.number }}" \
+            --data-urlencode "variables[GITHUB_MERGE_REF]=refs/pull/${{ github.event.issue.number }}/merge" \
+            --data-urlencode "variables[GITHUB_TRIGGER_ACTOR]=${{ github.actor }}" \
+            --data-urlencode "variables[GITHUB_PR_TITLE]=${{ steps.setref.outputs.pr_title }}" \
+            --data-urlencode "variables[GITHUB_PIPELINE_NAME]=${GITHUB_PIPELINE_NAME}" \
             "https://gitlab.spack.io/api/v4/projects/${{ env.GITLAB_PROJECT_ID }}/trigger/pipeline")
 
           echo "GitLab response: $RESPONSE"
