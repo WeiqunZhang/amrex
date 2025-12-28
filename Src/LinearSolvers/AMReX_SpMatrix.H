@@ -128,6 +128,31 @@ public:
      */
     void define (AlgPartition partition, csr_type csr);
 
+    /**
+     * \brief Define a default-constructed matrix from given CSR arrays,
+     *        removing invalid or zero entries.
+     *
+     * Unlike \ref define(AlgPartition,T const*,Long const*,Long,Long const*),
+     * the inputs are allowed to contain entries that are considered
+     * invalid. An entry is considered invalid and will be removed if its
+     * column index is negative. Additionally, this function will also
+     * remove entries if their matrix values are zero.
+     *
+     * The input data can be freed after this function call. For GPU builds,
+     * the input arrays are expected to reside in GPU memory.
+     *
+     * \param partition Parallel partition information.
+     * \param mat CSR values array (length `nnz`), possibly containing zeros.
+     * \param col_index CSR column indices array (length `nnz`), possibly containing
+     *                  invalid entries (i.e., negative index values).
+     * \param nentries Number of entries (including invalid ones); i.e., the length
+     *                 of \p mat and \p col_index.
+     * \param row_offset CSR row offsets array (length `num_local_rows + 1`) for
+     *                   the input (unfiltered) CSR representation.
+     */
+    void define_filtered (AlgPartition partition, T const* mat, Long const* col_index,
+                 Long nentries, Long const* row_offset);
+
     [[nodiscard]] AlgPartition const& partition () const { return m_partition; }
 
     /**
@@ -702,6 +727,15 @@ SpMatrix<T,Allocator>::define (AlgPartition partition, T const* mat,
     Gpu::copyAsync(Gpu::deviceToDevice, row_offset, row_offset+nlocalrows+1,
                    m_csr.row_offset.begin());
     Gpu::streamSynchronize();
+}
+
+template <typename T, template<typename> class Allocator>
+void
+SpMatrix<T,Allocator>::define_filtered (AlgPartition partition, T const* mat,
+                                        Long const* col_index, Long nentries,
+                                        Long const* row_offset)
+{
+    AMREX_ALWAYS_ASSERT(m_split == false);
 }
 
 template <typename T, template<typename> class Allocator>
