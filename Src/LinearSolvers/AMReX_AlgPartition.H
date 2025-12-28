@@ -25,8 +25,22 @@ public:
     [[nodiscard]] bool empty () const { return m_ref->m_row.empty(); }
 
     [[nodiscard]] Long operator[] (int i) const { return m_ref->m_row[i]; }
+    [[nodiscard]] Long numLocalRows () const {
+        int myproc = ParallelDescriptor::MyProc();
+        return m_ref->m_row[myproc+1] - m_ref->m_row[myproc];
+    }
     [[nodiscard]] Long numGlobalRows () const { return m_ref->m_row.back(); }
     [[nodiscard]] int numActiveProcs () const { return m_ref->m_n_active_procs; }
+
+    //! Inclusive global index begin on this process.
+    [[nodiscard]] Long globalRowBegin () const {
+        return m_ref->m_row[ParallelDescriptor::MyProc()];
+    }
+
+    //! Exclusive global index end on this process.
+    [[nodiscard]] Long globalRowEnd () const {
+        return m_ref->m_row[ParallelDescriptor::MyProc()+1];
+    }
 
     [[nodiscard]] Vector<Long> const& dataVector () const { return m_ref->m_row; }
 
