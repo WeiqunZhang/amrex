@@ -382,6 +382,55 @@ void CSR<T,V>::sort_on_host ()
     }
 }
 
+// CsrIndex is a helper class for cuSPARSE, because many cuSparse functions
+// such as cusparseSpGEMM do not support 64-bit integers.
+template <typename I, template <typename> class V>
+struct CsrIndex
+{
+    V<I> col_index;
+    V<I> row_offset;
+
+    template <typename T>
+    void copyFrom (CSR<T,V> const& csr)
+    {
+        AMREX_ALWAYS_ASSERT(csr.nnz < Long(std::numeric_limits<I>::max()) &&
+                            csr.nrows() < Long(std::numeric_limits<I>::max()));
+
+        col_index.resize(csr.col_index.size());
+        row_offset.resize(csr.row_offset.size());
+
+        auto N = static_cast<I>(std::max(col_index.size(), row_offset.size()));
+        auto lnnz = static_cast<I>(col_index.size());
+        auto lnro = static_cast<I>(row_offset.size());
+        auto* col_dst = col_index.data();
+        auto* row_dst = row_offset.data();
+        auto const* col_src = csr.col_index.data();
+        auto const* row_src = csr.row_offset.data();
+        ParallelFor(N, [=] AMREX_GPU_DEVICE (I i)
+        {
+            if (i < lnnz) { col_dst[i] = static_cast<I>(col_src[i]); }
+            if (i < lnro) { row_dst[i] = static_cast<I>(row_src[i]); }
+        });
+    }
+
+    template <typename T>
+    void copyTo (CSR<T,V>& csr) const
+    {
+        auto N = static_cast<I>(std::max(col_index.size(), row_offset.size()));
+        auto lnnz = static_cast<I>(col_index.size());
+        auto lnro = static_cast<I>(row_offset.size());
+        auto const* col_src = col_index.data();
+        auto const* row_src = row_offset.data();
+        auto* col_dst = csr.col_index.data();
+        auto* row_dst = csr.row_offset.data();
+        ParallelFor(N, [=] AMREX_GPU_DEVICE (I i)
+        {
+            if (i < lnnz) { col_dst[i] = static_cast<Long>(col_src[i]); }
+            if (i < lnro) { row_dst[i] = static_cast<Long>(row_src[i]); }
+        });
+    }
+};
+
 }
 
 #endif

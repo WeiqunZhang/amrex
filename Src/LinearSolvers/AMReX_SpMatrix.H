@@ -192,9 +192,9 @@ public:
     //! Number of nonzeros stored locally.
     [[nodiscard]] Long numLocalNonZeros () const { return m_nnz; }
 
-    //! Inclusive global index begin.
+    //! Inclusive global index begin on this process.
     [[nodiscard]] Long globalRowBegin () const { return m_row_begin; }
-    //! Exclusive global index end.
+    //! Exclusive global index end on this process.
     [[nodiscard]] Long globalRowEnd () const { return m_row_end; }
 
     //! Don't use this beyond initial setup.
@@ -242,7 +242,8 @@ public:
      * \endcode
 
      * and is responsible for setting the global column indices and values
-     * for the row specified by the global row index.
+     * for the row specified by the global row index. The two pointers point
+     * to the beginning of the specified row.
      *
      * This function is intended to be used after
      * \ref define(AlgPartition,int), when the storage has been allocated. It
@@ -262,11 +263,11 @@ public:
     //! used after the user sets the matrix manually or with `setVal`.
     void sortCSR ();
 
-    /**
-     * \brief Return (and cache) the diagonal entries of a square matrix.
-     *
-     * The diagonal is formed lazily and reused on subsequent calls.
-     */
+    //! Set column partition. This is usually not needed to be called by the
+    //! user.
+    void setColumnPartition (AlgPartition const& col_partition);
+
+    //! Return diagonal elements in a square matrix.
     [[nodiscard]] AlgVector<T,AllocT> const& diagonalVector () const;
 
     /**
@@ -292,7 +293,11 @@ public:
     void SpMV(AlgVector<U,N>& y, SpMatrix<U,M> const& A, AlgVector<U,N> const& x);
 
     template <typename U, template<typename> class M> friend
-    SpMatrix<U,M> transpose (SpMatrix<U,M> const& A, AlgPartition col_partition);
+    SpMatrix<U,M> transpose (SpMatrix<U,M> const& A, AlgPartition const& col_partition);
+
+    template <typename U, template<typename> class M> friend
+    SpMatrix<U,M> SpGEMM (SpMatrix<U,M> const& A, SpMatrix<U,M> const& B,
+                          AlgPartition const& col_partition);
 
     template <typename U> friend class AMG;
 
@@ -325,6 +330,8 @@ public:
     void startComm_tr (AlgPartition const& col_partition);
     //! Complete transpose communication, writing the assembled matrix into \p AT.
     void finishComm_tr (SpMatrix<T,Allocator>& AT);
+
+    void startComm_mm (SpMatrix<T,Allocator>& B);
 
 private:
 
@@ -821,6 +828,17 @@ void
 SpMatrix<T,Allocator>::sortCSR ()
 {
     m_csr.sort();
+}
+
+template <typename T, template<typename> class Allocator>
+void
+SpMatrix<T,Allocator>::setColumnPartition (AlgPartition const& col_partition)
+{
+#ifdef AMREX_USE_MPI
+    split_csr(col_partition);
+#else
+    amrex::ignore_unused(col_partition);
+#endif
 }
 
 template <typename T, template<typename> class Allocator>
