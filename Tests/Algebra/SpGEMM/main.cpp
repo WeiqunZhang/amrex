@@ -15,7 +15,7 @@ int main (int argc, char *argv[])
 {
     amrex::Initialize(argc, argv);
 
-#if 1
+#if 0
     // Identity Matrix
     {
         int nrows = 30;
@@ -77,8 +77,8 @@ int main (int argc, char *argv[])
 
     // 1D Laplacian
     {
-        int nrows = 128;
-        // int nrows = 6;
+        // int nrows = 128;
+        int nrows = 6;
         SpMatrix<Real> Lap(AlgPartition(nrows), 3);
         Lap.setVal([=] AMREX_GPU_DEVICE (Long row, Long* col, Real* val)
         {
@@ -168,10 +168,13 @@ int main (int argc, char *argv[])
         }, CsrSorted{true});
 
         auto LL = amrex::SpGEMM(Lap, Lap, Lap.partition());
+
+        LL.printToFile("LL");
+
         AMREX_ALWAYS_ASSERT(amrex::almostEqual(LL,Lap2));
     }
 
-#if 1
+#if 0
     // (A*B)^T = B^T * A^T
     {
         int n1 = 75;
