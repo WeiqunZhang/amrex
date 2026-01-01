@@ -312,6 +312,10 @@ private:
 #ifdef AMREX_USE_MPI
     csr_type m_csr_remote;
 
+    // The `row_offset` in m_csr_remote does not contain empty rows. The
+    // full list of row offsets is available in m_remote_row_offset.
+    container_type<Long> m_remote_row_offset;
+
     // It should be noted that m_csr and m_csr_remote may have different
     // number of rows, because some rows may be purely local and they do not
     // appear in m_csr_remote. Thus, we need a mapping from local row index
@@ -393,6 +397,7 @@ public: // NOLINT  Private functions, but public for cuda
     void pack_buffer_mv (AlgVector<T,AllocT> const& v);
     void unpack_buffer_mv (AlgVector<T,AllocT>& v);
     void unpack_buffer_tr (CommTR const& ctr, AlgPartition const& col_partition);
+    void expand_remote_row_offset ();
 
 #endif
 };
@@ -1461,7 +1466,8 @@ void SpMatrix<T,Allocator>::split_csr (AlgPartition const& col_partition)
         m_csr.col_index.swap(new_col);
 
         // In the remote part, it's expected that some rows don't have
-        // nonzeros. So we trim them off.
+        // nonzeros. So we trim them off, and also save a full copy of the
+        // row offsets.
         {
             Long old_size = m_csr_remote.row_offset.size();
             m_ri_ltor.resize(old_size-1);
@@ -1532,7 +1538,8 @@ void SpMatrix<T,Allocator>::split_csr (AlgPartition const& col_partition)
             m_ri_rtol.shrink_to_fit();
             trimmed_row_offset.shrink_to_fit();
 #endif
-            m_csr_remote.row_offset.swap(trimmed_row_offset);
+            m_remote_row_offset = std::move(trimmed_row_offset);
+            std::swap(m_csr_remote.row_offset, m_remote_row_offset);
         }
 
     } else if (col_begin > 0) {
@@ -1873,6 +1880,52 @@ void SpMatrix<T,Allocator>::unpack_buffer_tr (CommTR const& ctr,
     amrex::duplicateCSR(Gpu::hostToDevice, m_csr_remote, csrr);
     Gpu::streamSynchronize();
 #endif
+}
+
+template <typename T, template<typename> class Allocator>
+void SpMatrix<T,Allocator>::expand_remote_row_offset ()
+{
+    if (! m_remote_row_offset.empty()) { return; }
+
+    auto nrows = m_csr.nrows();
+    m_remote_row_offset.resize(nrows+1);
+    auto* pro_full = m_remote_row_offset.data();
+    auto const* pro_comp = m_csr_remote.row_offset.data();
+    auto const* ri_ltor = m_ri_ltor.data();
+    auto nnz_r = m_csr_remote.nnz;
+    if (nnz_r < Long(std::numeric_limits<int>::max())) {
+        Scan::PrefixSum<int>(nrows,
+                             [=] AMREX_GPU_DEVICE (Long i) -> int {
+                                 Long rrow = ri_ltor[i];
+                                 if (rrow == -1) {
+                                     return int(0);
+                                 } else {
+                                     return int(pro_comp[rrow+1]-pro_comp[rrow]);
+                                 }},
+                             [=] AMREX_GPU_DEVICE (Long i, int x) {
+                                 if (i == 0) {
+                                     pro_full[0] = 0;
+                                 }
+                                 pro_full[i+1] = x;
+                             },
+                             Scan::Type::inclusive, Scan::noRetSum);
+    } else {
+        Scan::PrefixSum<Long>(nrows,
+                              [=] AMREX_GPU_DEVICE (Long i) -> Long {
+                                  Long rrow = ri_ltor[i];
+                                  if (rrow == -1) {
+                                      return Long(0);
+                                  } else {
+                                      return pro_comp[rrow+1]-pro_comp[rrow];
+                                  }},
+                              [=] AMREX_GPU_DEVICE (Long i, Long x) {
+                                  if (i == 0) {
+                                      pro_full[0] = 0;
+                                  }
+                                  pro_full[i+1] = x;
+                              },
+                              Scan::Type::inclusive, Scan::noRetSum);
+    }
 }
 
 #endif
