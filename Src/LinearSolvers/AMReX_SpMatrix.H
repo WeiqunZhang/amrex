@@ -290,7 +290,7 @@ public:
     void startComm_tr (AlgPartition const& col_partition);
     void finishComm_tr (SpMatrix<T,Allocator>& AT);
 
-    void startComm_mm (SpMatrix<T,Allocator>& B);
+    void startComm_mm (SpMatrix<T,Allocator>& B, AlgPartition const& col_partition);
 
 private:
 
@@ -1366,6 +1366,18 @@ void SpMatrix<T,Allocator>::finishComm_tr (SpMatrix<T,Allocator>& AT)
     m_comm_tr = CommTR{};
 #else
     amrex::ignore_unused(AT);
+#endif
+}
+
+template <typename T, template<typename> class Allocator>
+void SpMatrix<T,Allocator>::startComm_mm (SpMatrix<T,Allocator>& B,
+                                          AlgPartition const& col_partition)
+{
+    this->setColumnPartition(B.partition());
+    B.setColumnPartition(col_partition);
+
+#ifdef AMREX_USE_MPI
+    if (this->partition().numActiveProcs() <= 1) { return; }
 #endif
 }
 
