@@ -140,6 +140,10 @@ struct SpGEMMHelper
     {
         AMREX_ASSERT(nrows == A.nrows);
 
+        if (A.nnz == 0 || B.nnz == 0) {
+            return csr_type{};
+        }
+
 #if defined(AMREX_USE_CUDA)
 
         AMREX_ALWAYS_ASSERT(nrows < Long(std::numeric_limits<int>::max()) &&
@@ -291,14 +295,19 @@ SpGEMM (SpMatrix<T,Allocator> const& A, SpMatrix<T,Allocator> const& B,
 
     auto csrC = helper(nrows, ncols, A.m_csr.const_view(), B.m_csr.const_view());
 
+    SpMatrix<T,Allocator> C(A.partition(), std::move(csrC));
+    C.m_col_partition = col_partition;
+    C.m_col_end = B.m_col_end;
+
 #ifdef AMREX_USE_MPI
-    // auto csrCR = SpGEMM();
+    C.m_split = true;
+    auto ncols_b1 = Long(B.m_remote_cols_v.size());
+    C.m_csr_remote = helper(nrows, ncols_b1, A.m_csr.const_view(),
+                            B.remote_full_const_view());
 #endif
 
-    SpMatrix<T,Allocator> C(A.partition(), std::move(csrC));
-    C.m_col_end = ncols;
-
-    // finish comm
+    C.finishComm_mm(const_cast<SpMatrix<T,Allocator>&>(A),
+                    const_cast<SpMatrix<T,Allocator>&>(B));
 
     return C;
 }
