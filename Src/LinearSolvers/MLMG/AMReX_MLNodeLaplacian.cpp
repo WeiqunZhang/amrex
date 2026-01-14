@@ -551,7 +551,7 @@ MLNodeLaplacian::restriction (int amrlev, int cmglev, MultiFab& crse, MultiFab& 
                 mlndlap_restriction_rap(i,j,k,pcrse_ma[box_no],fine_ma[box_no],st_ma[box_no],msk_ma[box_no]);
             });
         }
-        if (cfine.local_size() > 0 || !Gpu::inNoSyncRegion()) {
+        if (!Gpu::inNoSyncRegion()) {
             Gpu::streamSynchronize();
         }
     } else
@@ -686,7 +686,7 @@ MLNodeLaplacian::interpolation (int amrlev, int fmglev, MultiFab& fine, const Mu
                 mlndlap_semi_interpadd_aa(i, j, k, fine_ma[box_no], crse_ma[box_no], sig_ma[box_no], msk_ma[box_no], idir);
             });
         }
-        if (cfine.local_size() > 0 || !Gpu::inNoSyncRegion()) {
+        if (!Gpu::inNoSyncRegion()) {
             Gpu::streamSynchronize();
         }
     } else

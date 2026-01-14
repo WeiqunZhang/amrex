@@ -197,7 +197,7 @@ MLNodeABecLaplacian::restriction (int amrlev, int cmglev, MultiFab& crse, MultiF
     {
         mlndlap_restriction(i,j,k,pcrse_ma[box_no],fine_ma[box_no],msk_ma[box_no]);
     });
-    if (need_parallel_copy || !Gpu::inNoSyncRegion()) {
+    if (!Gpu::inNoSyncRegion()) {
         Gpu::streamSynchronize();
     }
 
@@ -231,7 +231,7 @@ MLNodeABecLaplacian::interpolation (int amrlev, int fmglev, MultiFab& fine, cons
         mlndlap_interpadd_aa(i, j, k, fine_ma[box_no], crse_ma[box_no],
                              sig_ma[box_no], msk_ma[box_no]);
     });
-    if (cfine.local_size() > 0 || !Gpu::inNoSyncRegion()) {
+    if (!Gpu::inNoSyncRegion()) {
         Gpu::streamSynchronize();
     }
 }

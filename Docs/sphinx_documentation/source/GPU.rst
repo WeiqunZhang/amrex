@@ -1653,12 +1653,27 @@ One could also use :cpp:`Gpu::NoSyncRegion`, as shown below:
 
      // Gpu::streamSynchronize(); Explicit synchronization is allowed.
 
-     for (MFIter mfi(mf2); mfi.isValid9); ++mfi) { .... }
+     for (MFIter mfi(mf2); mfi.isValid(); ++mfi) { .... }
    }
 
 This approach suppresses implicit synchronization for all operations within
 the scoped region and restores the previous synchronization setting upon
-exiting.
+exiting.  A variant, :cpp:`Gpu::SyncAtExitOnly`, additionally synchronizes
+the GPU streams when the scope is exited, unless the enclosing code is
+already inside a :cpp:`Gpu::NoSyncRegion`.  This is convenient for functions
+that want to skip the implicit synchronizations internally but return with
+all their GPU work completed.  For example, :cpp:`MLMG::solve` uses it
+together with :cpp:`Gpu::SingleStreamRegion` by default.
+
+Inside a no-sync region, all GPU work should be launched on a single stream
+(e.g., by also using :cpp:`Gpu::SingleStreamRegion`) unless the ordering
+between streams is managed explicitly.  With a single stream, temporary
+:cpp:`MultiFab`\ s and :cpp:`FArrayBox`\ es can be created and destroyed
+inside the region: the reuse of their device memory is ordered by the
+stream, and the auxiliary pinned host buffers AMReX allocates for them are
+released in a stream-ordered fashion.  Host code that needs to read the
+results of GPU work must still synchronize explicitly (reductions such as
+:cpp:`MultiFab::sum` do this internally).
 
 .. _sec:gpu:external-streams:
 

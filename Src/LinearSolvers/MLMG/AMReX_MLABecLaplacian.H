@@ -435,6 +435,7 @@ requires (std::is_convertible_v<T, typename MF::value_type>)
 void
 MLABecLaplacianT<MF>::setBCoeffs (int amrlev, T beta)
 {
+    Gpu::SyncAtExitOnly no_sync{};
     for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
         m_b_coeffs[amrlev][0][idim].setVal(RT(beta));
     }
@@ -447,6 +448,7 @@ requires (std::is_convertible_v<T, typename MF::value_type>)
 void
 MLABecLaplacianT<MF>::setBCoeffs (int amrlev, Vector<T> const& beta)
 {
+    Gpu::SyncAtExitOnly no_sync{};
     const int ncomp = this->getNComp();
     for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
         for (int icomp = 0; icomp < ncomp; ++icomp) {
@@ -1094,7 +1096,7 @@ MLABecLaplacianT<MF>::Fsmooth (int amrlev, int mglev, MF& sol, const MF& rhs, in
                 });
             }
         }
-        if (Ax.local_size() > 0 || !Gpu::inNoSyncRegion()) {
+        if (!Gpu::inNoSyncRegion()) {
             Gpu::streamSynchronize();
         }
     } else
@@ -1450,7 +1452,7 @@ MLABecLaplacianT<MF>::makeNLinOp (int /*grid_size*/) const
                 ama[box_no](i,j,k,n) = huge_alpha;
             }
         });
-        if (alpha.local_size() > 0 || !Gpu::inNoSyncRegion()) {
+        if (!Gpu::inNoSyncRegion()) {
             Gpu::streamSynchronize();
         }
     } else
