@@ -257,5 +257,7 @@ int main (int argc, char* argv[])
         The_Arena()->free(p);
     }
 
+    static_assert(sizeof(Array4<int>) == 64);
+
     amrex::Finalize();
 }
