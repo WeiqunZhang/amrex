@@ -6,7 +6,11 @@
 
 #ifdef AMREX_USE_GPU
 
-#ifdef AMREX_USE_SYCL
+#if defined(AMREX_USE_CUDA)
+#  include <cuda_runtime.h>
+#elif defined(AMREX_USE_HIP)
+#  include <hip_runtime.h>
+#elif defined(AMREX_USE_SYCL)
 #  include <sycl/sycl.hpp>
 #endif
 
@@ -102,6 +106,14 @@ struct Handler {};
 
 #endif
 
+}
+
+namespace amrex {
+#if defined(AMREX_USE_CUDA) || defined(AMREX_USE_AMD)
+    using Int4 = int4;
+#else
+    struct Int4 { int x, y, z, w; };
+#endif
 }
 
 #endif

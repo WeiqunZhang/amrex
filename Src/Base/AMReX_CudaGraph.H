@@ -34,8 +34,22 @@ template <typename T, typename U>
 CopyMemory
 makeCopyMemory (Array4<T> const& src, Array4<U> const& dst, int scomp, int ncomp)
 {
-    return CopyMemory{ (void*)(src.p), (void*)(dst.p), IntVectShrink<3>(src.begin).dim3(), IntVectShrink<3>(src.end).dim3(),
-        IntVectShrink<3>(dst.begin).dim3(), IntVectShrink<3>(dst.end).dim3(), scomp, ncomp };
+#if __cplusplus < 201402L
+    CopyMemory mem;
+    mem.src = (void*)(src.p);
+    mem.dst = (void*)(dst.p);
+    mem.src_begin = src.begin;
+    mem.src_end = src.end;
+    mem.dst_begin = dst.begin;
+    mem.dst_end = dst.end;
+    mem.scomp = scomp;
+    mem.ncomp = ncomp;
+    return mem;
+
+#else
+
+    return CopyMemory{ (void*)(src.p), (void*)(dst.p), src.begin, src.end, dst.begin, dst.end, scomp, ncomp };
+#endif
 }
 
 // ======================================================================================

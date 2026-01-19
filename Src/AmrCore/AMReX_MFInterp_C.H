@@ -14,7 +14,7 @@ Real mf_compute_slopes_x (int i, int j, int k, Array4<Real const> const& u, int 
     Real dc = Real(0.5) * (u(i+1,j,k,nu) - u(i-1,j,k,nu));
     if (i == domain.smallEnd(0) && (bc.lo(0) == BCType::ext_dir ||
                                     bc.lo(0) == BCType::hoextrap)) {
-        if (i+2 < u.end[0]) {
+        if (i+2 < u.end.x) {
             dc = -Real(16./15.)*u(i-1,j,k,nu) + Real(0.5)*u(i,j,k,nu)
                 + Real(2./3.)*u(i+1,j,k,nu) - Real(0.1)*u(i+2,j,k,nu);
         } else {
@@ -23,7 +23,7 @@ Real mf_compute_slopes_x (int i, int j, int k, Array4<Real const> const& u, int 
     }
     if (i == domain.bigEnd(0) && (bc.hi(0) == BCType::ext_dir ||
                                   bc.hi(0) == BCType::hoextrap)) {
-        if (i-2 >= u.begin[0]) {
+        if (i-2 >= u.begin.x) {
             dc = Real(16./15.)*u(i+1,j,k,nu) - Real(0.5)*u(i,j,k,nu)
                 - Real(2./3.)*u(i-1,j,k,nu) + Real(0.1)*u(i-2,j,k,nu);
         } else {
@@ -40,7 +40,7 @@ Real mf_compute_slopes_y (int i, int j, int k, Array4<Real const> const& u, int 
     Real dc = Real(0.5) * (u(i,j+1,k,nu) - u(i,j-1,k,nu));
     if (j == domain.smallEnd(1) && (bc.lo(1) == BCType::ext_dir ||
                                     bc.lo(1) == BCType::hoextrap)) {
-        if (j+2 < u.end[1]) {
+        if (j+2 < u.end.y) {
             dc = -Real(16./15.)*u(i,j-1,k,nu) + Real(0.5)*u(i,j,k,nu)
                 + Real(2./3.)*u(i,j+1,k,nu) - Real(0.1)*u(i,j+2,k,nu);
         } else {
@@ -49,7 +49,7 @@ Real mf_compute_slopes_y (int i, int j, int k, Array4<Real const> const& u, int 
     }
     if (j == domain.bigEnd(1) && (bc.hi(1) == BCType::ext_dir ||
                                   bc.hi(1) == BCType::hoextrap)) {
-        if (j-2 >= u.begin[1]) {
+        if (j-2 >= u.begin.y) {
             dc = Real(16./15.)*u(i,j+1,k,nu) - Real(0.5)*u(i,j,k,nu)
                 - Real(2./3.)*u(i,j-1,k,nu) + Real(0.1)*u(i,j-2,k,nu);
         } else {
@@ -66,7 +66,7 @@ Real mf_compute_slopes_z (int i, int j, int k, Array4<Real const> const& u, int 
     Real dc = Real(0.5) * (u(i,j,k+1,nu) - u(i,j,k-1,nu));
     if (k == domain.smallEnd(2) && (bc.lo(2) == BCType::ext_dir ||
                                     bc.lo(2) == BCType::hoextrap)) {
-        if (k+2 < u.end[2]) {
+        if (k+2 < u.end.z) {
             dc = -Real(16./15.)*u(i,j,k-1,nu) + Real(0.5)*u(i,j,k,nu)
                 + Real(2./3.)*u(i,j,k+1,nu) - Real(0.1)*u(i,j,k+2,nu);
         } else {
@@ -75,7 +75,7 @@ Real mf_compute_slopes_z (int i, int j, int k, Array4<Real const> const& u, int 
     }
     if (k == domain.bigEnd(2) && (bc.hi(2) == BCType::ext_dir ||
                                   bc.hi(2) == BCType::hoextrap)) {
-        if (k-2 >= u.begin[2]) {
+        if (k-2 >= u.begin.z) {
             dc = Real(16./15.)*u(i,j,k+1,nu) - Real(0.5)*u(i,j,k,nu)
                 - Real(2./3.)*u(i,j,k-1,nu) + Real(0.1)*u(i,j,k-2,nu);
         } else {
@@ -93,13 +93,13 @@ Real mf_cell_quadratic_compute_slopes_xx (int i, int j, int k,
     Real xx = u(i-1,j,k,nu) - 2.0_rt * u(i,j,k,nu) + u(i+1,j,k,nu);
     if (i == domain.smallEnd(0) && (bc.lo(0) == BCType::ext_dir ||
                                     bc.lo(0) == BCType::hoextrap)) {
-        if (i+2 < u.end[0]) {
+        if (i+2 < u.end.x) {
             xx = 0._rt;
         }
     }
     if (i == domain.bigEnd(0) && (bc.hi(0) == BCType::ext_dir ||
                                   bc.hi(0) == BCType::hoextrap)) {
-        if (i-2 >= u.begin[0]) {
+        if (i-2 >= u.begin.x) {
             xx = 0._rt;
         }
     }
@@ -114,13 +114,13 @@ Real mf_cell_quadratic_compute_slopes_yy (int i, int j, int k,
     Real yy = u(i,j-1,k,nu) - 2.0_rt * u(i,j,k,nu) + u(i,j+1,k,nu);
     if (j == domain.smallEnd(1) && (bc.lo(1) == BCType::ext_dir ||
                                     bc.lo(1) == BCType::hoextrap)) {
-        if (j+2 < u.end[1]) {
+        if (j+2 < u.end.y) {
             yy = 0._rt;
         }
     }
     if (j == domain.bigEnd(1) && (bc.hi(1) == BCType::ext_dir ||
                                   bc.hi(1) == BCType::hoextrap)) {
-        if (j-2 >= u.begin[1]) {
+        if (j-2 >= u.begin.y) {
             yy = 0._rt;
         }
     }
@@ -135,13 +135,13 @@ Real mf_cell_quadratic_compute_slopes_zz (int i, int j, int k,
     Real zz = u(i,j,k-1,nu) - 2.0_rt * u(i,j,k,nu) + u(i,j,k+1,nu);
     if (k == domain.smallEnd(2) && (bc.lo(2) == BCType::ext_dir ||
                                     bc.lo(2) == BCType::hoextrap)) {
-        if (k+2 < u.end[2]) {
+        if (k+2 < u.end.z) {
             zz = 0._rt;
         }
     }
     if (k == domain.bigEnd(1) && (bc.hi(2) == BCType::ext_dir ||
                                   bc.hi(2) == BCType::hoextrap)) {
-        if (k-2 >= u.begin[2]) {
+        if (k-2 >= u.begin.z) {
             zz = 0._rt;
         }
     }
@@ -157,25 +157,25 @@ Real mf_cell_quadratic_compute_slopes_xy (int i, int j, int k,
                               - u(i-1,j+1,k,nu) + u(i+1,j+1,k,nu) );
     if (i == domain.smallEnd(0) && (bc.lo(0) == BCType::ext_dir ||
                                     bc.lo(0) == BCType::hoextrap)) {
-        if (i+2 < u.end[0]) {
+        if (i+2 < u.end.x) {
             xy = 0._rt;
         }
     }
     if (i == domain.bigEnd(0) && (bc.hi(0) == BCType::ext_dir ||
                                   bc.hi(0) == BCType::hoextrap)) {
-        if (i-2 >= u.begin[0]) {
+        if (i-2 >= u.begin.x) {
             xy = 0._rt;
         }
     }
     if (j == domain.smallEnd(1) && (bc.lo(1) == BCType::ext_dir ||
                                     bc.lo(1) == BCType::hoextrap)) {
-        if (j+2 < u.end[1]) {
+        if (j+2 < u.end.y) {
             xy = 0._rt;
         }
     }
     if (j == domain.bigEnd(1) && (bc.hi(1) == BCType::ext_dir ||
                                   bc.hi(1) == BCType::hoextrap)) {
-        if (j-2 >= u.begin[1]) {
+        if (j-2 >= u.begin.y) {
             xy = 0._rt;
         }
     }
@@ -191,25 +191,25 @@ Real mf_cell_quadratic_compute_slopes_xz (int i, int j, int k,
                               - u(i-1,j,k+1,nu) + u(i+1,j,k+1,nu) );
     if (i == domain.smallEnd(0) && (bc.lo(0) == BCType::ext_dir ||
                                     bc.lo(0) == BCType::hoextrap)) {
-        if (i+2 < u.end[0]) {
+        if (i+2 < u.end.x) {
             xz = 0._rt;
         }
     }
     if (i == domain.bigEnd(0) && (bc.hi(0) == BCType::ext_dir ||
                                   bc.hi(0) == BCType::hoextrap)) {
-        if (i-2 >= u.begin[0]) {
+        if (i-2 >= u.begin.x) {
             xz = 0._rt;
         }
     }
     if (k == domain.smallEnd(2) && (bc.lo(2) == BCType::ext_dir ||
                                     bc.lo(2) == BCType::hoextrap)) {
-        if (k+2 < u.end[2]) {
+        if (k+2 < u.end.z) {
             xz = 0._rt;
         }
     }
     if (k == domain.bigEnd(1) && (bc.hi(2) == BCType::ext_dir ||
                                   bc.hi(2) == BCType::hoextrap)) {
-        if (k-2 >= u.begin[2]) {
+        if (k-2 >= u.begin.z) {
             xz = 0._rt;
         }
     }
@@ -225,25 +225,25 @@ Real mf_cell_quadratic_compute_slopes_yz (int i, int j, int k,
                               - u(i,j+1,k-1,nu) + u(i,j+1,k+1,nu) );
     if (j == domain.smallEnd(1) && (bc.lo(1) == BCType::ext_dir ||
                                     bc.lo(1) == BCType::hoextrap)) {
-        if (j+2 < u.end[1]) {
+        if (j+2 < u.end.y) {
             yz = 0._rt;
         }
     }
     if (j == domain.bigEnd(1) && (bc.hi(1) == BCType::ext_dir ||
                                   bc.hi(1) == BCType::hoextrap)) {
-        if (j-2 >= u.begin[1]) {
+        if (j-2 >= u.begin.y) {
             yz = 0._rt;
         }
     }
     if (k == domain.smallEnd(2) && (bc.lo(2) == BCType::ext_dir ||
                                     bc.lo(2) == BCType::hoextrap)) {
-        if (k+2 < u.end[2]) {
+        if (k+2 < u.end.z) {
             yz = 0._rt;
         }
     }
     if (k == domain.bigEnd(1) && (bc.hi(2) == BCType::ext_dir ||
                                   bc.hi(2) == BCType::hoextrap)) {
-        if (k-2 >= u.begin[2]) {
+        if (k-2 >= u.begin.z) {
             yz = 0._rt;
         }
     }
