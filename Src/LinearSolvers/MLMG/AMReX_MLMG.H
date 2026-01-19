@@ -1777,6 +1777,7 @@ MLMGT<MF>::interpCorrection (int alev)
     {
         ng_src = linop.getNGrow(alev-1);
         ng_dst = linop.getNGrow(alev-1);
+        const_cast<MF&>(crse_cor).FillBoundary(0, ncomp, IntVect(ng_src), crse_geom.periodicity());
     }
 
     MF cfine = linop.makeCoarseAmr(alev, IntVect(ng_dst));
