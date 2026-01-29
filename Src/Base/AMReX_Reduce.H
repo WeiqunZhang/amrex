@@ -1456,13 +1456,13 @@ namespace reducer_detail
     T init_value (ReduceOpType op)
     {
         T r;
-        if (ReduceOpType::max == op) {
-            ReduceOpMax{}.init(r);
-        } else if (ReduceOpType::min == op) {
-            ReduceOpMin{}.init(r);
-        } else {
+//        if (ReduceOpType::max == op) {
+//            ReduceOpMax{}.init(r);
+//        } else if (ReduceOpType::min == op) {
+//            ReduceOpMin{}.init(r);
+//        } else {
             ReduceOpSum{}.init(r);
-        }
+//        }
         return r;
     }
 
@@ -1470,13 +1470,13 @@ namespace reducer_detail
     AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
     void local_update (ReduceOpType op, T& dst, T const& src)
     {
-        if (ReduceOpType::max == op) {
-            ReduceOpMax{}.local_update(dst, src);
-        } else if (ReduceOpType::min == op) {
-            ReduceOpMin{}.local_update(dst, src);
-        } else {
+//        if (ReduceOpType::max == op) {
+//            ReduceOpMax{}.local_update(dst, src);
+//        } else if (ReduceOpType::min == op) {
+//            ReduceOpMin{}.local_update(dst, src);
+//        } else {
             ReduceOpSum{}.local_update(dst, src);
-        }
+//        }
     }
 
 #ifdef AMREX_USE_GPU
@@ -1489,25 +1489,25 @@ namespace reducer_detail
 #endif
         )
     {
-        if (ReduceOpType::max == op) {
-            ReduceOpMax{}.parallel_update(dst, src
-#ifdef AMREX_USE_SYCL
-                                          , gh
-#endif
-                );
-        } else if (ReduceOpType::min == op) {
-            ReduceOpMin{}.parallel_update(dst, src
-#ifdef AMREX_USE_SYCL
-                                          , gh
-#endif
-                );
-        } else {
+//        if (ReduceOpType::max == op) {
+//            ReduceOpMax{}.parallel_update(dst, src
+//#ifdef AMREX_USE_SYCL
+//                                          , gh
+//#endif
+//                );
+//        } else if (ReduceOpType::min == op) {
+//            ReduceOpMin{}.parallel_update(dst, src
+//#ifdef AMREX_USE_SYCL
+//                                          , gh
+//#endif
+//                );
+//        } else {
             ReduceOpSum{}.parallel_update(dst, src
 #ifdef AMREX_USE_SYCL
                                           , gh
 #endif
                 );
-        }
+//        }
     }
 
     template <typename OP, typename T, int dim, typename F>
@@ -1545,25 +1545,25 @@ namespace reducer_detail
 #endif
         )
     {
-        if (ReduceOpType::max == op) {
-            block_update(iop, ReduceOpMax{}, dst, icell, stride, indexer, f
-#ifdef AMREX_USE_SYCL
-                         , gh
-#endif
-                );
-        } else if (ReduceOpType::min == op) {
-            block_update(iop, ReduceOpMin{}, dst, icell, stride, indexer, f
-#ifdef AMREX_USE_SYCL
-                         , gh
-#endif
-                );
-        } else {
+//        if (ReduceOpType::max == op) {
+//            block_update(iop, ReduceOpMax{}, dst, icell, stride, indexer, f
+//#ifdef AMREX_USE_SYCL
+//                         , gh
+//#endif
+//                );
+//        } else if (ReduceOpType::min == op) {
+//            block_update(iop, ReduceOpMin{}, dst, icell, stride, indexer, f
+//#ifdef AMREX_USE_SYCL
+//                         , gh
+//#endif
+//                );
+//        } else {
             block_update(iop, ReduceOpSum{}, dst, icell, stride, indexer, f
 #ifdef AMREX_USE_SYCL
                          , gh
 #endif
                 );
-        }
+//        }
     }
 
     template <typename OP, typename T, int dim, typename F>
@@ -1604,25 +1604,25 @@ namespace reducer_detail
 #endif
         )
     {
-        if (ReduceOpType::max == op) {
-            block_update(iop, ReduceOpMax{}, dst, icell, stride, indexer, ncomp, f
-#ifdef AMREX_USE_SYCL
-                         , gh
-#endif
-                );
-        } else if (ReduceOpType::min == op) {
-            block_update(iop, ReduceOpMin{}, dst, icell, stride, indexer, ncomp, f
-#ifdef AMREX_USE_SYCL
-                         , gh
-#endif
-                );
-        } else {
+//        if (ReduceOpType::max == op) {
+//            block_update(iop, ReduceOpMax{}, dst, icell, stride, indexer, ncomp, f
+//#ifdef AMREX_USE_SYCL
+//                         , gh
+//#endif
+//                );
+//        } else if (ReduceOpType::min == op) {
+//            block_update(iop, ReduceOpMin{}, dst, icell, stride, indexer, ncomp, f
+//#ifdef AMREX_USE_SYCL
+//                         , gh
+//#endif
+//                );
+//        } else {
             block_update(iop, ReduceOpSum{}, dst, icell, stride, indexer, ncomp, f
 #ifdef AMREX_USE_SYCL
                          , gh
 #endif
                 );
-        }
+//        }
     }
 
     template <typename OP, typename T, typename N, typename F>
@@ -1654,25 +1654,25 @@ namespace reducer_detail
 #endif
         )
     {
-        if (ReduceOpType::max == op) {
-            block_update(iop, ReduceOpMax{}, dst, i, n, stride, f
-#ifdef AMREX_USE_SYCL
-                         , gh
-#endif
-                );
-        } else if (ReduceOpType::min == op) {
-            block_update(iop, ReduceOpMin{}, dst, i, n, stride, f
-#ifdef AMREX_USE_SYCL
-                         , gh
-#endif
-                );
-        } else {
+//        if (ReduceOpType::max == op) {
+//            block_update(iop, ReduceOpMax{}, dst, i, n, stride, f
+//#ifdef AMREX_USE_SYCL
+//                         , gh
+//#endif
+//                );
+//        } else if (ReduceOpType::min == op) {
+//            block_update(iop, ReduceOpMin{}, dst, i, n, stride, f
+//#ifdef AMREX_USE_SYCL
+//                         , gh
+//#endif
+//                );
+//        } else {
             block_update(iop, ReduceOpSum{}, dst, i, n, stride, f
 #ifdef AMREX_USE_SYCL
                          , gh
 #endif
                 );
-        }
+//        }
     }
 
     template <typename OP, typename T>
@@ -1714,25 +1714,25 @@ namespace reducer_detail
 #endif
         )
     {
-        if (ReduceOpType::max == op) {
-            return final_update(iop, nops, ReduceOpMax{}, dp, maxblocks, nblocks
-#ifdef AMREX_USE_SYCL
-                                , gh
-#endif
-                );
-        } else if (ReduceOpType::min == op) {
-            return final_update(iop, nops, ReduceOpMin{}, dp, maxblocks, nblocks
-#ifdef AMREX_USE_SYCL
-                                , gh
-#endif
-                );
-        } else {
+//        if (ReduceOpType::max == op) {
+//            return final_update(iop, nops, ReduceOpMax{}, dp, maxblocks, nblocks
+//#ifdef AMREX_USE_SYCL
+//                                , gh
+//#endif
+//                );
+//        } else if (ReduceOpType::min == op) {
+//            return final_update(iop, nops, ReduceOpMin{}, dp, maxblocks, nblocks
+//#ifdef AMREX_USE_SYCL
+//                                , gh
+//#endif
+//                );
+//        } else {
             return final_update(iop, nops, ReduceOpSum{}, dp, maxblocks, nblocks
 #ifdef AMREX_USE_SYCL
                                 , gh
 #endif
                 );
-        }
+//        }
     }
 
     template <typename I, typename T, typename F,
@@ -1762,13 +1762,13 @@ namespace reducer_detail
     template <typename T>
     void reduceop_doit (ReduceOpType op, T& dst, T const& src)
     {
-        if (ReduceOpType::max == op) {
-            ReduceOpMax{}.local_update(dst, src);
-        } else if (ReduceOpType::min == op) {
-            ReduceOpMin{}.local_update(dst, src);
-        } else {
+//        if (ReduceOpType::max == op) {
+//            ReduceOpMax{}.local_update(dst, src);
+//        } else if (ReduceOpType::min == op) {
+//            ReduceOpMin{}.local_update(dst, src);
+//        } else {
             ReduceOpSum{}.local_update(dst, src);
-        }
+//        }
     }
 
 #endif
@@ -1853,7 +1853,8 @@ public:
             for (int iop = 0; iop < nops; ++iop) {
                 auto pr = reducer_detail::call_f_intvect
                     (std::make_index_sequence<dim>(), f, iop, iv);
-                reducer_detail::reduceop_doit(ops[iop], dst[iop], pr);
+                ReduceOpSum{}.local_update(dst[iop], pr);
+                // reducer_detail::reduceop_doit(ops[iop], dst[iop], pr);
             }
         });
 
