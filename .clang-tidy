@@ -2,6 +2,7 @@ Checks: >
     '-*,
      bugprone-*,
        -bugprone-casting-through-void,
+       -bugprone-easily-swappable-parameters,
        -bugprone-exception-escape,
        -bugprone-implicit-widening-of-multiplication-result,
      clang-analyzer-*,
@@ -32,6 +33,8 @@ Checks: >
        -modernize-avoid-c-arrays,
        -modernize-macro-to-enum,
        -modernize-return-braced-init-list,
+       -modernize-use-constraints,
+       -modernize-use-designated-initializers,
        -modernize-use-trailing-return-type,
      performance-*,
      portability-*,
@@ -56,3 +59,7 @@ HeaderFilterRegex: '([^n].....|[^o]....|[^l]...|[^i]..|[^n].|[^t])\.H$'
 
 # Only available in clang-tidy >= 17
 HeaderFileExtensions: ['', "H", 'h', 'hh', 'hpp', 'hxx']
+
+# We will try to modernize this after switching to C++20
+# -modernize-use-constraints
+# -modernize-use-designated-initializers
