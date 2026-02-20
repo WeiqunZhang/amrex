@@ -2,6 +2,11 @@
 #define AMREX_SMALL_MATRIX_H_
 #include <AMReX_Config.H>
 
+/**
+ * \file AMReX_SmallMatrix.H
+ * \brief Compile-time-sized dense matrix, vector, and row-vector types.
+ */
+
 #include <AMReX_Algorithm.H>
 #include <AMReX_BLassert.H>
 #include <AMReX_Extension.H>
@@ -20,15 +25,17 @@
 namespace amrex {
 
     /**
-     * \brief Matrix class with compile-time size
+     * \class amrex::SmallMatrix
+     * \ingroup amrex_arithmetic_types
+     * \brief Matrix class with compile-time size.
      *
-     * Note that column vectors and row vectors are special cases of a
-     * Matrix.
+     * Column vectors and row vectors are special cases of SmallMatrix.
+     * The class is usable in GPU device code.
      *
-     * \tparam T Matrix element data type.
-     * \tparam NRows Number of rows.
-     * \tparam NCols Number of columns.
-     * \tparam ORDER Memory layout order. Order::F (i.e., column-major) by default.
+     * \tparam T          Matrix element data type.
+     * \tparam NRows      Number of rows.
+     * \tparam NCols      Number of columns.
+     * \tparam ORDER      Memory layout order. \c Order::F (column-major) by default.
      * \tparam StartIndex Starting index. Either 0 or 1.
      */
     template <class T, int NRows, int NCols, Order ORDER = Order::F, int StartIndex = 0>
@@ -183,6 +190,7 @@ namespace amrex {
          * Returns a \c const pointer address to the first element of the
          * SmallMatrix object, as if the object is treated as one-dimensional.
          */
+        /// \return Pointer to the first coefficient (const-qualified).
         [[nodiscard]] AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
         const T* begin () const noexcept { return m_mat; }
 
@@ -190,6 +198,7 @@ namespace amrex {
          * Returns a \c const pointer address right after the last element of the
          * SmallMatrix object, as if the object is treated as one-dimensional.
          */
+        /// \return Past-the-end pointer (const-qualified).
         [[nodiscard]] AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
         const T* end () const noexcept { return m_mat + NRows*NCols; }
 
@@ -197,6 +206,7 @@ namespace amrex {
          * Returns a pointer address to the first element of the
          * SmallMatrix object, as if the object is treated as one-dimensional.
          */
+        /// \return Pointer to the first coefficient.
         [[nodiscard]] AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
         T* begin () noexcept { return m_mat; }
 
@@ -207,7 +217,12 @@ namespace amrex {
         [[nodiscard]] AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
         T* end () noexcept { return m_mat + NRows*NCols; }
 
-        //! Set all elements in the matrix to the given value
+        /**
+         * \brief Set every entry of the matrix to the scalar \p val.
+         *
+         * \param val Value assigned to each coefficient.
+         * \return Reference to \c *this so calls can be chained.
+         */
         AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
         SmallMatrix<T,NRows,NCols,ORDER,StartIndex>&
         setVal (T val)
@@ -238,7 +253,11 @@ namespace amrex {
             return Z;
         }
 
-        //! Returns transposed matrix
+        /**
+         * \brief Return the transpose of this matrix (swapping rows/columns).
+         *
+         * The original matrix is left unchanged.
+         */
         [[nodiscard]] AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
         SmallMatrix<T,NCols,NRows,ORDER,StartIndex>
         transpose () const
@@ -252,7 +271,13 @@ namespace amrex {
             return r;
         }
 
-        //! Transposes a square matrix in-place.
+        /**
+         * \brief Transpose a square matrix in place.
+         *
+         * Only defined when \c NRows equals \c NCols.
+         *
+         * \return Reference to \c *this for chaining.
+         */
         template <int MM=NRows, int NN=NCols, std::enable_if_t<MM==NN,int> = 0>
         AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
         SmallMatrix<T,NRows,NCols,ORDER,StartIndex>&
@@ -267,7 +292,7 @@ namespace amrex {
             return *this;
         }
 
-        //! Returns the product of all elements in the matrix
+        //! Returns the product of all elements in the matrix.
         [[nodiscard]] AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
         T product () const
         {
@@ -278,7 +303,7 @@ namespace amrex {
             return p;
         }
 
-        //! Returns the sum of all elements in the matrix
+        //! Returns the sum of all elements in the matrix.
         [[nodiscard]] AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
         T sum () const
         {
@@ -289,7 +314,7 @@ namespace amrex {
             return s;
         }
 
-        //! Returns the trace of a square matrix
+        //! Returns the trace (sum of diagonal elements) of a square matrix.
         template <int MM=NRows, int NN=NCols, std::enable_if_t<MM==NN,int> = 0>
         [[nodiscard]] AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
         T trace () const
@@ -310,7 +335,7 @@ namespace amrex {
             return *this;
         }
 
-        //! Binary operator + returning the result of maxtrix addition, lhs+rhs
+        //! Binary operator + returning the result of matrix addition, lhs+rhs
         AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
         friend SmallMatrix<T,NRows,NCols,ORDER,StartIndex>
         operator+ (SmallMatrix<T,NRows,NCols,ORDER,StartIndex>        lhs,
@@ -331,7 +356,7 @@ namespace amrex {
             return *this;
         }
 
-        //! Binary operator - returning the result of maxtrix subtraction, lhs-rhs
+        //! Binary operator - returning the result of matrix subtraction, lhs-rhs
         AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
         friend SmallMatrix<T,NRows,NCols,ORDER,StartIndex>
         operator- (SmallMatrix<T,NRows,NCols,ORDER,StartIndex>        lhs,
@@ -385,7 +410,14 @@ namespace amrex {
         operator* (SmallMatrix<U,N1,N2,Ord,SI> const& lhs,
                    SmallMatrix<V,N2,N3,Ord,SI> const& rhs);
 
-        //! Returns the dot product of two vectors
+        /**
+         * \brief Compute the dot product with another SmallMatrix.
+         *
+         * Both operands must be vectors (either \c NRows==1 or \c NCols==1).
+         *
+         * \param rhs Vector whose elements are multiplied with this one.
+         * \return Sum over element-wise products.
+         */
         [[nodiscard]] AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
         T dot (SmallMatrix<T,NRows,NCols,ORDER,StartIndex> const& rhs) const
         {
@@ -396,10 +428,12 @@ namespace amrex {
             return r;
         }
 
+        //! Return a const reference to the compile-time \p N -th element (for structured bindings).
         template <int N, std::enable_if_t<(N<NRows*NCols),int> = 0>
         [[nodiscard]] AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
         constexpr T const& get () const { return m_mat[N]; }
 
+        //! Return a reference to the compile-time \p N -th element (for structured bindings).
         template <int N, std::enable_if_t<(N<NRows*NCols),int> = 0>
         [[nodiscard]] AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
         constexpr T& get () { return m_mat[N]; }
@@ -445,6 +479,8 @@ namespace amrex {
         return r;
     }
 
+    /// \ingroup amrex_arithmetic_types
+    //! Write matrix to \p os row-by-row, with elements separated by spaces.
     template <class T, int NRows, int NCols, Order ORDER, int SI>
     std::ostream& operator<< (std::ostream& os,
                               SmallMatrix<T,NRows,NCols,ORDER,SI> const& mat)
@@ -459,13 +495,18 @@ namespace amrex {
         return os;
     }
 
+    /// \ingroup amrex_arithmetic_types
+    //! A column vector of \p N elements (alias for SmallMatrix<T,N,1>).
     template <class T, int N, int StartIndex = 0>
     using SmallVector = SmallMatrix<T,N,1,Order::F,StartIndex>;
 
+    /// \ingroup amrex_arithmetic_types
+    //! A row vector of \p N elements (alias for SmallMatrix<T,1,N>).
     template <class T, int N, int StartIndex = 0>
     using SmallRowVector = SmallMatrix<T,1,N,Order::F,StartIndex>;
 }
 
+/// \cond DOXYGEN_IGNORE
 template <class T, int NRows, int NCols, amrex::Order ORDER, int StartIndex>
 struct std::tuple_size<amrex::SmallMatrix<T,NRows,NCols,ORDER,StartIndex> >
     : std::integral_constant<std::size_t,NRows*NCols> {};
@@ -475,6 +516,7 @@ struct std::tuple_element<N, amrex::SmallMatrix<T,NRows,NCols,ORDER,StartIndex> 
 {
     using type = T;
 };
+/// \endcond
 
 #endif
 

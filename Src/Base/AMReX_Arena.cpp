@@ -873,6 +873,9 @@ The_Comms_Arena ()
 
 #ifdef AMREX_TINY_PROFILING
 
+/// \cond DOXYGEN_IGNORE
+#ifdef AMREX_TINY_PROFILING
+
 Arena::ArenaProfiler::~ArenaProfiler ()
 {
     if (m_do_profiling) {
@@ -912,5 +915,6 @@ void Arena::ArenaProfiler::profile_free ([[maybe_unused]] void* ptr) {
     }
 #endif
 }
+/// \endcond
 
 }

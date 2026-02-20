@@ -7,6 +7,11 @@
 #include <AMReX_FabConv.H>
 #include <AMReX_FabFactory.H>
 
+/**
+ * \file AMReX_FArrayBox.H
+ * \brief Floating-point specialization of BaseFab plus FAB I/O helpers.
+ */
+
 namespace amrex {
 
 class FArrayBox;
@@ -163,6 +168,7 @@ class FABio_binary
     public FABio
 {
 public:
+    //! Construct a binary FAB I/O helper backed by \p rd_ (ownership transferred).
     FABio_binary (RealDescriptor* rd_);
 
     void read (std::istream& is,
@@ -235,8 +241,10 @@ public:
     //! Construct an invalid FAB with no memory.
     FArrayBox () noexcept = default;
 
+    //! Construct an invalid FAB that will allocate from the supplied arena.
     explicit FArrayBox (Arena* ar) noexcept;
 
+    //! Allocate \p ncomp components over \p b using arena-managed memory.
     FArrayBox (const Box& b, int ncomp, Arena* ar);
 
     /**
@@ -250,10 +258,21 @@ public:
                         bool       shared=false,
                         Arena*     ar = nullptr);
 
+    /**
+     * \brief Construct from another FAB either by aliasing or deep-copying components.
+     *
+     * \param rhs       Source FAB providing the data.
+     * \param make_type Use \c amrex::make_alias to share storage or
+     *                  \c amrex::make_deep_copy to allocate new storage and copy.
+     * \param scomp     First component to import from \p rhs.
+     * \param ncomp     Number of components to import.
+     */
     FArrayBox (const FArrayBox& rhs, MakeType make_type, int scomp, int ncomp);
 
+    //! Wrap an externally owned const buffer; no memory is allocated or freed.
     FArrayBox (const Box& b, int ncomp, Real const* p) noexcept;
 
+    //! Wrap an externally owned mutable buffer; no memory is allocated or freed.
     FArrayBox (const Box& b, int ncomp, Real* p) noexcept;
 
     explicit FArrayBox (Array4<Real> const& a) noexcept : BaseFab<Real>(a) {}
@@ -267,7 +286,9 @@ public:
     //!  The destructor.
     ~FArrayBox () noexcept override = default;
 
+    //! Move-construct, leaving \p rhs empty.
     FArrayBox (FArrayBox&& rhs) noexcept = default;
+    //! Move-assign, releasing existing storage then adopting \p rhs memory.
     FArrayBox& operator= (FArrayBox&&) noexcept = default;
 
     FArrayBox (const FArrayBox&) = delete;
@@ -282,18 +303,27 @@ public:
     * This may return false, even if the FAB contains NaNs, if the machine
     * doesn't support the appropriate NaN testing functions.
     */
+    //! True if any component within the entire FAB is NaN.
     template <RunOn run_on AMREX_DEFAULT_RUNON>
     [[nodiscard]] bool contains_nan () const noexcept;
 
+    /**
+     * \brief Check a sub-box and component range for NaN values.
+     * \param bx     Region to inspect (must lie within the FAB).
+     * \param scomp  First component to test.
+     * \param ncomp  Number of components to inspect.
+     */
     template <RunOn run_on AMREX_DEFAULT_RUNON>
     [[nodiscard]] bool contains_nan (const Box& bx, int scomp, int ncomp) const noexcept;
     /**
     * \brief These versions return the cell index (though not the component) of
     * the first location of a NaN if there is one.
     */
+    //! Return the index of the first NaN (if any) in the full FAB.
     template <RunOn run_on AMREX_DEFAULT_RUNON>
     bool contains_nan (IntVect& where) const noexcept;
 
+    //! Return the index of the first NaN in \p bx / component range (if any).
     template <RunOn run_on AMREX_DEFAULT_RUNON>
     bool contains_nan (const Box& bx, int scomp, int ncomp, IntVect& where) const noexcept;
     /**
@@ -301,18 +331,27 @@ public:
     * This may return false, even if the FAB contains Infs, if the machine
     * doesn't support the appropriate Inf testing functions.
     */
+    //! True if any component within the entire FAB is Inf.
     template <RunOn run_on AMREX_DEFAULT_RUNON>
     [[nodiscard]] bool contains_inf () const noexcept;
 
+    /**
+     * \brief Check a sub-box and component range for Inf values.
+     * \param bx     Region to inspect (must lie within the FAB).
+     * \param scomp  First component to test.
+     * \param ncomp  Number of components to inspect.
+     */
     template <RunOn run_on AMREX_DEFAULT_RUNON>
     [[nodiscard]] bool contains_inf (const Box& bx, int scomp, int ncomp) const noexcept;
     /**
     * \brief These versions return the cell index (though not the component) of
     * the first location of an Inf if there is one.
     */
+    //! Return the index of the first Inf (if any) in the full FAB.
     template <RunOn run_on AMREX_DEFAULT_RUNON>
     bool contains_inf (IntVect& where) const noexcept;
 
+    //! Return the index of the first Inf in \p bx / component range (if any).
     template <RunOn run_on AMREX_DEFAULT_RUNON>
     bool contains_inf (const Box& bx, int scomp, int ncomp, IntVect& where) const noexcept;
 
@@ -331,6 +370,7 @@ public:
     * \brief Writes out the FAB in whatever format you've set.
     * The default format is NATIVE.
     */
+    //! Write every component using the current FABio format (default NATIVE).
     void writeOn (std::ostream& os) const;
 
     /**
@@ -348,7 +388,7 @@ public:
                   int           comp,
                   int           num_comp=1) const;
 
-    //! Read FAB from istream.  Format is as it was written out.
+    //! Read FAB from \p is using whichever FABio format it was written with.
     void readFrom (std::istream& is);
 
     /**
@@ -357,6 +397,7 @@ public:
     * compIndex of the FAB from the istream.
     * Returns the number of components available in the fab.
     */
+    //! Read a single component (indexed by \p compIndex) from the serialized FAB.
     int readFrom (std::istream& is, int compIndex);
 
     /**
@@ -377,6 +418,7 @@ public:
     * be the only function that needs to be called in order
     * to set the format.
     */
+    //! Programmatic shorthand for selecting the FAB I/O format.
     static void setFormat (FABio::Format fmt);
 
     //! Gets the FABio::Format set in the program.
@@ -393,6 +435,7 @@ public:
     * such as the Ordering was lost when the "old" FAB was
     * written out.
     */
+    //! Override the legacy byte-ordering expected when reading pre-self-describing FABs.
     static void setOrdering (FABio::Ordering ordering);
 
     /**
@@ -400,12 +443,14 @@ public:
     * deprecated.  It does NOT do the right thing with the
     * new FAB I/O format.
     */
+    //! Return the legacy byte-ordering flag currently configured.
     static FABio::Ordering getOrdering ();
 
     /**
     * \brief Set the FABio::Precision.  This is deprecated.  It
     * is not useful with the "new" FAB I/O format.
     */
+    //! Override the legacy precision flag used for older FAB formats.
     static void setPrecision (FABio::Precision precision);
 
     /**
@@ -413,6 +458,7 @@ public:
     * is not useful with the "new" FAB I/O format.  Always
     * returns FABio::Float.
     */
+    //! Return the legacy precision flag currently configured.
     static FABio::Precision getPrecision ();
 
     //! Returns reference to the FABio object used by the program.
@@ -422,15 +468,22 @@ public:
     * \brief Sets the FABio object used by the program.  It is an error
     * if the passed pointer rd is the null pointer.
     */
+    //! Replace the global FABio helper (takes ownership of \p rd).
     static void setFABio (FABio* rd);
 
+    //! Return a copy of the RealDescriptor describing the on-disk layout.
     static std::unique_ptr<RealDescriptor> getDataDescriptor ();
 
+    //! Return the runtime class name (for metadata headers).
     static std::string getClassName ();
 
+    //! Enable or disable initializing newly allocated elements to the init value.
     static bool set_do_initval (bool tf);
+    //! Query whether init-value filling is enabled.
     static bool get_do_initval ();
+    //! Set the default value used for initialization.
     static Real set_initval    (Real iv);
+    //! Query the current initialization value.
     static Real get_initval    ();
     //! Initialize from ParmParse with "fab" prefix.
     static void Initialize ();

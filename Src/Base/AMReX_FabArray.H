@@ -33,6 +33,11 @@
 
 #include <AMReX_Gpu.H>
 
+/**
+ * \file AMReX_FabArray.H
+ * \brief Distributed container of BaseFabs plus copy/fill utilities.
+ */
+
 #ifdef AMREX_USE_EB
 #include <AMReX_EBFabFactory.H>
 #endif
@@ -444,13 +449,34 @@ public:
                  const FabFactory<FAB>&     factory = DefaultFabFactory<FAB>());
 #endif
 
+    /**
+     * \brief Factory used to allocate FAB instances for this FabArray.
+     *
+     * \return Reference to the FabFactory supplied at construction (or the default factory if not provided).
+     */
     const FabFactory<FAB>& Factory () const noexcept { return *m_factory; }
 
-    // Provides access to the Arena this FabArray was build with.
+    /**
+     * \brief Arena that backs allocations done by this FabArray.
+     *
+     * \return Pointer to the Arena configured through MFInfo (or nullptr for the default Arena).
+     */
     Arena* arena () const noexcept { return m_dallocator.arena(); }
 
+    /**
+     * \brief Tags describing the intent of this FabArray.
+     *
+     * The tags originate from `MFInfo::SetTag()` calls and can be used when
+     * analyzing memory usage.
+     */
     const Vector<std::string>& tags () const noexcept { return m_tags; }
 
+    /**
+     * \brief Whether this FabArray was built with an EBFArrayBoxFactory.
+     *
+     * This is a convenience wrapper around a `dynamic_cast` that allows
+     * callers to quickly check for embedded-boundary support.
+     */
     bool hasEBFabFactory () const noexcept {
 #ifdef AMREX_USE_EB
         const auto *const f = dynamic_cast<EBFArrayBoxFactory const*>(m_factory.get());
@@ -476,6 +502,9 @@ public:
     //! single contiguous chunk of memory, 0 otherwise.
     [[nodiscard]] std::size_t singleChunkSize () const noexcept { return m_single_chunk_size; }
 
+    /**
+     * \brief Query whether every FAB supplied by the factory is regular (non-EB).
+     */
     bool isAllRegular () const noexcept {
 #ifdef AMREX_USE_EB
         const auto *const f = dynamic_cast<EBFArrayBoxFactory const*>(m_factory.get());
@@ -541,6 +570,9 @@ public:
     FAB      * fabPtr (int K) noexcept;  // Here K is global index
     FAB const* fabPtr (int K) const noexcept;
 
+    /**
+     * \brief Prefetch the FAB owned by iterator \p mfi to host memory.
+     */
     template <class F=FAB, std::enable_if_t<IsBaseFab<F>::value,int> = 0>
     void prefetchToHost (const MFIter& mfi) const noexcept
     {
@@ -551,6 +583,9 @@ public:
 #endif
     }
 
+    /**
+     * \brief Prefetch the FAB owned by iterator \p mfi to device memory.
+     */
     template <class F=FAB, std::enable_if_t<IsBaseFab<F>::value,int> = 0>
     void prefetchToDevice (const MFIter& mfi) const noexcept
     {
@@ -561,78 +596,93 @@ public:
 #endif
     }
 
+    //! Read-only Array4 view for the FAB referenced by iterator \p mfi.
     template <class F=FAB, std::enable_if_t<IsBaseFab<F>::value,int> = 0>
     Array4<typename FabArray<FAB>::value_type const> array (const MFIter& mfi) const noexcept
     {
         return fabPtr(mfi)->const_array();
     }
 
+    //! Mutable Array4 view for the FAB referenced by iterator \p mfi.
     template <class F=FAB, std::enable_if_t<IsBaseFab<F>::value,int> = 0>
     Array4<typename FabArray<FAB>::value_type> array (const MFIter& mfi) noexcept
     {
         return fabPtr(mfi)->array();
     }
 
+    //! Read-only Array4 view for the FAB identified by global index \p K.
     template <class F=FAB, std::enable_if_t<IsBaseFab<F>::value,int> = 0>
     Array4<typename FabArray<FAB>::value_type const> array (int K) const noexcept
     {
         return fabPtr(K)->const_array();
     }
 
+    //! Mutable Array4 view for the FAB identified by global index \p K.
     template <class F=FAB, std::enable_if_t<IsBaseFab<F>::value,int> = 0>
     Array4<typename FabArray<FAB>::value_type> array (int K) noexcept
     {
         return fabPtr(K)->array();
     }
 
+    //! Synonym for array(const MFIter&) that highlights read-only semantics.
     template <class F=FAB, std::enable_if_t<IsBaseFab<F>::value,int> = 0>
     Array4<typename FabArray<FAB>::value_type const> const_array (const MFIter& mfi) const noexcept
     {
         return fabPtr(mfi)->const_array();
     }
 
+    //! Read-only Array4 view for the FAB identified by global index \p K.
     template <class F=FAB, std::enable_if_t<IsBaseFab<F>::value,int> = 0>
     Array4<typename FabArray<FAB>::value_type const> const_array (int K) const noexcept
     {
         return fabPtr(K)->const_array();
     }
 
+    //! Read-only sub-component view beginning at \p start_comp for iterator \p mfi.
     template <class F=FAB, std::enable_if_t<IsBaseFab<F>::value,int> = 0>
     Array4<typename FabArray<FAB>::value_type const> array (const MFIter& mfi, int start_comp) const noexcept
     {
         return fabPtr(mfi)->const_array(start_comp);
     }
 
+    //! Mutable sub-component view beginning at \p start_comp for iterator \p mfi.
     template <class F=FAB, std::enable_if_t<IsBaseFab<F>::value,int> = 0>
     Array4<typename FabArray<FAB>::value_type> array (const MFIter& mfi, int start_comp) noexcept
     {
         return fabPtr(mfi)->array(start_comp);
     }
 
+    //! Read-only sub-component view beginning at \p start_comp for FAB \p K.
     template <class F=FAB, std::enable_if_t<IsBaseFab<F>::value,int> = 0>
     Array4<typename FabArray<FAB>::value_type const> array (int K, int start_comp) const noexcept
     {
         return fabPtr(K)->const_array(start_comp);
     }
 
+    //! Mutable sub-component view beginning at \p start_comp for FAB \p K.
     template <class F=FAB, std::enable_if_t<IsBaseFab<F>::value,int> = 0>
     Array4<typename FabArray<FAB>::value_type> array (int K, int start_comp) noexcept
     {
         return fabPtr(K)->array(start_comp);
     }
 
+    //! Read-only synonym for array(mfi,start_comp).
     template <class F=FAB, std::enable_if_t<IsBaseFab<F>::value,int> = 0>
     Array4<typename FabArray<FAB>::value_type const> const_array (const MFIter& mfi, int start_comp) const noexcept
     {
         return fabPtr(mfi)->const_array(start_comp);
     }
 
+    //! Read-only synonym for array(K,start_comp).
     template <class F=FAB, std::enable_if_t<IsBaseFab<F>::value,int> = 0>
     Array4<typename FabArray<FAB>::value_type const> const_array (int K, int start_comp) const noexcept
     {
         return fabPtr(K)->const_array(start_comp);
     }
 
+    /**
+     * \brief Build (if needed) and return mutable Array4 views for every FAB.
+     */
     template <class F=FAB, std::enable_if_t<IsBaseFab<F>::value,int> = 0>
     MultiArray4<typename FabArray<FAB>::value_type> arrays () noexcept
     {
@@ -640,6 +690,9 @@ public:
         return m_arrays;
     }
 
+    /**
+     * \brief Build (if needed) and return read-only Array4 views for every FAB.
+     */
     template <class F=FAB, std::enable_if_t<IsBaseFab<F>::value,int> = 0>
     MultiArray4<typename FabArray<FAB>::value_type const> arrays () const noexcept
     {
@@ -647,6 +700,7 @@ public:
         return m_const_arrays;
     }
 
+    //! Read-only convenience wrapper equivalent to arrays() const.
     template <class F=FAB, std::enable_if_t<IsBaseFab<F>::value,int> = 0>
     MultiArray4<typename FabArray<FAB>::value_type const> const_arrays () const noexcept
     {
@@ -810,19 +864,23 @@ public:
     template <class F=FAB, std::enable_if_t<IsBaseFab<F>::value,int> = 0>
     void setBndry (value_type val);
 
-    //! Set ncomp values in the boundary region, starting at start_comp to val.
+    //! Set ncomp values in the boundary region, starting at \p strt_comp, to val.
     template <class F=FAB, std::enable_if_t<IsBaseFab<F>::value,int> = 0>
     void setBndry (value_type val, int strt_comp, int ncomp);
 
-   //! Set all values outside the Geometry domain to val.
+   //! Set all values outside the Geometry domain described by \p geom to val.
     template <class F=FAB, std::enable_if_t<IsBaseFab<F>::value,int> = 0>
     void setDomainBndry (value_type val, const Geometry& geom);
 
-    //! Set ncomp values outside the Geometry domain to val, starting at start_comp.
+    //! Set ncomp values outside the Geometry domain described by \p geom to val, starting at start_comp.
     template <class F=FAB, std::enable_if_t<IsBaseFab<F>::value,int> = 0>
     void setDomainBndry (value_type val, int strt_comp, int ncomp, const Geometry& geom);
 
-    //! Get capacity of the FabArray
+    /**
+     * \brief Report the per-FAB allocation sizes.
+     *
+     * \param mem LayoutData populated with the number of elements owned by each FAB.
+     */
     template <typename I, class F=FAB, std::enable_if_t<IsBaseFab<F>::value && std::is_integral_v<I> && (sizeof(I) >= sizeof(Long)), int> = 0>
     void capacityOfFabs (LayoutData<I>& mem) const;
 
@@ -857,9 +915,23 @@ public:
                CpOp                 op = FabArrayBase::COPY)
         { ParallelCopy(src,period,op); }
 
+    /**
+     * \brief Start an asynchronous ParallelAdd that copies every component.
+     *
+     * \param src    Source FabArray to add from.
+     * \param period Periodicity description applied during the communication pattern.
+     */
     void ParallelAdd_nowait (const FabArray<FAB>& src,
                              const Periodicity& period = Periodicity::NonPeriodic())
         { ParallelCopy_nowait(src,period,FabArray::ADD); }
+
+    /**
+     * \brief Start an asynchronous ParallelCopy that copies every component.
+     *
+     * \param src    Source FabArray to copy from.
+     * \param period Periodicity description applied during the communication pattern.
+     * \param op     Copy operator (COPY, ADD, or similar) executed when data arrives.
+     */
     void ParallelCopy_nowait (const FabArray<FAB>& src,
                               const Periodicity&   period = Periodicity::NonPeriodic(),
                               CpOp                 op = FabArrayBase::COPY)
@@ -896,12 +968,32 @@ public:
                CpOp                 op = FabArrayBase::COPY)
         { ParallelCopy(src,src_comp,dest_comp,num_comp, period, op); }
 
+    /**
+     * \brief Start an asynchronous ParallelAdd for a component subset.
+     *
+     * \param src       Source FabArray to add from.
+     * \param src_comp  First component in \p src to include.
+     * \param dest_comp First component in this FabArray receiving the data.
+     * \param num_comp  Number of components to transfer.
+     * \param period    Periodicity description applied during the communication pattern.
+     */
     void ParallelAdd_nowait (const FabArray<FAB>& src,
                              int                  src_comp,
                              int                  dest_comp,
                              int                  num_comp,
                              const Periodicity&   period = Periodicity::NonPeriodic())
        { ParallelCopy_nowait(src,src_comp,dest_comp,num_comp, period, FabArrayBase::ADD); }
+
+    /**
+     * \brief Start an asynchronous ParallelCopy for a component subset.
+     *
+     * \param src       Source FabArray to copy from.
+     * \param src_comp  First component in \p src to include.
+     * \param dest_comp First component in this FabArray receiving the data.
+     * \param num_comp  Number of components to transfer.
+     * \param period    Periodicity description applied during the communication pattern.
+     * \param op        Copy operator (COPY, ADD, or similar) executed when data arrives.
+     */
     void ParallelCopy_nowait (const FabArray<FAB>& src,
                               int                  src_comp,
                               int                  dest_comp,
@@ -948,6 +1040,17 @@ public:
                        const FabArrayBase::CPC* a_cpc = nullptr,
                        bool                 deterministic = false);
 
+    /**
+     * \brief Asynchronous ParallelAdd with scalar ghost-cell growth.
+     *
+     * \param src        Source FabArray to add from.
+     * \param src_comp   First component in \p src to include.
+     * \param dest_comp  First component in this FabArray receiving the data.
+     * \param num_comp   Number of components to transfer.
+     * \param src_nghost Grow cells around each source FAB.
+     * \param dst_nghost Grow cells around each destination FAB.
+     * \param period     Periodicity description applied during the communication pattern.
+     */
     void ParallelAdd_nowait (const FabArray<FAB>& src,
                              int                  src_comp,
                              int                  dest_comp,
@@ -958,6 +1061,17 @@ public:
        { ParallelCopy_nowait(src,src_comp,dest_comp,num_comp,IntVect(src_nghost),
                                IntVect(dst_nghost),period,FabArrayBase::ADD); }
 
+    /**
+     * \brief Asynchronous ParallelAdd with per-direction ghost-cell growth.
+     *
+     * \param src        Source FabArray to add from.
+     * \param src_comp   First component in \p src to include.
+     * \param dest_comp  First component in this FabArray receiving the data.
+     * \param num_comp   Number of components to transfer.
+     * \param src_nghost Per-direction grow cells around each source FAB.
+     * \param dst_nghost Per-direction grow cells around each destination FAB.
+     * \param period     Periodicity description applied during the communication pattern.
+     */
     void ParallelAdd_nowait (const FabArray<FAB>& src,
                              int                  src_comp,
                              int                  dest_comp,
@@ -968,6 +1082,18 @@ public:
        { ParallelCopy_nowait(src,src_comp,dest_comp,num_comp,src_nghost,
                              dst_nghost,period,FabArrayBase::ADD); }
 
+    /**
+     * \brief Asynchronous ParallelCopy with scalar ghost-cell growth.
+     *
+     * \param src        Source FabArray to copy from.
+     * \param src_comp   First component in \p src to include.
+     * \param dest_comp  First component in this FabArray receiving the data.
+     * \param num_comp   Number of components to transfer.
+     * \param src_nghost Grow cells around each source FAB.
+     * \param dst_nghost Grow cells around each destination FAB.
+     * \param period     Periodicity description applied during the communication pattern.
+     * \param op         Copy operator (COPY, ADD, or similar) executed when data arrives.
+     */
     void ParallelCopy_nowait (const FabArray<FAB>& src,
                               int                  src_comp,
                               int                  dest_comp,
@@ -979,6 +1105,21 @@ public:
        { ParallelCopy_nowait(src,src_comp,dest_comp,num_comp,IntVect(src_nghost),
                              IntVect(dst_nghost),period,op); }
 
+    /**
+     * \brief Asynchronous ParallelCopy with per-direction ghost-cell growth.
+     *
+     * \param src                 Source FabArray to copy from.
+     * \param scomp               First source component.
+     * \param dcomp               First destination component.
+     * \param ncomp               Number of components to transfer.
+     * \param snghost             Per-direction grow cells applied to source FABs.
+     * \param dnghost             Per-direction grow cells applied to destination FABs.
+     * \param period              Periodicity description applied during the communication pattern.
+     * \param op                  Copy operator (COPY, ADD, or similar) executed when data arrives.
+     * \param a_cpc               Optional cached copy descriptor (nullptr to rebuild).
+     * \param to_ghost_cells_only Restrict copy to the destination ghost region when true.
+     * \param deterministic       Whether to enforce deterministic MPI ordering.
+     */
     void ParallelCopy_nowait (const FabArray<FAB>& src,
                               int                  scomp,
                               int                  dcomp,
@@ -991,6 +1132,22 @@ public:
                               bool                 to_ghost_cells_only = false,
                               bool                 deterministic = false);
 
+    /**
+     * \brief Asynchronous ParallelCopy with per-direction ghost-cell growth and a spatial offset.
+     *
+     * \param src                 Source FabArray to copy from.
+     * \param scomp               First source component.
+     * \param dcomp               First destination component.
+     * \param ncomp               Number of components to transfer.
+     * \param snghost             Per-direction grow cells applied to source FABs.
+     * \param dnghost             Per-direction grow cells applied to destination FABs.
+     * \param offset              Shift applied to the source boxes before they intersect with destinations.
+     * \param period              Periodicity description applied during the communication pattern.
+     * \param op                  Copy operator (COPY, ADD, or similar) executed when data arrives.
+     * \param a_cpc               Optional cached copy descriptor (nullptr to rebuild).
+     * \param to_ghost_cells_only Restrict copy to the destination ghost region when true.
+     * \param deterministic       Whether to enforce deterministic MPI ordering.
+     */
     void ParallelCopy_nowait (const FabArray<FAB>& src,
                               int                  scomp,
                               int                  dcomp,
@@ -1004,8 +1161,22 @@ public:
                               bool                 to_ghost_cells_only = false,
                               bool                 deterministic = false);
 
+    /**
+     * \brief Wait for all outstanding nowait ParallelCopy/ParallelAdd operations to finish.
+     */
     void ParallelCopy_finish ();
 
+    /**
+     * \brief Copy interior data from the source to the destination ghost cells only.
+     *
+     * \param src       Source FabArray to copy from.
+     * \param scomp     First source component.
+     * \param dcomp     First destination component.
+     * \param ncomp     Number of components to transfer.
+     * \param snghost   Per-direction grow cells applied to source FABs.
+     * \param dnghost   Per-direction grow cells applied to destination FABs.
+     * \param period    Periodicity description applied during the communication pattern.
+     */
     void ParallelCopyToGhost (const FabArray<FAB>& src,
                               int                  scomp,
                               int                  dcomp,
@@ -1014,6 +1185,17 @@ public:
                               const IntVect&       dnghost,
                               const Periodicity&   period = Periodicity::NonPeriodic());
 
+    /**
+     * \brief Start an asynchronous version of ParallelCopyToGhost().
+     *
+     * \param src       Source FabArray to copy from.
+     * \param scomp     First source component.
+     * \param dcomp     First destination component.
+     * \param ncomp     Number of components to transfer.
+     * \param snghost   Per-direction grow cells applied to source FABs.
+     * \param dnghost   Per-direction grow cells applied to destination FABs.
+     * \param period    Periodicity description applied during the communication pattern.
+     */
     void ParallelCopyToGhost_nowait (const FabArray<FAB>& src,
                                      int                  scomp,
                                      int                  dcomp,
@@ -1022,6 +1204,7 @@ public:
                                      const IntVect&       dnghost,
                                      const Periodicity&   period = Periodicity::NonPeriodic());
 
+    //! Wait for the outstanding ParallelCopyToGhost_nowait() requests.
     void ParallelCopyToGhost_finish();
 
     /**

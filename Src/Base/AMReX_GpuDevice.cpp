@@ -145,6 +145,7 @@ namespace {
     }
 }
 
+/// \cond DOXYGEN_IGNORE
 [[nodiscard]] gpuStream_t&
 StreamManager::getStream () {
     return m_stream;
@@ -218,6 +219,7 @@ StreamManager::wait_list_size () {
     std::lock_guard<std::mutex> lock(m_mutex);
     return m_free_wait_list.size();
 }
+/// \endcond
 
 #endif
 

@@ -6,13 +6,20 @@
 #include <omp.h>
 #endif
 
+/**
+ * \file AMReX_BLBackTrace.H
+ * \brief Utilities for capturing and printing lightweight backtraces.
+ */
+
 #include <stack>
 #include <string>
 #include <utility>
 #include <cstdlib>
 
+/// \cond DOXYGEN_IGNORE
 #define BL_PASTE2(x, y) x##y
 #define BL_PASTE(x, y) BL_PASTE2(x, y)
+/// \endcond
 #define BL_BACKTRACE_PUSH( S )  amrex::BLBTer BL_PASTE( bl_bter, __COUNTER__ )( S, __FILE__, __LINE__ )
 #define BL_BACKTRACE_POP()   amrex::BLBackTrace::bt_stack.pop()
 
@@ -20,10 +27,20 @@ namespace amrex {
 
 struct BLBackTrace
 {
+    /**
+     * \brief Signal handler that prints and aborts on fatal signals.
+     * \param s Signal number provided by the runtime.
+     */
     static void handler(int s);
-    //! Abort backtrace. Used automatically.
+    /**
+     * \brief Abort backtrace that writes details to \p f.
+     * \param f Destination file handle (for example, stderr).
+     */
     static void print_backtrace_info (FILE* f);
-    //! Non-abort backtrace. Prints to specified file and continues.
+    /**
+     * \brief Non-aborting backtrace that prints to a file and continues.
+     * \param filename Output file that receives the textual stack trace.
+     */
     static void print_backtrace_info (const std::string& filename);
 
     static std::stack<std::pair<std::string, std::string> > bt_stack;
@@ -36,6 +53,13 @@ struct BLBackTrace
 class BLBTer
 {
 public:
+    /**
+     * \brief Push an entry onto the backtrace stack.
+     *
+     * \param s Message describing the scope being entered.
+     * \param file Source file name.
+     * \param line Source line number.
+     */
     BLBTer(const std::string& s, const char* file, int line);
     BLBTer (BLBTer const&) = delete;
     BLBTer (BLBTer &&) = delete;
@@ -44,6 +68,11 @@ public:
     ~BLBTer();
 private:
     std::string line_file;
+    /**
+     * \brief Pop the most recent backtrace entry.
+     *
+     * Invoked automatically when the guard object falls out of scope.
+     */
     void pop_bt_stack();
 };
 

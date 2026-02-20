@@ -2,6 +2,11 @@
 #define AMREX_PRINT_H_
 #include <AMReX_Config.H>
 
+/**
+ * \file AMReX_Print.H
+ * \brief MPI-aware print utility classes.
+ */
+
 #include <AMReX.H>
 #include <AMReX_ParallelContext.H>
 #include <AMReX_ParallelDescriptor.H>
@@ -14,6 +19,7 @@
 
 namespace amrex
 {
+    //! Write an AMREX_SPACEDIM-element Array to an output stream.
     template <typename T>
     std::ostream& operator<< (std::ostream& os, Array<T,AMREX_SPACEDIM> const& a)
     {
@@ -23,6 +29,7 @@ namespace amrex
         return os;
     }
 
+    //! Write a std::pair to an output stream as \c (first, second).
     template <typename T, typename S>
     std::ostream& operator<<(std::ostream& os, const std::pair<T, S>& v)
     {
@@ -30,35 +37,52 @@ namespace amrex
         return os;
     }
 
-    //! This class provides the user with a few print options
+    /**
+     * \class amrex::Print
+     * \ingroup amrex_utilities
+     * \brief Print to an output stream from a single MPI rank.
+     *
+     * Output is buffered and flushed to the stream only from the designated
+     * rank when the object is destroyed (typically at the end of the
+     * statement).
+     *
+     * Example:
+     * \code{.cpp}
+     * amrex::Print() << "x = " << x << '\n';          // I/O processor only
+     * amrex::Print(2) << "rank 2 says " << x << '\n'; // rank 2 only
+     * \endcode
+     */
     class Print
     {
     public:
 
         static constexpr int AllProcs = -1;
 
-    /**
-    * \brief Print on I/O Processor of the default communicator
-    * Example: Print() << " x = " << x << '\n';
-    */
+        /**
+         * \brief Buffer output and flush it on the I/O processor of the default communicator.
+         * \param os_ Destination stream (defaults to amrex::OutStream()).
+         */
         explicit Print (std::ostream& os_ = amrex::OutStream())
             : to_print(ParallelContext::IOProcessorSub())
             , os(os_)
             { ss.precision(os.precision()); }
 
-    /**
-    * \brief Print on given rank of the default communicator
-    * Example: Print(2) << " x = " << x << '\n'; // Print on rank 2
-    */
+        /**
+         * \brief Buffer output and flush it on \p rank_ of the default communicator.
+         * \param rank_ MPI rank in the default communicator that emits the data.
+         * \param os_   Destination stream (defaults to amrex::OutStream()).
+         */
         Print (int rank_, std::ostream& os_ = amrex::OutStream())
             : to_print(rank_ == AllProcs || rank_ == ParallelContext::MyProcSub())
             , os(os_)
             { ss.precision(os.precision()); }
 
-    /**
-    * \brief Print on process rank_ of communicator comm_
-    * Example: Print(rank_, comm_) << " x = " << x << '\n';
-    */
+        /**
+         * \brief Buffer output and flush it on \p rank_ of communicator \p comm_.
+         * \param rank_ MPI rank that emits the data.
+         * \param comm_ Communicator containing the ranks of interest.
+         * \param os_   Destination stream (defaults to amrex::OutStream()).
+         */
         Print (int rank_, MPI_Comm comm_, std::ostream& os_ = amrex::OutStream())
             : to_print((rank_ == AllProcs) || (
 #ifdef AMREX_USE_MPI
@@ -83,17 +107,20 @@ namespace amrex
         Print& operator= (Print const&) = delete;
         Print& operator= (Print &&) = delete;
 
+        //! Set the output precision to \p p digits and return \c *this.
         Print& SetPrecision(int p) {
             ss.precision(p);
             return *this;
         }
 
+        //! Append \p x to the output buffer and return \c *this.
         template <typename T>
         Print& operator<< (const T& x) {
             ss << x;
             return *this;
         }
 
+        //! Support stream manipulators such as \c std::endl and \c std::flush.
         Print& operator<< (        std::basic_ostream<char, std::char_traits<char> >&
                            (*func)(std::basic_ostream<char, std::char_traits<char> >&))
         {
@@ -107,35 +134,66 @@ namespace amrex
         std::ostringstream ss;
     };
 
-    //! Print on all processors of the default communicator
+    /**
+     * \class amrex::AllPrint
+     * \ingroup amrex_utilities
+     * \brief Print to an output stream from all MPI ranks.
+     *
+     * Example:
+     * \code{.cpp}
+     * amrex::AllPrint() << "rank " << amrex::ParallelDescriptor::MyProc() << '\n';
+     * \endcode
+     */
     class AllPrint
         : public Print
     {
     public:
-        //! Example: AllPrint() << " x = " << x << '\n';
+        //! Print on all processors of the default communicator.
         explicit AllPrint (std::ostream& os_ = amrex::OutStream())
             : Print(Print::AllProcs, os_)
             {}
 
     };
 
-    //! This class prints to a file with a given base name
+    /**
+     * \class amrex::PrintToFile
+     * \ingroup amrex_utilities
+     * \brief Print to a per-process file from a single MPI rank.
+     *
+     * Output is appended to a file named \c file_name.rank (and
+     * \c file_name.rank.thread when OpenMP is enabled).
+     */
     class PrintToFile
     {
     public:
 
         static constexpr int AllProcs = -1;
 
+        /**
+         * \brief Append output from the I/O processor to per-rank files.
+         * \param file_name_ Base file name (rank/thread suffixes are added automatically).
+         */
         explicit PrintToFile (std::string file_name_)
             : file_name(std::move(file_name_))
             , to_print(ParallelContext::IOProcessorSub())
         { Initialize(); }
 
+        /**
+         * \brief Append output from a specific rank in the default communicator.
+         * \param file_name_ Base file name (rank/thread suffixes are added automatically).
+         * \param rank_      MPI rank that is allowed to write.
+         */
         PrintToFile (std::string file_name_, int rank_ )
             : file_name(std::move(file_name_))
             , to_print(rank_ == AllProcs || rank_ == ParallelContext::MyProcSub())
         { Initialize(); }
 
+        /**
+         * \brief Append output from \p rank_ of communicator \p comm_ to a per-rank file.
+         * \param file_name_ Base file name (rank/thread suffixes are added automatically).
+         * \param rank_      MPI rank that is allowed to write.
+         * \param comm_      Communicator containing \p rank_.
+         */
         PrintToFile (std::string file_name_, int rank_, MPI_Comm comm_)
             : file_name(std::move(file_name_))
             , to_print((rank_ == AllProcs) || (
@@ -145,6 +203,7 @@ namespace amrex
                         rank_ == ParallelDescriptor::MyProc(comm_)))
         { Initialize(); }
 
+        //! Flush the buffered output (if this rank is permitted) and close the file stream.
         ~PrintToFile () {
             if (to_print) {
                 ofs.flush();
@@ -158,17 +217,20 @@ namespace amrex
         PrintToFile& operator= (PrintToFile const&) = delete;
         PrintToFile& operator= (PrintToFile &&) = delete;
 
+        //! Set the output precision to \p p digits and return \c *this.
         PrintToFile& SetPrecision(int p) {
             ss.precision(p);
             return *this;
         }
 
+        //! Append \p x to the output buffer and return \c *this.
         template <typename T>
         PrintToFile& operator<< (const T& x) {
             ss << x;
             return *this;
         }
 
+        //! Support stream manipulators such as \c std::endl and \c std::flush.
         PrintToFile& operator<< (        std::basic_ostream<char, std::char_traits<char> >&
                                  (*func)(std::basic_ostream<char, std::char_traits<char> >&))
         {
@@ -199,12 +261,16 @@ namespace amrex
         std::ostringstream ss;
     };
 
-    //! Print on all processors of the default communicator
+    /**
+     * \class amrex::AllPrintToFile
+     * \ingroup amrex_utilities
+     * \brief Print to a per-process file from all MPI ranks.
+     */
     class AllPrintToFile
         : public PrintToFile
     {
     public:
-        //! Example: AllPrint() << " x = " << x << '\n';
+        //! Print on all processors of the default communicator.
         explicit AllPrintToFile (std::string file_name_)
             : PrintToFile(std::move(file_name_), Print::AllProcs)
             {}

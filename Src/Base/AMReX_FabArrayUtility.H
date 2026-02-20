@@ -8,8 +8,21 @@
 #include <AMReX_ParReduce.H>
 #include <limits>
 
+/**
+ * \file AMReX_FabArrayUtility.H
+ * \brief Reduction helpers and utility algorithms for FabArray objects.
+ */
+
 namespace amrex {
 
+/**
+ * \brief Sum a user-defined quantity over every FAB, growing by \p nghost cells.
+ *
+ * \param fa     FabArray supplying data to the reduction.
+ * \param nghost Number of ghost cells to include uniformly in every direction.
+ * \param f      Callable invoked as `f(Box const&, Array4<T const> const&)` whose
+ *               return type adds into the global sum.
+ */
 template <class FAB, class F,
           class bar = std::enable_if_t<IsBaseFab<FAB>::value> >
 typename FAB::value_type
@@ -126,6 +139,14 @@ ReduceSum_host_wrapper (FabArray<FAB> const& fa, IntVect const& nghost, F&& f)
 }
 /// \endcond
 
+/**
+ * \brief Sum a user-defined quantity over every FAB, growing by the vector \p nghost.
+ *
+ * \param fa     FabArray supplying data to the reduction.
+ * \param nghost Per-direction ghost cells to include before invoking the functor.
+ * \param f      Callable invoked as `f(Box const&, Array4<T const> const&)` whose
+ *               return contributes to the reduction.
+ */
 template <class FAB, class F,
           class bar = std::enable_if_t<IsBaseFab<FAB>::value> >
 typename FAB::value_type
@@ -138,6 +159,13 @@ ReduceSum (FabArray<FAB> const& fa, IntVect const& nghost, F&& f)
     }
 }
 #else
+/**
+ * \brief Compute the global minimum of a functor over every FAB with per-direction ghost widths.
+ *
+ * \param fa     FabArray supplying data.
+ * \param nghost Per-direction ghost cells to include.
+ * \param f      Callable invoked as `f(Box const&, Array4<T const> const&)`.
+ */
 template <class FAB, class F,
           class bar = std::enable_if_t<IsBaseFab<FAB>::value> >
 typename FAB::value_type
@@ -147,6 +175,14 @@ ReduceSum (FabArray<FAB> const& fa, IntVect const& nghost, F&& f)
 }
 #endif
 
+/**
+ * \brief Sum a functor over two FabArrays with the same BoxArray/DM.
+ *
+ * \param fa1    First FabArray supplying data.
+ * \param fa2    Second FabArray supplying data (can have different value_type).
+ * \param nghost Number of ghost cells to include uniformly.
+ * \param f      Callable invoked as `f(Box const&, Array4<T1 const> const&, Array4<T2 const> const&)`.
+ */
 template <class FAB1, class FAB2, class F,
           class bar = std::enable_if_t<IsBaseFab<FAB1>::value> >
 typename FAB1::value_type
@@ -205,6 +241,17 @@ ReduceSum_host_wrapper (FabArray<FAB1> const& fa1, FabArray<FAB2> const& fa2,
 }
 /// \endcond
 
+#endif
+
+/**
+ * \brief Sum a functor over two FabArrays with per-direction ghost-cell widths.
+ *
+ * \param fa1    First FabArray supplying data.
+ * \param fa2    Second FabArray supplying data.
+ * \param nghost Per-direction ghost cells to include before invoking the functor.
+ * \param f      Callable invoked as `f(Box const&, Array4<T1 const> const&, Array4<T2 const> const&)`.
+ */
+#ifdef AMREX_USE_GPU
 template <class FAB1, class FAB2, class F,
           class bar = std::enable_if_t<IsBaseFab<FAB1>::value> >
 typename FAB1::value_type
@@ -218,6 +265,14 @@ ReduceSum (FabArray<FAB1> const& fa1, FabArray<FAB2> const& fa2,
     }
 }
 #else
+/**
+ * \brief Sum a functor over two FabArrays with per-direction ghost-cell widths.
+ *
+ * \param fa1    First FabArray supplying data.
+ * \param fa2    Second FabArray supplying data.
+ * \param nghost Per-direction ghost cells to include before invoking the functor.
+ * \param f      Callable invoked as `f(Box const&, Array4<T1 const> const&, Array4<T2 const> const&)`.
+ */
 template <class FAB1, class FAB2, class F,
           class bar = std::enable_if_t<IsBaseFab<FAB1>::value> >
 typename FAB1::value_type
@@ -228,6 +283,15 @@ ReduceSum (FabArray<FAB1> const& fa1, FabArray<FAB2> const& fa2,
 }
 #endif
 
+/**
+ * \brief Sum a functor over three FabArrays with the same layout.
+ *
+ * \param fa1    First FabArray supplying data.
+ * \param fa2    Second FabArray supplying data.
+ * \param fa3    Third FabArray supplying data.
+ * \param nghost Uniform ghost-cell count to include.
+ * \param f      Callable invoked as `f(Box const&, Array4<T1 const> const&, Array4<T2 const> const&, Array4<T3 const> const&)`.
+ */
 template <class FAB1, class FAB2, class FAB3, class F,
           class bar = std::enable_if_t<IsBaseFab<FAB1>::value> >
 typename FAB1::value_type
@@ -288,6 +352,15 @@ ReduceSum_host_wrapper (FabArray<FAB1> const& fa1, FabArray<FAB2> const& fa2,
 }
 /// \endcond
 
+/**
+ * \brief Sum a functor over three FabArrays with per-direction ghost-cell widths.
+ *
+ * \param fa1    First FabArray supplying data.
+ * \param fa2    Second FabArray supplying data.
+ * \param fa3    Third FabArray supplying data.
+ * \param nghost Per-direction ghost cells to include before invoking the functor.
+ * \param f      Callable invoked as `f(Box const&, Array4<T1 const> const&, Array4<T2 const> const&, Array4<T3 const> const&)`.
+ */
 template <class FAB1, class FAB2, class FAB3, class F,
           class bar = std::enable_if_t<IsBaseFab<FAB1>::value> >
 typename FAB1::value_type
@@ -301,6 +374,15 @@ ReduceSum (FabArray<FAB1> const& fa1, FabArray<FAB2> const& fa2,
     }
 }
 #else
+/**
+ * \brief Sum a functor over three FabArrays with per-direction ghost-cell widths.
+ *
+ * \param fa1    First FabArray supplying data.
+ * \param fa2    Second FabArray supplying data.
+ * \param fa3    Third FabArray supplying data.
+ * \param nghost Per-direction ghost cells to include before invoking the functor.
+ * \param f      Callable invoked as `f(Box const&, Array4<T1 const> const&, Array4<T2 const> const&, Array4<T3 const> const&)`.
+ */
 template <class FAB1, class FAB2, class FAB3, class F,
           class bar = std::enable_if_t<IsBaseFab<FAB1>::value> >
 typename FAB1::value_type
@@ -311,6 +393,13 @@ ReduceSum (FabArray<FAB1> const& fa1, FabArray<FAB2> const& fa2,
 }
 #endif
 
+/**
+ * \brief Compute the global minimum of a functor over every FAB, growing by \p nghost.
+ *
+ * \param fa     FabArray supplying data.
+ * \param nghost Number of ghost cells to include uniformly.
+ * \param f      Callable invoked as `f(Box const&, Array4<T const> const&)` whose return participates in a min-reduction.
+ */
 template <class FAB, class F,
           class bar = std::enable_if_t<IsBaseFab<FAB>::value> >
 typename FAB::value_type
@@ -364,6 +453,13 @@ ReduceMin_host_wrapper (FabArray<FAB> const& fa, IntVect const& nghost, F&& f)
 }
 /// \endcond
 
+/**
+ * \brief Compute the global minimum of a functor over every FAB with per-direction ghost widths.
+ *
+ * \param fa     FabArray supplying data.
+ * \param nghost Per-direction ghost cells to include.
+ * \param f      Callable invoked as `f(Box const&, Array4<T const> const&)`.
+ */
 template <class FAB, class F,
           class bar = std::enable_if_t<IsBaseFab<FAB>::value> >
 typename FAB::value_type
@@ -385,6 +481,14 @@ ReduceMin (FabArray<FAB> const& fa, IntVect const& nghost, F&& f)
 }
 #endif
 
+/**
+ * \brief Compute the minimum of a functor that touches two FabArrays grown by \p nghost.
+ *
+ * \param fa1    First FabArray supplying data.
+ * \param fa2    Second FabArray supplying data.
+ * \param nghost Uniform ghost width to include for both.
+ * \param f      Callable invoked as `f(Box const&, Array4<T1 const> const&, Array4<T2 const> const&)`.
+ */
 template <class FAB1, class FAB2, class F,
           class bar = std::enable_if_t<IsBaseFab<FAB1>::value> >
 typename FAB1::value_type
@@ -443,6 +547,14 @@ ReduceMin_host_wrapper (FabArray<FAB1> const& fa1, FabArray<FAB2> const& fa2,
 }
 /// \endcond
 
+/**
+ * \brief Compute the minimum of a functor that touches two FabArrays grown by \p nghost.
+ *
+ * \param fa1    First FabArray supplying data.
+ * \param fa2    Second FabArray supplying data.
+ * \param nghost Per-direction ghost cells to include.
+ * \param f      Callable invoked as `f(Box const&, Array4<T1 const> const&, Array4<T2 const> const&)`.
+ */
 template <class FAB1, class FAB2, class F,
           class bar = std::enable_if_t<IsBaseFab<FAB1>::value> >
 typename FAB1::value_type
@@ -456,6 +568,9 @@ ReduceMin (FabArray<FAB1> const& fa1, FabArray<FAB2> const& fa2,
     }
 }
 #else
+/**
+ * \brief Compute the minimum of a functor that touches two FabArrays grown by \p nghost.
+ */
 template <class FAB1, class FAB2, class F,
           class bar = std::enable_if_t<IsBaseFab<FAB1>::value> >
 typename FAB1::value_type
@@ -466,6 +581,9 @@ ReduceMin (FabArray<FAB1> const& fa1, FabArray<FAB2> const& fa2,
 }
 #endif
 
+/**
+ * \brief Convenience overload of ReduceMin for three FabArrays with a uniform ghost width.
+ */
 template <class FAB1, class FAB2, class FAB3, class F,
           class bar = std::enable_if_t<IsBaseFab<FAB1>::value> >
 typename FAB1::value_type
@@ -549,6 +667,9 @@ ReduceMin (FabArray<FAB1> const& fa1, FabArray<FAB2> const& fa2,
 }
 #endif
 
+/**
+ * \brief Compute the global maximum of a functor over every FAB, growing by \p nghost cells.
+ */
 template <class FAB, class F,
           class bar = std::enable_if_t<IsBaseFab<FAB>::value> >
 typename FAB::value_type
@@ -603,6 +724,9 @@ ReduceMax_host_wrapper (FabArray<FAB> const& fa, IntVect const& nghost, F&& f)
 }
 /// \endcond
 
+/**
+ * \brief Compute the global maximum of a functor over every FAB with per-direction ghost widths.
+ */
 template <class FAB, class F,
           class bar = std::enable_if_t<IsBaseFab<FAB>::value> >
 typename FAB::value_type
@@ -615,6 +739,9 @@ ReduceMax (FabArray<FAB> const& fa, IntVect const& nghost, F&& f)
     }
 }
 #else
+/**
+ * \brief Compute the global maximum of a functor over every FAB with per-direction ghost widths.
+ */
 template <class FAB, class F,
           class bar = std::enable_if_t<IsBaseFab<FAB>::value> >
 typename FAB::value_type
@@ -624,6 +751,9 @@ ReduceMax (FabArray<FAB> const& fa, IntVect const& nghost, F&& f)
 }
 #endif
 
+/**
+ * \brief Convenience overload of ReduceMax for two FabArrays with uniform ghost cells.
+ */
 template <class FAB1, class FAB2, class F,
           class bar = std::enable_if_t<IsBaseFab<FAB1>::value> >
 typename FAB1::value_type
@@ -682,6 +812,9 @@ ReduceMax_host_wrapper (FabArray<FAB1> const& fa1, FabArray<FAB2> const& fa2,
 }
 /// \endcond
 
+/**
+ * \brief Compute the maximum of a functor that touches two FabArrays grown by \p nghost.
+ */
 template <class FAB1, class FAB2, class F,
           class bar = std::enable_if_t<IsBaseFab<FAB1>::value> >
 typename FAB1::value_type
@@ -695,6 +828,9 @@ ReduceMax (FabArray<FAB1> const& fa1, FabArray<FAB2> const& fa2,
     }
 }
 #else
+/**
+ * \brief Compute the maximum of a functor that touches two FabArrays grown by \p nghost.
+ */
 template <class FAB1, class FAB2, class F,
           class bar = std::enable_if_t<IsBaseFab<FAB1>::value> >
 typename FAB1::value_type
@@ -705,6 +841,9 @@ ReduceMax (FabArray<FAB1> const& fa1, FabArray<FAB2> const& fa2,
 }
 #endif
 
+/**
+ * \brief Convenience overload of ReduceMax for three FabArrays with a uniform ghost width.
+ */
 template <class FAB1, class FAB2, class FAB3, class F,
           class bar = std::enable_if_t<IsBaseFab<FAB1>::value> >
 typename FAB1::value_type
@@ -765,6 +904,9 @@ ReduceMax_host_wrapper (FabArray<FAB1> const& fa1, FabArray<FAB2> const& fa2,
 }
 /// \endcond
 
+/**
+ * \brief Compute the maximum of a functor that touches three FabArrays with per-direction ghost cells.
+ */
 template <class FAB1, class FAB2, class FAB3, class F,
           class bar = std::enable_if_t<IsBaseFab<FAB1>::value> >
 typename FAB1::value_type
@@ -778,6 +920,9 @@ ReduceMax (FabArray<FAB1> const& fa1, FabArray<FAB2> const& fa2,
     }
 }
 #else
+/**
+ * \brief Compute the maximum of a functor that touches three FabArrays with per-direction ghost cells.
+ */
 template <class FAB1, class FAB2, class FAB3, class F,
           class bar = std::enable_if_t<IsBaseFab<FAB1>::value> >
 typename FAB1::value_type
@@ -788,6 +933,9 @@ ReduceMax (FabArray<FAB1> const& fa1, FabArray<FAB2> const& fa2,
 }
 #endif
 
+/**
+ * \brief Return true only if a predicate is true in every FAB cell (uniform ghost width).
+ */
 template <class FAB, class F,
           class bar = std::enable_if_t<IsBaseFab<FAB>::value> >
 bool
@@ -841,6 +989,9 @@ ReduceLogicalAnd_host_wrapper (FabArray<FAB> const& fa, IntVect const& nghost, F
 }
 /// \endcond
 
+/**
+ * \brief Return true only if a predicate is true in every FAB cell (per-direction ghost widths).
+ */
 template <class FAB, class F,
           class bar = std::enable_if_t<IsBaseFab<FAB>::value> >
 bool
@@ -853,6 +1004,9 @@ ReduceLogicalAnd (FabArray<FAB> const& fa, IntVect const& nghost, F&& f)
     }
 }
 #else
+/**
+ * \brief Return true only if a predicate is true in every FAB cell (per-direction ghost widths).
+ */
 template <class FAB, class F,
           class bar = std::enable_if_t<IsBaseFab<FAB>::value> >
 bool
@@ -862,6 +1016,9 @@ ReduceLogicalAnd (FabArray<FAB> const& fa, IntVect const& nghost, F&& f)
 }
 #endif
 
+/**
+ * \brief Convenience overload of ReduceLogicalAnd for two FabArrays with uniform ghost cells.
+ */
 template <class FAB1, class FAB2, class F,
           class bar = std::enable_if_t<IsBaseFab<FAB1>::value> >
 bool
@@ -920,6 +1077,9 @@ ReduceLogicalAnd_host_wrapper (FabArray<FAB1> const& fa1, FabArray<FAB2> const& 
 }
 /// \endcond
 
+/**
+ * \brief Two-Fab logical AND reduction with per-direction ghost cells.
+ */
 template <class FAB1, class FAB2, class F,
           class bar = std::enable_if_t<IsBaseFab<FAB1>::value> >
 bool
@@ -933,6 +1093,9 @@ ReduceLogicalAnd (FabArray<FAB1> const& fa1, FabArray<FAB2> const& fa2,
     }
 }
 #else
+/**
+ * \brief Two-Fab logical AND reduction with per-direction ghost cells.
+ */
 template <class FAB1, class FAB2, class F,
           class bar = std::enable_if_t<IsBaseFab<FAB1>::value> >
 bool
@@ -943,6 +1106,9 @@ ReduceLogicalAnd (FabArray<FAB1> const& fa1, FabArray<FAB2> const& fa2,
 }
 #endif
 
+/**
+ * \brief Return true if any cell satisfies the predicate (uniform ghost width).
+ */
 template <class FAB, class F,
           class bar = std::enable_if_t<IsBaseFab<FAB>::value> >
 bool
@@ -996,6 +1162,9 @@ ReduceLogicalOr_host (FabArray<FAB> const& fa, IntVect const& nghost, F&& /*f*/)
 }
 /// \endcond
 
+/**
+ * \brief Return true if any cell satisfies the predicate (per-direction ghost widths).
+ */
 template <class FAB, class F,
           class bar = std::enable_if_t<IsBaseFab<FAB>::value> >
 bool
@@ -1008,6 +1177,9 @@ ReduceLogicalOr (FabArray<FAB> const& fa, IntVect const& nghost, F&& f)
     }
 }
 #else
+/**
+ * \brief Return true if any cell satisfies the predicate (per-direction ghost widths).
+ */
 template <class FAB, class F,
           class bar = std::enable_if_t<IsBaseFab<FAB>::value> >
 bool
@@ -1017,6 +1189,9 @@ ReduceLogicalOr (FabArray<FAB> const& fa, IntVect const& nghost, F&& f)
 }
 #endif
 
+/**
+ * \brief Convenience overload of ReduceLogicalOr for two FabArrays with uniform ghost cells.
+ */
 template <class FAB1, class FAB2, class F,
           class bar = std::enable_if_t<IsBaseFab<FAB1>::value> >
 bool
@@ -1075,6 +1250,9 @@ ReduceLogicalOr_host_wrapper (FabArray<FAB1> const& fa1, FabArray<FAB2> const& f
 }
 /// \endcond
 
+/**
+ * \brief Two-Fab logical OR reduction with per-direction ghost cells.
+ */
 template <class FAB1, class FAB2, class F,
           class bar = std::enable_if_t<IsBaseFab<FAB1>::value> >
 bool
@@ -1088,6 +1266,9 @@ ReduceLogicalOr (FabArray<FAB1> const& fa1, FabArray<FAB2> const& fa2,
     }
 }
 #else
+/**
+ * \brief Two-Fab logical OR reduction with per-direction ghost cells.
+ */
 template <class FAB1, class FAB2, class F,
           class bar = std::enable_if_t<IsBaseFab<FAB1>::value> >
 bool
@@ -1098,6 +1279,14 @@ ReduceLogicalOr (FabArray<FAB1> const& fa1, FabArray<FAB2> const& fa2,
 }
 #endif
 
+/**
+ * \brief Print the value(s) stored at a specific cell of a FabArray.
+ *
+ * \param mf    FabArray inspected.
+ * \param cell  Cell index to read (without ghost offset applied).
+ * \param comp  Component to print, or -1 to dump every component.
+ * \param ng    Extra grow cells to include when searching for the owning FAB.
+ */
 template <class FAB, class bar = std::enable_if_t<IsBaseFab<FAB>::value> >
 void
 printCell (FabArray<FAB> const& mf, const IntVect& cell, int comp = -1,
@@ -1150,6 +1339,16 @@ printCell (FabArray<FAB> const& mf, const IntVect& cell, int comp = -1,
     }
 }
 
+/**
+ * \brief Swap a component subset (with uniform ghost cells) between two FabArrays.
+ *
+ * \param dst      Destination FabArray whose components will be exchanged.
+ * \param src      Source FabArray providing the other half of the exchange.
+ * \param srccomp  Starting component in \p src.
+ * \param dstcomp  Starting component in \p dst.
+ * \param numcomp  Number of components to swap.
+ * \param nghost   Uniform ghost width involved in the exchange.
+ */
 template <class FAB,
           class bar = std::enable_if_t<IsBaseFab<FAB>::value> >
 void
@@ -1158,6 +1357,16 @@ Swap (FabArray<FAB>& dst, FabArray<FAB>& src, int srccomp, int dstcomp, int numc
     Swap(dst,src,srccomp,dstcomp,numcomp,IntVect(nghost));
 }
 
+/**
+ * \brief Swap a component subset (with per-direction ghost cells) between two FabArrays.
+ *
+ * \param dst      Destination FabArray whose components will be exchanged.
+ * \param src      Source FabArray providing the other half of the exchange.
+ * \param srccomp  Starting component in \p src.
+ * \param dstcomp  Starting component in \p dst.
+ * \param numcomp  Number of components to swap.
+ * \param nghost   Per-direction ghost width involved in the exchange.
+ */
 template <class FAB,
           class bar = std::enable_if_t<IsBaseFab<FAB>::value> >
 void

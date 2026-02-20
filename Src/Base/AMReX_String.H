@@ -2,34 +2,45 @@
 #define AMREX_STRING_H_
 #include <AMReX_Config.H>
 
+/**
+ * \file AMReX_String.H
+ * \brief String utility functions.
+ */
+
 #include <string>
 #include <vector>
 
 namespace amrex {
 
-    //! Converts all characters of the string into lower case based on std::locale
+    /// \ingroup amrex_utilities
+    //! Convert \p s to lowercase characters using the current locale.
     std::string toLower (std::string s);
 
-    //! Converts all characters of the string into uppercase based on std::locale
+    /// \ingroup amrex_utilities
+    //! Convert \p s to uppercase characters using the current locale.
     std::string toUpper (std::string s);
 
-    //! Trim leading and trailing characters in the optional `space`
-    //! argument.
+    /// \ingroup amrex_utilities
+    //! Trim leading/trailing characters from \p s that appear in \p space.
     std::string trim (std::string s, std::string const& space = " \t");
 
-    //! Returns rootNNNN where NNNN == num.
+    /// \ingroup amrex_utilities
+    //! Return `rootNNNN`, zero-padding \p num out to \p mindigits digits.
     std::string Concatenate (const std::string& root,
                              int                num,
                              int                mindigits = 5);
 
-    //! Split a string using given tokens in `sep`.
+    /// \ingroup amrex_utilities
+    //! Split \p s using any character in \p sep as a delimiter.
     std::vector<std::string> split (std::string const& s,
                                     std::string const& sep = " \t");
 
-    //! Join a vector of strings with given char `sep` as delimiter.
+    /// \ingroup amrex_utilities
+    //! Join the entries in \p sv using the delimiter character \p sep.
     std::string join (std::vector<std::string> const& sv, char sep);
 
-    //! Join a vector of strings without delimiter.
+    /// \ingroup amrex_utilities
+    //! Join the entries in \p sv without any delimiter.
     std::string join (std::vector<std::string> const& sv);
 }
 

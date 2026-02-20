@@ -12,6 +12,11 @@
 #include <AMReX_Arena.H>
 #include <AMReX_Gpu.H>
 
+/**
+ * \file AMReX_FabArrayBase.H
+ * \brief Common infrastructure shared by FabArray specializations.
+ */
+
 #ifdef AMREX_USE_OMP
 #include <omp.h>
 #endif
@@ -143,12 +148,23 @@ public:
     */
     [[nodiscard]] bool is_cell_centered () const noexcept;
 
+    /**
+     * \brief Record whether this FabArrayBase participates in multi-ghost exchanges.
+     *
+     * Multi-ghost mode indicates that ghost values may originate from non-nearest
+     * neighbors, guiding FillBoundary's metadata generation.
+     */
     void setMultiGhost(bool a_multi_ghost) {m_multi_ghost = a_multi_ghost;}
 
     // These are provided for convenience to keep track of how many
     // ghost cells are up to date.  The number of filled ghost cells
     // is updated by FillBoundary and ParallelCopy.
     [[nodiscard]] IntVect nGrowFilled () const noexcept { return n_filled; }
+    /**
+     * \brief Update the bookkeeping on how many ghost cells are known to be valid.
+     *
+     * \param ng Grow-vector describing the currently up-to-date halo width.
+     */
     void setNGrowFilled (IntVect const& ng) noexcept { n_filled = ng; }
 
     //! Is this a good candidate for kernel fusing?
@@ -251,6 +267,7 @@ public:
         return {boxarray.getRefID(), distributionMap.getRefID()};
     }
 
+    //! Refresh the cached BDKey after rebinding BoxArray or DistributionMapping data.
     void updateBDKey ();
 
     //
@@ -393,6 +410,12 @@ public:
     //! parallel copy or add
     enum CpOp { COPY = 0, ADD = 1 };
 
+    /**
+     * \brief Obtain (and lazily build) the tiling metadata for the requested tile size.
+     *
+     * \param tilesize  Tile lengths per direction supplied to MFIter.
+     * \return          Cached TileArray describing the local tile decomposition, or nullptr if none.
+     */
     const TileArray* getTileArray (const IntVect& tilesize) const;
 
     // Memory Usage Tags
@@ -402,13 +425,33 @@ public:
     };
     static std::map<std::string, meminfo> m_mem_usage;
 
+    /**
+     * \brief Accumulate memory usage statistics for diagnostics.
+     *
+     * \param tag    Subsystem identifier (e.g., "MultiFab scratch").
+     * \param nbytes Signed byte change being accounted for.
+     * \param ar     Arena associated with the allocation (can be nullptr).
+     */
     static void updateMemUsage (std::string const& tag, Long nbytes, Arena const* ar);
+
+    //! Print the tracked memory usage table (all tags) to amrex::Print.
     static void printMemUsage ();
+
+    //! Query the currently-live bytes for `tag` (or the sum of all tags).
     static Long queryMemUsage (const std::string& tag = std::string("All"));
+
+    //! Query the recorded high-water mark for `tag` (or the sum of all tags).
     static Long queryMemUsageHWM (const std::string& tag = std::string("All"));
 
+    /**
+     * \brief Annotate the current thread with a memory-region tag.
+     *
+     * Tags form a stack so that nested regions can be distinguished in logs.
+     */
     static void pushRegionTag (const char* t);
+    //! Overload accepting std::string to avoid temporary c_str() lifetimes.
     static void pushRegionTag (std::string t);
+    //! Leave the most recent region annotation.
     static void popRegionTag ();
 
     static AMREX_EXPORT std::vector<std::string> m_region_tag;
@@ -428,6 +471,11 @@ public:
 //protected:
 //#endif
 
+    /**
+     * \brief Release all metadata (BoxArray, caches, ownership) associated with this object.
+     *
+     * Derived classes call this before redefining to avoid leaking cached communication state.
+     */
     void clear ();
 
     /**
@@ -478,6 +526,15 @@ public:
         std::unique_ptr<MapOfCopyComTagContainers> m_RcvTags;
     };
 
+    /**
+     * \brief Populate communication metadata used by FillBoundary/ParallelCopy.
+     *
+     * \param cmd         Reference to the metadata record that will own the tag arrays.
+     * \param nghost      Grow vector describing the ghost region of interest.
+     * \param cross       Whether to skip corner ghost cells.
+     * \param period      Periodicity object defining wrapped intersections.
+     * \param multi_ghost Treat halos as potentially overlapping multiple neighbors.
+     */
     void define_fb_metadata (CommMetaData& cmd, const IntVect& nghost, bool cross,
                              const Periodicity& period, bool multi_ghost) const;
 
@@ -526,6 +583,16 @@ public:
     static FBCache    m_TheFBCache;
     static CacheStats m_FBC_stats;
     //
+    /**
+     * \brief Retrieve (and cache) the FillBoundary metadata for the requested halo.
+     *
+     * \param nghost                      Number of grow cells required.
+     * \param period                      Periodicity description honoring domain wrapping.
+     * \param cross                       Skip corner fills when true.
+     * \param enforce_periodicity_only    Generate tags strictly for periodic exchanges.
+     * \param override_sync               Force metadata generation even if parameters match a cached entry.
+     * \param sumboundary_src_nghost      Optional override for source nghost when using sum-boundary logic.
+     */
     const FB& getFB (const IntVect& nghost, const Periodicity& period,
                      bool cross=false, bool enforce_periodicity_only = false,
                      bool override_sync = false,
@@ -578,6 +645,16 @@ public:
     static CPCache    m_TheCPCache;
     static CacheStats m_CPC_stats;
     //
+    /**
+     * \brief Retrieve (and cache) the ParallelCopy metadata between two FabArrays.
+     *
+     * \param dstng                Grow vector applied to the destination FABs.
+     * \param src                  Source FabArrayBase driving the exchange.
+     * \param srcng                Grow vector applied to the source FABs.
+     * \param period               Periodicity description honoring domain wrapping.
+     * \param to_ghost_cells_only  Restrict transfers to destination ghost cells.
+     * \param offset               Optional shift applied to the source boxes.
+     */
     const CPC& getCPC (const IntVect& dstng, const FabArrayBase& src, const IntVect& srcng,
                        const Periodicity& period, bool to_ghost_cells_only = false,
                        const IntVect& offset = IntVect(0)) const;
@@ -599,6 +676,7 @@ public:
     //
     static RB90Cache m_TheRB90Cache;
     //
+    //! Retrieve rotation-by-90 metadata for a given halo width and domain.
     const RB90& getRB90 (const IntVect& nghost, const Box& domain) const;
     //
     void flushRB90 (bool no_assertion=false) const; //!< This flushes its own RB90.
@@ -621,6 +699,7 @@ public:
     //
     static RB180Cache m_TheRB180Cache;
     //
+    //! Retrieve rotation-by-180 metadata for a given halo width and domain.
     const RB180& getRB180 (const IntVect& nghost, const Box& domain) const;
     //
     void flushRB180 (bool no_assertion=false) const; //!< This flushes its own RB180.
@@ -643,6 +722,7 @@ public:
     //
     static PolarBCache m_ThePolarBCache;
     //
+    //! Retrieve spherical polar-boundary metadata for a given halo width and domain.
     const PolarB& getPolarB (const IntVect& nghost, const Box& domain) const;
     //
     void flushPolarB (bool no_assertion=false) const; //!< This flushes its own PolarB.
@@ -674,6 +754,11 @@ public:
         char* m_hp = nullptr;
     };
 
+    /**
+     * \brief Obtain metadata describing how to launch device ParallelFor over this FabArray.
+     *
+     * \param nghost Grow vector describing which halo width will participate in the loop.
+     */
     ParForInfo const& getParForInfo (const IntVect& nghost) const;
 
     static std::multimap<BDKey,ParForInfo*> m_TheParForCache;
@@ -727,8 +812,10 @@ public:
 
     static AMREX_EXPORT bool m_alloc_single_chunk;
 
+    //! Query whether single-chunk allocation is enabled for new FabArrays.
     [[nodiscard]] static bool getAllocSingleChunk () { return m_alloc_single_chunk; }
 
+    //! Generate a monotonically increasing identifier for communication metadata objects.
     [[nodiscard]] static std::uint64_t getNextCommMetaDataId ();
 
 private:
@@ -777,12 +864,17 @@ namespace detail {
 }
 /// \endcond
 
+//! Convenience wrapper that forwards to `fa.nComp()`.
 [[nodiscard]] int nComp (FabArrayBase const& fa);
+//! Convenience wrapper that forwards to `fa.nGrowVect()`.
 [[nodiscard]] IntVect nGrowVect (FabArrayBase const& fa);
+//! Convenience wrapper that forwards to `fa.boxArray()`.
 [[nodiscard]] BoxArray const& boxArray (FabArrayBase const& fa);
+//! Convenience wrapper that forwards to `fa.DistributionMap()`.
 [[nodiscard]] DistributionMapping const& DistributionMap (FabArrayBase const& fa);
 
 #ifdef BL_USE_MPI
+//! Validate that all non-blocking receives tagged with \p tag completed successfully.
 bool CheckRcvStats (Vector<MPI_Status>& recv_stats, const Vector<std::size_t>& recv_size, int tag);
 #endif
 

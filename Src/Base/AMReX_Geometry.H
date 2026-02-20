@@ -2,6 +2,11 @@
 #define AMREX_GEOMETRY_H_
 #include <AMReX_Config.H>
 
+/**
+ * \file AMReX_Geometry.H
+ * \brief Problem-domain geometry: maps between index space and physical space.
+ */
+
 #include <AMReX_Array.H>
 #include <AMReX_CoordSys.H>
 #include <AMReX_ParallelDescriptor.H>
@@ -21,24 +26,29 @@ class MultiFab;
 class DistributionMapping;
 class BoxArray;
 
+/**
+ * \struct amrex::GeometryData
+ * \ingroup amrex_real_space
+ * \brief Plain-old-data view of Geometry suitable for capture in GPU kernels.
+ */
 struct GeometryData
 {
  //! Returns the cellsize for each coordinate direction.
     [[nodiscard]] AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
     const Real* CellSize () const noexcept { return dx; }
-    //
+    //! Returns the cellsize for direction \p dir.
     [[nodiscard]] AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
     Real CellSize (int dir) const noexcept { return dx[dir]; }
  //! Returns the lo end of the problem domain in each dimension.
     [[nodiscard]] AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
     const Real* ProbLo () const noexcept { return prob_domain.lo(); }
-    //
+    //! Returns the lo end of the problem domain in direction \p dir.
     [[nodiscard]] AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
     Real ProbLo (int dir) const noexcept { return prob_domain.lo(dir); }
  //! Returns the hi end of the problem domain in each dimension.
     [[nodiscard]] AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
     const Real* ProbHi () const noexcept { return prob_domain.hi(); }
-    //
+    //! Returns the hi end of the problem domain in direction \p dir.
     [[nodiscard]] AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
     Real ProbHi (int dir) const noexcept { return prob_domain.hi(dir); }
  //! Returns our rectangular domain.
@@ -127,10 +137,19 @@ public:
                 static_cast<int>(c_sys) };
     }
 
-    //! Read static values from ParmParse database.
+    /**
+     * \brief Populate the global default geometry settings.
+     *
+     * \param rb    Optional problem-domain bounds parsed from ParmParse if nullptr.
+     * \param coord Coordinate-system identifier (defaults to ParmParse or Cartesian when -1).
+     * \param isper Optional periodicity flags; when nullptr values come from ParmParse.
+     */
     static void Setup (const RealBox* rb = nullptr, int coord = -1, int const* isper = nullptr) noexcept;
+    //! Reset the default problem domain used when none is supplied at construction to \p rb.
     static void ResetDefaultProbDomain (const RealBox& rb) noexcept;
+    //! Reset the default periodicity flags used when none are supplied at construction to \p is_per.
     static void ResetDefaultPeriodicity (const Array<int,AMREX_SPACEDIM>& is_per) noexcept;
+    //! Reset the default coordinate-system type used when none is supplied at construction to \p coord.
     static void ResetDefaultCoord (int coord) noexcept;
 
     /**
@@ -184,18 +203,22 @@ public:
     //! Returns the hi end of the problem domain in specified direction.
     [[nodiscard]] Real ProbHi (int dir) const noexcept { return prob_domain.hi(dir); }
 
+    //! Return the lo end of the problem domain as a GpuArray (usable on host or device).
     [[nodiscard]] GpuArray<Real,AMREX_SPACEDIM> ProbLoArray () const noexcept {
         return {{AMREX_D_DECL(prob_domain.lo(0),prob_domain.lo(1),prob_domain.lo(2))}};
     }
 
+    //! Return the hi end of the problem domain as a GpuArray (usable on host or device).
     [[nodiscard]] GpuArray<Real,AMREX_SPACEDIM> ProbHiArray () const noexcept {
         return {{AMREX_D_DECL(prob_domain.hi(0),prob_domain.hi(1),prob_domain.hi(2))}};
     }
 
+    //! Return the lo end of the roundoff domain in ParticleReal precision.
     [[nodiscard]] GpuArray<ParticleReal,AMREX_SPACEDIM> ProbLoArrayInParticleReal () const noexcept {
         return roundoff_lo;
     }
 
+    //! Return the hi end of the roundoff domain in ParticleReal precision.
     [[nodiscard]] GpuArray<ParticleReal,AMREX_SPACEDIM> ProbHiArrayInParticleReal () const noexcept {
         return roundoff_hi;
     }
@@ -216,14 +239,16 @@ public:
         domain = bx;
         computeRoundoffDomain();
     }
-    //! Define a multifab of areas and volumes with given grow factor.
+    //! Define a multifab of areas and volumes with given grow factor using grids \p grds and distribution map \p dm.
+    //! The resulting MultiFab \p vol is resized/defined internally and grown by \p grow in every direction.
     void GetVolume (MultiFab&       vol,
                     const BoxArray& grds,
                     const DistributionMapping& dm,
                     int             grow) const;
-    //! Fill the pre-built multifab with volume
+    //! Fill the pre-built multifab \p vol (previously defined on appropriate BoxArray/DM) with cell volumes.
     void GetVolume (MultiFab&       vol) const;
 
+    //! Fill the pre-built FArrayBox \p vol with the cell volume for box \p idx in \p grds grown by \p grow.
     void GetVolume (FArrayBox&      vol,
                     const BoxArray& grds,
                     int             idx,
@@ -302,8 +327,8 @@ public:
     }
 
     /**
-    * \brief Compute d(log(A))/dr at cell centers in given region and
-    *           stuff the results into the passed MultiFab.
+    * \brief Compute d(log(A))/dr at cell centers in the region described by \p grds / \p dm and
+    * place the results into \p dloga grown by \p grow in direction \p dir.
     */
     void GetDLogA (MultiFab&       dloga,
                    const BoxArray& grds,
@@ -311,18 +336,18 @@ public:
                    int             dir,
                    int             grow) const;
     /**
-    * \brief Compute area of cell faces in given region and stuff
-    * stuff the results into the passed MultiFab.
+    * \brief Compute face areas over the region described by \p grds / \p dm and write them into \p area grown by \p grow in direction \p dir.
     */
     void GetFaceArea (MultiFab&       area,
                       const BoxArray& grds,
                       const DistributionMapping& dm,
                       int             dir,
                       int             grow) const;
-    //! Fill the pre-built multifab with area
+    //! Fill the pre-built multifab with face areas in direction \p dir.
     void GetFaceArea (MultiFab&       area,
                       int             dir) const;
 
+    //! Fill the pre-built FArrayBox \p area with face areas for box \p idx in \p grds, direction \p dir, grown by \p grow.
     void GetFaceArea (FArrayBox&      area,
                       const BoxArray& grds,
                       int             idx,
@@ -340,11 +365,13 @@ public:
     {
         return AMREX_D_TERM(isPeriodic(0),&&isPeriodic(1),&&isPeriodic(2));
     }
+    //! Return the periodicity flags for all directions as an Array.
     [[nodiscard]] Array<int,AMREX_SPACEDIM> isPeriodic () const noexcept {
         return {{AMREX_D_DECL(static_cast<int>(is_periodic[0]),
                               static_cast<int>(is_periodic[1]),
                               static_cast<int>(is_periodic[2]))}};
     }
+    //! Return the periodicity flags for all directions as a GpuArray (usable on host or device).
     [[nodiscard]] GpuArray<int,AMREX_SPACEDIM> isPeriodicArray () const noexcept {
         return {{AMREX_D_DECL(static_cast<int>(is_periodic[0]),
                               static_cast<int>(is_periodic[1]),
@@ -353,12 +380,14 @@ public:
     //! What's period in specified direction?
     [[nodiscard]] int period (int dir) const noexcept { BL_ASSERT(is_periodic[dir]); return domain.length(dir); }
 
+    //! Return the Periodicity of the full domain (period = domain length in periodic directions).
     [[nodiscard]] Periodicity periodicity () const noexcept {
         return Periodicity(IntVect(AMREX_D_DECL(domain.length(0) * is_periodic[0],
                                           domain.length(1) * is_periodic[1],
                                           domain.length(2) * is_periodic[2])));
     }
 
+    //! Return the Periodicity based on the lengths of box \p b (useful for sub-domain iteration).
     [[nodiscard]] Periodicity periodicity (const Box& b) const noexcept {
         AMREX_ASSERT(b.cellCentered());
         return Periodicity(IntVect(AMREX_D_DECL(b.length(0) * is_periodic[0],
@@ -367,12 +396,13 @@ public:
     }
 
     /**
-    * \brief Compute Array of shifts which will translate src so that it will
-    * intersect target with non-zero intersection.  the array will be
-    * resized internally, so anything previously there will be gone
-    * DO NOT return non-periodic shifts, even if the box's do
+    * \brief Compute Array of shifts which will translate \p src so that it will
+    * intersect \p target with non-zero intersection. The \p out array will be
+    * resized internally, so anything previously there will be gone.
+    * DO NOT return non-periodic shifts, even if the boxes do
     * intersect without shifting.  The logic is that you will only do
-    * this as a special case if there is some periodicity.
+    * this as a special case if there is some periodicity.  The output IntVects
+    * represent multiples of the domain period that must be applied to \p src.
     */
     void periodicShift (const Box&      target,
                         const Box&      src,
@@ -389,7 +419,7 @@ public:
 
     //! Set periodicity flags and return the old flags.
     //! Note that, unlike Periodicity class, the flags are just boolean.
-    //!
+    //! The caller can use the returned array to restore the previous state after temporary overrides.
     Array<int,AMREX_SPACEDIM>
     setPeriodicity (Array<int,AMREX_SPACEDIM> const& period) noexcept {
         Array<int,AMREX_SPACEDIM> r{{AMREX_D_DECL(is_periodic[0],
@@ -401,6 +431,7 @@ public:
         return r;
     }
 
+    //! Coarsen the domain by refinement ratio \p rr and recompute cell sizes.
     void coarsen (IntVect const& rr) {
         domain.coarsen(rr);
         for (int i = 0; i < AMREX_SPACEDIM; ++i) {
@@ -409,6 +440,7 @@ public:
         }
     }
 
+    //! Refine the domain by refinement ratio \p rr and recompute cell sizes.
     void refine (IntVect const& rr) {
         domain.refine(rr);
         for (int i = 0; i < AMREX_SPACEDIM; ++i) {
@@ -467,11 +499,15 @@ private:
 };
 
 
-//! Nice ASCII output.
+/// \ingroup amrex_real_space
+//! Write a human-readable description of \p g to stream \p os.
 std::ostream& operator<< (std::ostream&, const Geometry&);
-//! Nice ASCII input.
+/// \ingroup amrex_real_space
+//! Read a Geometry from stream \p is.
 std::istream& operator>> (std::istream&, Geometry&);
 
+/// \ingroup amrex_real_space
+//! Return a copy of \p fine coarsened by refinement ratio \p rr.
 inline
 Geometry
 coarsen (Geometry const& fine, IntVect const& rr) {
@@ -480,10 +516,14 @@ coarsen (Geometry const& fine, IntVect const& rr) {
     return r;
 }
 
+/// \ingroup amrex_real_space
+//! Return a copy of \p fine coarsened by scalar ratio \p rr.
 inline
 Geometry
 coarsen (Geometry const& fine, int rr) { return coarsen(fine, IntVect(rr)); }
 
+/// \ingroup amrex_real_space
+//! Return a copy of \p crse refined by refinement ratio \p rr.
 inline
 Geometry
 refine (Geometry const& crse, IntVect const& rr) {
@@ -492,10 +532,14 @@ refine (Geometry const& crse, IntVect const& rr) {
     return r;
 }
 
+/// \ingroup amrex_real_space
+//! Return a copy of \p crse refined by scalar ratio \p rr.
 inline
 Geometry
 refine (Geometry const& crse, int rr) { return refine(crse, IntVect(rr)); }
 
+/// \ingroup amrex_real_space
+//! Return the default Geometry registered with the top-level AMReX instance.
 inline
 const Geometry&
 DefaultGeometry () {

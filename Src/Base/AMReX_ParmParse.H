@@ -22,6 +22,11 @@
 #include <variant>
 #include <vector>
 
+/**
+ * \file AMReX_ParmParse.H
+ * \brief Runtime parameter database and parsing utilities.
+ */
+
 namespace amrex {
 
 template<int dim>
@@ -1700,42 +1705,44 @@ public:
     */
     static void Finalize ();
 
-    //! Set prefix used by math expression Parser
+    //! Set the prefix used by the math-expression Parser for evaluating embedded expressions.
     static void SetParserPrefix (std::string a_prefix);
 
+    //! Return the current verbose level (larger => more logging when parsing).
     static int Verbose ();
+    //! Override the verbose level used when reporting parse activity.
     static void SetVerbose (int v);
 
-    //! Write the contents of the table in ASCII to the ostream (diagnostic only, not valid ParmParse syntax).
-    //! Diagnostic view of the internal table. This text is not valid ParmParse syntax
-    //! and is meant for debugging only; use prettyPrintTable() for canonical, re-readable output.
+    //! Write the contents of the table in ASCII to \p os (diagnostic only,
+    //! not valid ParmParse syntax).  This text is not valid ParmParse
+    //! syntax and is meant for debugging only; use prettyPrintTable() for
+    //! canonical, re-readable output.
     static void dumpTable (std::ostream& os, bool prettyPrint = false);
 
-    //! Write all entries in ParmParse syntax suitable for re-reading. If
+    //! Pretty-print all entries to \p os in ParmParse syntax suitable for re-reading. If
     //! there are duplicates, only the last one is printed; the output can be fed
     //! back to ParmParse via addfile/Initialize.
     static void prettyPrintTable (std::ostream& os);
 
-    //! Write unused inputs in a pretty way to the ostream. If there are
-    //! duplicates, only the last one is printed.
+    //! Pretty-print unused entries to \p os, showing only the last occurrence of duplicates.
     static void prettyPrintUnusedInputs (std::ostream& os);
 
-    //! Write used inputs in a pretty way to the ostream. If there are
-    //! duplicates, only the last one is printed.
+    //! Pretty-print used entries to \p os, showing only the last occurrence of duplicates.
     static void prettyPrintUsedInputs (std::ostream& os);
 
-    //! Add keys and values from a file to the end of the PP table.
+    //! Append the key/value pairs found in \p filename to the global ParmParse table.
     static void addfile (std::string const& filename);
 
+    //! Return true if any unused inputs remain (optionally filtered by prefix via hasUnusedInputs()).
     static bool QueryUnusedInputs ();
 
-    //! Any unused [prefix.]* parameters?
+    //! Return true if there are unused parameters whose name starts with \p prefix (or any prefix if empty).
     [[nodiscard]] static bool hasUnusedInputs (const std::string& prefix = std::string());
 
-    //! Returns unused [prefix.]* parameters.
+    //! Return the list of unused parameters whose name starts with \p prefix (or any prefix if empty).
     [[nodiscard]] static std::vector<std::string> getUnusedInputs (const std::string& prefix = std::string());
 
-    //! Returns [prefix.]* parameters.
+    //! Return the set of table entries beginning with \p prefix (or all entries if empty).
     [[nodiscard]] static std::set<std::string> getEntries (const std::string& prefix = std::string());
 
     enum class QuoteType : unsigned char {
@@ -1768,6 +1775,7 @@ public:
     };
     using Table = std::unordered_map<std::string, PP_entry>;
 
+    //! Expose the underlying key/value table (read-only).
     [[nodiscard]] const Table& table() const {return *m_table;}
 
     //! keyword for files to load

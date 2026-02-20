@@ -2,6 +2,11 @@
 #define AMREX_SARENA_H_
 #include <AMReX_Config.H>
 
+/**
+ * \file AMReX_SArena.H
+ * \brief Stream-ordered memory arena that defers frees until after pending GPU kernels complete.
+ */
+
 #include <AMReX_Arena.H>
 #ifdef AMREX_USE_GPU
 #include <AMReX_GpuControl.H>
@@ -10,8 +15,9 @@
 
 namespace amrex {
 /**
-* \ingroup amrex_memory
-* \brief A STREAM-ordered memory arena.
+ * \class amrex::SArena
+ * \ingroup amrex_memory
+ * \brief A STREAM-ordered memory arena.
 *
 * This Arena is implemented as a wrapper around amrex::The_Arena()
 * where the free() function calls amrex::Gpu::freeAsync().
@@ -20,11 +26,10 @@ namespace amrex {
 * These kernels need to use the same GPU stream that is active when free() is called,
 * otherwise explicit synchronization is needed.
 *
-* This is achieved by holding freed memory in a temporary buffer until the next time the
-* GPU stream is synchronized. In case too much memory is held up in this buffer or if The_Arena
-* needs more memory, the stream is automatically synchronized to clear the buffer.
-*
-*/
+ * This is achieved by holding freed memory in a temporary buffer until the next time the
+ * GPU stream is synchronized. In case too much memory is held up in this buffer or if The_Arena
+ * needs more memory, the stream is automatically synchronized to clear the buffer.
+ */
 class SArena
     :
     public Arena
@@ -45,11 +50,16 @@ public:
     */
     void free (void* pt) final;
 
+    //! Return true; SArena allocations are accessible from the device.
     [[nodiscard]] bool isDeviceAccessible () const final;
+    //! Return true; SArena allocations reside in host memory.
     [[nodiscard]] bool isHostAccessible () const final;
 
+    //! Return false; SArena does not allocate managed (unified) memory.
     [[nodiscard]] bool isManaged () const final;
+    //! Return false because SArena is backed by host memory.
     [[nodiscard]] bool isDevice () const final;
+    //! Return false; SArena allocations are not pinned host buffers.
     [[nodiscard]] bool isPinned () const final;
 
 #ifdef AMREX_USE_GPU

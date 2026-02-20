@@ -2,6 +2,11 @@
 #define AMREX_REDUCE_H_
 #include <AMReX_Config.H>
 
+/**
+ * \file AMReX_Reduce.H
+ * \brief Local reduction kernels on arrays and MultiFabs (no MPI).
+ */
+
 #include <AMReX_Gpu.H>
 #include <AMReX_Arena.H>
 #include <AMReX_OpenMP.H>
@@ -447,6 +452,15 @@ template <typename... Ps> class ReduceOps;
 
 #ifdef AMREX_USE_GPU
 
+/**
+ * \class ReduceData
+ * \brief Tuple-backed storage for intermediate and final reduction results.
+ *
+ * Each instantiation owns host/device buffers sized for the maximum number
+ * of thread blocks across all active CUDA/HIP/SYCL streams.  \c ReduceOps
+ * uses this class to aggregate per-block partials before producing the
+ * user-visible reduction value.
+ */
 /// \ingroup amrex_collectives
 template <typename... Ts>
 class ReduceData
@@ -500,6 +514,7 @@ public:
         return r;
     }
 
+    //! Return the base device pointer holding this stream’s partial tuples.
     Type* devicePtr () { return m_device_tuple; }
     Type* devicePtr (gpuStream_t const& s) {
         return m_device_tuple+streamIndexChecked(s)*m_max_blocks;
@@ -606,6 +621,14 @@ namespace Reduce::detail {
 }
 /// \endcond
 
+/**
+ * \class ReduceOps
+ * \brief Backend runner that evaluates reductions specified by \p Ps...
+ *
+ * Provides overloads of \c eval() that accept MultiFabs, BoxND, or raw
+ * ranges and populate the accompanying \c ReduceData instance with
+ * per-block partials before combining them on the host.
+ */
 /// \ingroup amrex_collectives
 template <typename... Ps>
 class ReduceOps
@@ -1183,6 +1206,14 @@ bool AnyOf (BoxND<dim> const& box, P const& pred)
 
 #else
 
+/**
+ * \class ReduceData
+ * \brief Host-only storage for reduction tuples when GPUs are disabled.
+ *
+ * Maintains one tuple per OpenMP thread (or a single entry when not in
+ * a threaded region) so that \c ReduceOps can accumulate local results
+ * without false sharing.
+ */
 template <typename... Ts>
 class ReduceData
 {

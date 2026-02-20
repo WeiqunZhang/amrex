@@ -5,6 +5,11 @@
 #include <AMReX_FabArray.H>
 #include <AMReX_FArrayBox.H>
 
+/**
+ * \file AMReX_NonLocalBC.H
+ * \brief Index-mapping utilities for non-local boundary condition exchanges.
+ */
+
 namespace amrex::NonLocalBC {
 
 ////////////////////////////////////////////////////////////////////////////////////
@@ -499,12 +504,42 @@ struct IsDataPacking :
     > {};
 #endif
 
+/**
+ * \brief Perform a host-side local copy honoring an index mapping and optional projection.
+ *
+ * \tparam FAB  FabArray element type.
+ * \tparam DTOS Index-mapping functor applied to destination indices.
+ * \tparam Proj Functor that maps components/value lookups.
+ * \param dest       Destination FabArray.
+ * \param src        Source FabArray.
+ * \param dcomp      First destination component to fill.
+ * \param scomp      First source component to read.
+ * \param ncomp      Number of components to copy.
+ * \param local_tags Copy tags describing overlapping tiles on this rank.
+ * \param dtos       Index mapping from destination to source coordinates.
+ * \param proj       Projection applied to each fetched value.
+ */
 template <class FAB, class DTOS = Identity, class Proj = Identity>
 std::enable_if_t<IsBaseFab<FAB>() && IsCallableR<Dim3, DTOS, Dim3>() && IsFabProjection<Proj, FAB>()>
 local_copy_cpu (FabArray<FAB>& dest, const FabArray<FAB>& src, int dcomp, int scomp, int ncomp,
                 FabArrayBase::CopyComTagsContainer const& local_tags, DTOS const& dtos = DTOS{},
                 Proj const& proj = Proj{}) noexcept;
 
+/**
+ * \brief Expand received buffers into destination FABs on the host.
+ *
+ * \tparam FAB  FabArray element type.
+ * \tparam DTOS Index-mapping functor applied to destination indices.
+ * \tparam Proj Functor that maps components/value lookups.
+ * \param mf          Destination FabArray populated from the buffer.
+ * \param dcomp       First destination component to fill.
+ * \param ncomp       Number of components stored per buffer entry.
+ * \param recv_data   Raw buffers received via MPI.
+ * \param recv_size   Size of each entry in \p recv_data (bytes).
+ * \param recv_cctc   Copy-tag metadata describing each buffer.
+ * \param dtos        Index mapping from destination to source coordinates.
+ * \param proj        Projection applied to each fetched value.
+ */
 template <class FAB, class DTOS = Identity, class Proj = Identity>
 std::enable_if_t<IsBaseFab<FAB>() && IsCallableR<Dim3, DTOS, Dim3>() && IsFabProjection<Proj, FAB>()>
 unpack_recv_buffer_cpu (FabArray<FAB>& mf, int dcomp, int ncomp, Vector<char*> const& recv_data,
@@ -513,12 +548,36 @@ unpack_recv_buffer_cpu (FabArray<FAB>& mf, int dcomp, int ncomp, Vector<char*> c
                         DTOS const& dtos = DTOS{}, Proj const& proj = Proj{}) noexcept;
 
 #ifdef AMREX_USE_GPU
+/**
+ * \brief GPU counterpart to local_copy_cpu.
+ *
+ * \param dest       Destination FabArray.
+ * \param src        Source FabArray.
+ * \param dcomp      First destination component to fill.
+ * \param scomp      First source component to read.
+ * \param ncomp      Number of components to copy.
+ * \param local_tags Copy tags describing overlapping tiles on this rank.
+ * \param dtos       Index mapping from destination to source coordinates.
+ * \param proj       Projection applied to each fetched value.
+ */
 template <class FAB, class DTOS = Identity, class Proj = Identity>
 std::enable_if_t<IsBaseFab<FAB>() && IsCallableR<Dim3, DTOS, Dim3>() && IsFabProjection<Proj, FAB>()>
 local_copy_gpu (FabArray<FAB>& dest, const FabArray<FAB>& src, int dcomp, int scomp, int ncomp,
                 FabArrayBase::CopyComTagsContainer const& local_tags, DTOS const& dtos = DTOS{},
                 Proj const& proj = Proj{}) noexcept;
 
+/**
+ * \brief GPU counterpart to unpack_recv_buffer_cpu.
+ *
+ * \param mf          Destination FabArray populated from the buffer.
+ * \param scomp       First destination component to fill.
+ * \param ncomp       Number of components stored per buffer entry.
+ * \param recv_data   Raw buffers received via MPI.
+ * \param recv_size   Size of each entry in \p recv_data (bytes).
+ * \param recv_cctc   Copy-tag metadata describing each buffer.
+ * \param dtos        Index mapping from destination to source coordinates.
+ * \param proj        Projection applied to each fetched value.
+ */
 template <class FAB, class DTOS = Identity, class Proj = Identity>
 std::enable_if_t<IsBaseFab<FAB>() && IsCallableR<Dim3, DTOS, Dim3>() && IsFabProjection<Proj, FAB>()>
 unpack_recv_buffer_gpu (FabArray<FAB>& mf, int scomp, int ncomp,
@@ -1012,38 +1071,65 @@ ParallelCopy (FabArray<FAB>& dest, const Box& destbox, const FabArray<FAB>& src,
     return ParallelCopy(dest, destbox, src, SrcComp(srccomp), DestComp(destcomp), NumComps(numcomp), ngrow, dtos, proj);
 }
 
-// Rotate90 fills the lo-x and lo-y boundary regions by rotating the data
-// around (x=0,y=0) by 90 degrees in either direction.  It also fills the
-// corner of lo-x and lo-y boundary region by rotating the data by 180
-// degrees.
-
+/**
+ * \brief Rotate data to fill the lo-x and lo-y boundaries.
+ *
+ * Copies interior values into the lower-x/lower-y ghost regions by rotating
+ * around the origin: faces are rotated by ±90° and the shared corner by 180°.
+ *
+ * \param mf     FabArray to update in place.
+ * \param scomp  First component to rotate.
+ * \param ncomp  Number of components to rotate.
+ * \param nghost Number of ghost cells to populate.
+ * \param domain Cell-centered box describing the physical domain (origin at lo corner).
+ */
 template <class FAB>
 std::enable_if_t<IsBaseFab<FAB>::value>
 Rotate90 (FabArray<FAB>& mf, int scomp, int ncomp, IntVect const& nghost, Box const& domain);
 
+/// \overload
+/// Populate all components/ghost cells of \p mf by rotating around the origin.
 template <class FAB>
 std::enable_if_t<IsBaseFab<FAB>::value>
 Rotate90 (FabArray<FAB>& mf, Box const& domain);
 
-// Rotate180 fills the lo-x boundary by rotating the data around
-// (x=0,y=L_y/2) by 180 degrees.
-
+/**
+ * \brief Rotate data 180° about (x=0, y=L_y/2) to fill the lo-x boundary.
+ *
+ * \param mf     FabArray to update in place.
+ * \param scomp  First component to rotate.
+ * \param ncomp  Number of components to rotate.
+ * \param nghost Number of ghost cells to populate along x.
+ * \param domain Cell-centered domain whose length in y defines the rotation axis.
+ */
 template <class FAB>
 std::enable_if_t<IsBaseFab<FAB>::value>
 Rotate180 (FabArray<FAB>& mf, int scomp, int ncomp, IntVect const& nghost, Box const& domain);
 
+/// \overload
+/// Rotate all components of \p mf to fill the lo-x boundary.
 template <class FAB>
 std::enable_if_t<IsBaseFab<FAB>::value>
 Rotate180 (FabArray<FAB>& mf, Box const& domain);
 
-// Fill the polar boundaries of the spherical coordinates (theta, phi, r).
-// The lo-x boundary is filled with f(-x,y) = f(x,mod(y+pi,2*pi)), and
-// the hi-x boundary is filled with f(pi+x,y) = f(pi-x,mod(y+pi,2*pi)).
-
+/**
+ * \brief Fill polar boundaries for spherical (theta,phi,r) coordinates.
+ *
+ * Applies the mappings `f(-x,y)=f(x,mod(y+pi,2*pi))` at the lo-x pole and
+ * `f(pi+x,y)=f(pi-x,mod(y+pi,2*pi))` at the hi-x pole.
+ *
+ * \param mf     FabArray whose polar ghost cells are filled.
+ * \param scomp  First component to update.
+ * \param ncomp  Number of components updated.
+ * \param nghost Number of ghost cells to populate in each direction.
+ * \param domain Domain describing the theta/phi index bounds.
+ */
 template <class FAB>
 std::enable_if_t<IsBaseFab<FAB>::value>
 FillPolar (FabArray<FAB>& mf, int scomp, int ncomp, IntVect const& nghost, Box const& domain);
 
+/// \overload
+/// Fill polar ghost cells for every component of \p mf.
 template <class FAB>
 std::enable_if_t<IsBaseFab<FAB>::value>
 FillPolar (FabArray<FAB>& mf, Box const& domain);

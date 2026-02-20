@@ -2,6 +2,11 @@
 #define AMREX_REALVECT_H_
 #include <AMReX_Config.H>
 
+/**
+ * \file AMReX_RealVect.H
+ * \brief RealVectND: an N-dimensional floating-point vector in real space.
+ */
+
 #include <AMReX_Box.H>
 #include <AMReX_REAL.H>
 #include <AMReX_SPACE.H>
@@ -20,7 +25,7 @@ namespace amrex
 {
 
 /**
- * \class RealVectND
+ * \class amrex::RealVectND
  * \ingroup amrex_real_space
  * \brief A Real vector in dim-dimensional space
 
@@ -44,6 +49,10 @@ class RealVectND {
     */
     constexpr RealVectND () noexcept {}  // NOLINT
 
+    /**
+     * \brief Construct from a std::vector of coordinates.
+     * \param vr Container whose length must equal \p dim.
+     */
     explicit RealVectND (const std::vector<Real>& vr) noexcept {
         BL_ASSERT(vr.size() == dim);
         for (int i = 0; i < dim; ++i) {
@@ -56,6 +65,16 @@ class RealVectND {
         Construct a RealVectND given the specific values for its
         coordinates.
     */
+    /**
+     * \brief Construct from explicit coordinate values.
+     *
+     * The first two arguments are required; remaining coordinates are provided
+     * via the variadic pack.
+     *
+     * \param i First coordinate.
+     * \param j Second coordinate.
+     * \param ks Remaining coordinate values.
+     */
     template <class... Args,
         std::enable_if_t<
             (sizeof...(Args) + 2 == dim) &&
@@ -65,6 +84,10 @@ class RealVectND {
     constexpr RealVectND (Real i, Real j, Args... ks) noexcept
         : vect{i, j, static_cast<Real>(ks)...} {}
 
+    /**
+     * \brief Construct a vector with all coordinates equal to \p s.
+     * \param s Value copied into every component.
+     */
     AMREX_GPU_HOST_DEVICE
     explicit constexpr RealVectND (Real s) noexcept {
         for (int i = 0; i < dim; ++i) {
@@ -77,6 +100,10 @@ class RealVectND {
         Construct a RealVectND setting the coordinates to the corresponding values in
         the Real array a.
     */
+    /**
+     * \brief Construct from a raw pointer to \p dim coordinates.
+     * \param a Pointer to an array of at least \p dim elements.
+     */
     AMREX_GPU_HOST_DEVICE
     explicit RealVectND (const Real* a) noexcept {
         for (int i = 0; i < dim; ++i) {
@@ -89,6 +116,10 @@ class RealVectND {
         Construct a RealVectND from an IntVectND by coercing each component
         from <tt>int</tt> to Real.
     */
+    /**
+     * \brief Construct from an IntVectND by casting each component to Real.
+     * \param iv Integer vector supplying the coordinates.
+     */
     AMREX_GPU_HOST_DEVICE constexpr
     RealVectND (const IntVectND<dim>& iv) noexcept {
         for (int i = 0; i < dim; ++i) {
@@ -99,6 +130,10 @@ class RealVectND {
     ///
     /**
         Construct a RealVectND from a GpuArray
+    */
+   /**
+    * \brief Construct from a GPU array by copying each coordinate.
+    * \param ga Source array of length \p dim.
     */
    AMREX_GPU_HOST_DEVICE constexpr
    RealVectND (const GpuArray<Real, dim> ga) noexcept {
@@ -114,37 +149,31 @@ class RealVectND {
     */
     Real& operator[] (int i) && = delete;
 
-    ///
-    /**
-        Returns a modifiable lvalue reference to the <i>i</i>'th coordinate of the
-        RealVectND.
-    */
+    /// Returns a modifiable lvalue reference to the <i>i</i>'th coordinate of the vector.
     AMREX_GPU_HOST_DEVICE constexpr
     Real& operator[] (int i) & noexcept {
         AMREX_ASSERT(i >= 0 && i < dim);
         return vect[i];
     }
 
-    ///
-    /**
-        Returns the <i>i</i>'th coordinate of the RealVectND.
-    */
+    /// Returns the <i>i</i>'th coordinate of the vector.
     AMREX_GPU_HOST_DEVICE constexpr
     const Real& operator[] (int i) const& noexcept {
         AMREX_ASSERT(i >= 0 && i < dim);
         return vect[i];
     }
 
-    //! Returns a reference to the i'th coordinate of the RealVectND. Used by structured bindings.
+    //! Returns a reference to the i'th coordinate (used by structured bindings).
     template<std::size_t i>
     [[nodiscard]] AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE constexpr
     Real& get () noexcept {static_assert(0<=i && i<dim); return vect[i];}
 
-    //! Returns a reference to the i'th coordinate of the RealVectND. Used by structured bindings.
+    //! Returns a const reference to the i'th coordinate (used by structured bindings).
     template<std::size_t i>
     [[nodiscard]] AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE constexpr
     const Real& get () const noexcept {static_assert(0<=i && i<dim); return vect[i];}
 
+    //! Return the components as a GpuArray (host or device).
     [[nodiscard]] AMREX_GPU_HOST_DEVICE constexpr
     GpuArray<Real, dim> to_array () const noexcept {
         GpuArray<Real, dim> retval{};
@@ -161,31 +190,19 @@ class RealVectND {
     */
     /*@{*/
 
-    ///
-    /**
-        Return pointer to the first component.
-    */
+    //! Return pointer to the first component.
     [[nodiscard]] AMREX_GPU_HOST_DEVICE constexpr
     Real* begin () noexcept { return vect; }
 
-    ///
-    /**
-        Return pointer to the first component.
-    */
+    //! Return pointer to the first component (const overload).
     [[nodiscard]] AMREX_GPU_HOST_DEVICE constexpr
     const Real* begin () const noexcept { return vect; }
 
-    ///
-    /**
-        Return pointer to the one past last component
-    */
+    //! Return pointer one past the last component.
     [[nodiscard]] AMREX_GPU_HOST_DEVICE constexpr
     Real* end () noexcept { return vect + dim; }
 
-    ///
-    /**
-        Return pointer to the one past last component
-    */
+    //! Return pointer one past the last component (const overload).
     [[nodiscard]] AMREX_GPU_HOST_DEVICE constexpr
     const Real* end () const noexcept {
         return vect + dim;
@@ -817,8 +834,8 @@ RealVectND<dim>::max (const RealVectND<dim>& p) noexcept {
 }
 
 /**
-    Returns the RealVectND that is the component-wise minimum of two
-    argument RealVectNDs.
+ * \ingroup amrex_real_space
+ * \brief Returns the RealVectND that is the component-wise minimum of two argument RealVectNDs.
 */
 template <int dim>
 AMREX_GPU_HOST_DEVICE inline
@@ -828,8 +845,8 @@ RealVectND<dim> min (const RealVectND<dim>& p1, const RealVectND<dim>& p2) noexc
 }
 
 /**
-    Returns the RealVectND that is the component-wise maximum of two
-    argument RealVectNDs.
+ * \ingroup amrex_real_space
+ * \brief Returns the RealVectND that is the component-wise maximum of two argument RealVectNDs.
 */
 template <int dim>
 AMREX_GPU_HOST_DEVICE inline
@@ -993,7 +1010,8 @@ RealVectND<dim>::maxDir (const bool& a_doAbs) const noexcept {
 }
 
 /**
-    Returns a basis vector in the given coordinate direction.<br>
+ * \ingroup amrex_real_space
+ * \brief Returns a basis vector in the given coordinate direction.<br>
     In 2-D:<br>
     BASISREALV(0) == (1.,0.);
     BASISREALV(1) == (0.,1.).<br>
@@ -1018,8 +1036,8 @@ RealVectND<dim> BASISREALV (int dir) noexcept {
 /*@{*/
 
 /**
-     Returns a RealVectND that is a RealVectND <i>p</i> with each component
-    divided by a scalar <i>s</i>.
+ * \ingroup amrex_real_space
+ * \brief Returns a RealVectND that is a RealVectND \p p with each component divided by scalar \p s.
 */
 template <int dim>
 AMREX_GPU_HOST_DEVICE inline
@@ -1032,8 +1050,8 @@ RealVectND<dim> operator/ (Real s, const RealVectND<dim>& p) noexcept {
 }
 
 /**
-    Returns a RealVectND that is a RealVectND <i>p</i> with
-    a scalar <i>s</i> added to each component.
+ * \ingroup amrex_real_space
+ * \brief Returns a RealVectND that is a RealVectND \p p with scalar \p s added to each component.
 */
 template <int dim>
 AMREX_GPU_HOST_DEVICE inline
@@ -1046,6 +1064,7 @@ RealVectND<dim> operator+ (Real s, const RealVectND<dim>& p) noexcept {
 }
 
 /**
+ * \ingroup amrex_real_space
      Returns <i>s - p</i>.
 */
 template <int dim>
@@ -1059,6 +1078,7 @@ RealVectND<dim> operator- (Real s, const RealVectND<dim>& p) noexcept {
 }
 
 /**
+ * \ingroup amrex_real_space
      Returns a RealVectND that is a RealVectND <i>p</i> with each component
     multiplied by a scalar <i>s</i>.
 */
@@ -1073,6 +1093,7 @@ RealVectND<dim> operator* (Real s, const RealVectND<dim>& p) noexcept {
 }
 
 /**
+ * \ingroup amrex_real_space
      Returns component-wise quotient <i>p / s</i>.
 */
 template <int dim>
@@ -1086,6 +1107,7 @@ RealVectND<dim> operator/ (const RealVectND<dim>& s, const RealVectND<dim>& p) n
 }
 
 /**
+ * \ingroup amrex_real_space
      Returns component-wise sum of RealVectNDs <i>s</i> and <i>p</i>.
 */
 template <int dim>
@@ -1099,6 +1121,7 @@ RealVectND<dim> operator+ (const RealVectND<dim>& s, const RealVectND<dim>& p) n
 }
 
 /**
+ * \ingroup amrex_real_space
      Returns <i>s - p</i>.
 */
 template <int dim>
@@ -1112,6 +1135,7 @@ RealVectND<dim> operator- (const RealVectND<dim>& s, const RealVectND<dim>& p) n
 }
 
 /**
+ * \ingroup amrex_real_space
      Returns component-wise product of <i>s</i> and <i>p</i>.
 */
 template <int dim>
@@ -1125,6 +1149,7 @@ RealVectND<dim> operator* (const RealVectND<dim>& s, const RealVectND<dim>& p) n
 }
 
 /**
+ * \ingroup amrex_real_space
     Returns a RealVectND obtained by multiplying each of the components
     of the given RealVectND by a scalar.
 */
@@ -1170,6 +1195,8 @@ namespace detail {
 }
 /// \endcond
 
+/// \ingroup amrex_real_space
+//! Write a RealVectND to an output stream.
 template<int dim>
 std::ostream&
 operator<< (std::ostream& os, const RealVectND<dim>& p)
@@ -1177,6 +1204,8 @@ operator<< (std::ostream& os, const RealVectND<dim>& p)
     return detail::real_vector_write(os, p.begin(), dim);
 }
 
+/// \ingroup amrex_real_space
+//! Read a RealVectND from an input stream.
 template<int dim>
 std::istream&
 operator>> (std::istream& is, RealVectND<dim>& p)
@@ -1216,6 +1245,7 @@ RealVectSplit (const RealVectND<detail::get_sum<d, dims...>()>& v) noexcept {
 }
 
 /**
+* \ingroup amrex_real_space
 * \brief Returns a new RealVectND of size new_dim and
 * assigns the first new_dim values of iv to it.
 */
@@ -1228,6 +1258,7 @@ RealVectShrink (const RealVectND<old_dim>& iv) noexcept {
 }
 
 /**
+* \ingroup amrex_real_space
 * \brief Returns a new RealVectND of size new_dim and
 * assigns all values of iv to it and fill_extra to the remaining elements.
 */
@@ -1240,6 +1271,7 @@ RealVectExpand (const RealVectND<old_dim>& iv, Real fill_extra=0) noexcept {
 }
 
 /**
+* \ingroup amrex_real_space
 * \brief Returns a new RealVectND of size new_dim
 * by either shrinking or expanding iv.
 */
@@ -1255,13 +1287,13 @@ RealVectResize (const RealVectND<old_dim>& iv, Real fill_extra=0) noexcept {
 
 }  // namespace amrex
 
-// Spcialize std::tuple_size for RealVectND. Used by structured bindings.
+// Specialize std::tuple_size for RealVectND. Used by structured bindings.
 template<int dim>
 struct std::tuple_size<amrex::RealVectND<dim>> {
     static constexpr std::size_t value = dim;
 };
 
-// Spcialize std::tuple_element for RealVectND. Used by structured bindings.
+// Specialize std::tuple_element for RealVectND. Used by structured bindings.
 template<std::size_t s, int dim>
 struct std::tuple_element<s, amrex::RealVectND<dim>> {
     using type = amrex::Real;

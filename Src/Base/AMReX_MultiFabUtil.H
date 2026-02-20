@@ -12,25 +12,64 @@
 
 #include <AMReX_MultiFabUtilI.H>
 
+/**
+ * \file AMReX_MultiFabUtil.H
+ * \brief Averaging, norm, and utility routines operating on MultiFabs.
+ */
+
 namespace amrex
 {
-    //! Average nodal-based MultiFab onto cell-centered MultiFab.
+    /**
+     * \brief Average a nodal MultiFab onto a cell-centered MultiFab.
+     *
+     * Each cell value becomes the arithmetic mean of the surrounding nodes.
+     *
+     * \param[out] cc    Destination cell-centered MultiFab.
+     * \param dcomp      Destination component to start filling.
+     * \param[in]  nd    Source nodal MultiFab.
+     * \param scomp      First nodal component to average.
+     * \param ncomp      Number of components to average.
+     * \param ngrow      Number of ghost cells in \p cc to fill.
+     */
     void average_node_to_cellcenter (MultiFab& cc, int dcomp,
                                      const MultiFab& nd, int scomp,
                                      int ncomp, int ngrow = 0);
+    /**
+     * \brief Average a nodal MultiFab onto a cell-centered MultiFab with anisotropic ghosts.
+     *
+     * \param[out] cc     Destination cell-centered MultiFab.
+     * \param dcomp       Destination component to start filling.
+     * \param[in]  nd     Source nodal MultiFab.
+     * \param scomp       First nodal component to average.
+     * \param ncomp       Number of components to average.
+     * \param ng_vect     Directional ghost cells in \p cc to fill.
+     */
     void average_node_to_cellcenter (MultiFab& cc, int dcomp,
                                      const MultiFab& nd, int scomp,
                                      int ncomp, IntVect const& ng_vect);
 
     /**
-     * \brief Average edge-based MultiFab onto cell-centered MultiFab.
+     * \brief Average edge-based MultiFab onto a cell-centered MultiFab.
      *
-     * This fills in \p ngrow ghost cells in the cell-centered MultiFab. Both cell-centered and
-     * edge-centered MultiFabs need to have \p ngrow ghost values.
+     * This fills \p ngrow ghost cells in the cell-centered MultiFab. Both the
+     * cell-centered and edge-centered arrays must have at least \p ngrow ghosts.
+     *
+     * \param[out] cc  Destination cell-centered MultiFab.
+     * \param dcomp    Destination component to start filling.
+     * \param edge     Edge-centered inputs ordered by direction.
+     * \param ngrow    Number of ghost cells to average into \p cc.
      */
     void average_edge_to_cellcenter (MultiFab& cc, int dcomp,
                                      const Vector<const MultiFab*>& edge,
                                      int ngrow = 0);
+    /**
+     * \brief Same as above but accepts directional ghost widths.
+     *
+     * \param[out] cc  Destination cell-centered MultiFab.
+     * \param dcomp    Destination component to start filling.
+     * \param edge     Edge-centered inputs ordered by direction.
+     * \param ng_vect  Directional ghost cells in \p cc to fill.
+     */
     void average_edge_to_cellcenter (MultiFab& cc, int dcomp,
                                      const Vector<const MultiFab*>& edge,
                                      IntVect const& ng_vect);
@@ -38,113 +77,204 @@ namespace amrex
     /**
      * \brief Average face-based MultiFab onto cell-centered MultiFab.
      *
-     * This fills in \p ngrow ghost cells in the cell-centered MultiFab. Both cell-centered and
+     * This fills in \p ngrow ghost cells in the cell-centered MultiFab. Both the cell-centered and
      * face-centered MultiFabs need to have \p ngrow ghost values.
+     *
+     * \param[out] cc  Destination cell-centered MultiFab.
+     * \param dcomp    Destination component.
+     * \param fc       Face-centered inputs (vector ordered by direction).
+     * \param ngrow    Number of ghost cells to fill.
      */
     void average_face_to_cellcenter (MultiFab& cc, int dcomp,
                                      const Vector<const MultiFab*>& fc,
                                      int ngrow = 0);
+    /**
+     * \brief Variant of `average_face_to_cellcenter` that takes directional ghost widths.
+     *
+     * \param[out] cc  Destination cell-centered MultiFab.
+     * \param dcomp    Destination component.
+     * \param fc       Face-centered inputs (vector ordered by direction).
+     * \param ng_vect  Directional ghost cells in \p cc to fill.
+     */
     void average_face_to_cellcenter (MultiFab& cc, int dcomp,
                                      const Vector<const MultiFab*>& fc,
                                      IntVect const& ng_vect);
 
-    //! Average face-based FabArray onto cell-centered FabArray.
+    /**
+     * \brief Average face-centered FabArrays onto a cell-centered FabArray.
+     *
+     * \tparam CMF Cell-centered FabArray type (e.g., MultiFab).
+     * \tparam FMF Face-centered FabArray type.
+     * \param[out] cc Cell-centered destination.
+     * \param dcomp   Destination component to start filling.
+     * \param fc      Array of face-centered inputs ordered by direction.
+     * \param ngrow   Number of ghost cells in \p cc to fill.
+     */
     template <typename CMF, typename FMF,
               std::enable_if_t<IsFabArray_v<CMF> && IsFabArray_v<FMF>, int> = 0>
     void average_face_to_cellcenter (CMF& cc, int dcomp,
                                      const Array<const FMF*,AMREX_SPACEDIM>& fc,
                                      int ngrow = 0);
 
+    /**
+     * \brief Average face-centered FabArrays using anisotropic ghost widths.
+     *
+     * \param[out] cc Cell-centered destination.
+     * \param dcomp   Destination component to start filling.
+     * \param fc      Face-centered inputs (one per direction).
+     * \param ng_vect Directional ghost cells in \p cc to fill.
+     */
     template <typename CMF, typename FMF,
               std::enable_if_t<IsFabArray_v<CMF> && IsFabArray_v<FMF>, int> = 0>
     void average_face_to_cellcenter (CMF& cc, int dcomp,
                                      const Array<const FMF*,AMREX_SPACEDIM>& fc,
                                      IntVect const& ng_vect);
 
-    //! Average face-based MultiFab onto cell-centered MultiFab with geometric weighting.
+    /**
+     * \brief Average face-centered data onto cells using Geometry metrics.
+     *
+     * \param[out] cc Cell-centered destination.
+     * \param fc      Face-centered inputs (by direction).
+     * \param geom    Geometry describing grid spacing/metrics.
+     */
     void average_face_to_cellcenter (MultiFab& cc,
                                      const Vector<const MultiFab*>& fc,
                                      const Geometry& geom);
-    //! Average face-based MultiFab onto cell-centered MultiFab with geometric weighting.
+    /**
+     * \brief Same as the Vector-based overload but accepts an `Array` of face pointers.
+     *
+     * \param[out] cc  Destination cell-centered MultiFab.
+     * \param fc       Face-centered inputs by direction.
+     * \param geom     Geometry describing grid spacing/metrics.
+     */
     void average_face_to_cellcenter (MultiFab& cc,
                                      const Array<const MultiFab*,AMREX_SPACEDIM>& fc,
                                      const Geometry& geom);
-    //! Average cell-centered MultiFab onto face-based MultiFab with geometric weighting.
+    /**
+     * \brief Average cell-centered data onto faces using Geometry metrics.
+     *
+     * \param[out] fc  Face-centered destinations.
+     * \param cc       Cell-centered source.
+     * \param geom     Geometry describing the grid.
+     * \param ncomp    Number of components to average.
+     * \param use_harmonic_averaging Use harmonic instead of arithmetic means.
+     */
     void average_cellcenter_to_face (const Vector<MultiFab*>& fc,
                                      const MultiFab& cc,
                                      const Geometry& geom,
                                      int ncomp = 1,
                                      bool use_harmonic_averaging = false);
-    //! Average cell-centered MultiFab onto face-based MultiFab with geometric weighting.
+    //! Same as the Vector-based overload but accepts an `Array` of face MultiFabs.
     void average_cellcenter_to_face (const Array<MultiFab*,AMREX_SPACEDIM>& fc,
                                      const MultiFab& cc,
                                      const Geometry& geom,
                                      int ncomp = 1,
                                      bool use_harmonic_averaging = false);
 
-    //! Average fine face-based FabArray onto crse face-based FabArray.
+    /**
+     * \brief Restrict fine face-centered FabArrays to a coarse resolution.
+     *
+     * \tparam MF FabArray-like type (MultiFab or derived).
+     * \param fine   Face-centered data on the fine level (one per direction).
+     * \param crse   Face-centered destinations on the coarse level.
+     * \param ratio  Refinement ratio between fine and coarse levels.
+     * \param ngcrse Number of coarse ghost cells to fill.
+     */
     template <typename MF, std::enable_if_t<IsFabArray<MF>::value,int> = 0>
     void average_down_faces (const Vector<const MF*>& fine,
                              const Vector<MF*>& crse,
                              const IntVect& ratio,
                              int ngcrse = 0);
-    //! Average fine face-based FabArray onto crse face-based FabArray.
+    //! Convenience overload that calls the IntVect-based version with a scalar ratio.
     template <typename MF, std::enable_if_t<IsFabArray<MF>::value,int> = 0>
     void average_down_faces (const Vector<const MF*>& fine,
                              const Vector<MF*>& crse,
                              int ratio,
                              int ngcrse = 0);
-    //! Average fine face-based FabArray onto crse face-based FabArray.
+    //! Same operation as above but with `Array` containers instead of `Vector`.
     template <typename MF, std::enable_if_t<IsFabArray<MF>::value,int> = 0>
     void average_down_faces (const Array<const MF*,AMREX_SPACEDIM>& fine,
                              const Array<MF*,AMREX_SPACEDIM>& crse,
                              const IntVect& ratio,
                              int ngcrse = 0);
-    //! Average fine face-based FabArray onto crse face-based FabArray.
+    //! Scalar-ratio overload for the Array-based variant.
     template <typename MF, std::enable_if_t<IsFabArray<MF>::value,int> = 0>
     void average_down_faces (const Array<const MF*,AMREX_SPACEDIM>& fine,
                              const Array<MF*,AMREX_SPACEDIM>& crse,
                              int ratio,
                              int ngcrse = 0);
     /**
-     * \brief This version does average down for one face direction.
+     * \brief Average down faces when only one direction is face-centered.
      *
-     * It uses the IndexType of MultiFabs to determine the direction.
-     * It is expected that one direction is nodal and the rest are cell-centered.
+     * The IndexType determines which direction is nodal vs. cell-centered.
      */
     template <typename FAB>
     void average_down_faces (const FabArray<FAB>& fine, FabArray<FAB>& crse,
                              const IntVect& ratio, int ngcrse=0);
 
-    //  This version takes periodicity into account.
+    /**
+     * \brief Average down faces while supplying a coarse-level Geometry.
+     *
+     * \tparam MF  FabArray-like type (e.g., MultiFab).
+     * \param fine Fine-level face-centered data (array by direction).
+     * \param crse Coarse-level face-centered destinations.
+     * \param ratio Refinement ratio between fine and coarse levels.
+     * \param crse_geom Geometry describing the coarse mesh spacing and periodicity.
+     */
     template <typename MF, std::enable_if_t<IsFabArray<MF>::value,int> = 0>
     void average_down_faces (const Array<const MF*,AMREX_SPACEDIM>& fine,
                              const Array<MF*,AMREX_SPACEDIM>& crse,
                              const IntVect& ratio, const Geometry& crse_geom);
-    //  This version takes periodicity into account.
+    /**
+     * \brief Average down face-centered FabArrays using a coarse-level Geometry.
+     *
+     * \tparam FAB FabArray type (e.g., MultiFab).
+     * \param fine Fine-level face-centered data with IndexType indicating face orientation.
+     * \param crse Coarse-level destination.
+     * \param ratio Refinement ratio between levels.
+     * \param crse_geom Geometry describing the coarse mesh spacing and periodicity.
+     */
     template <typename FAB>
     void average_down_faces (const FabArray<FAB>& fine, FabArray<FAB>& crse,
                              const IntVect& ratio, const Geometry& crse_geom);
 
-    //! Average fine edge-based MultiFab onto crse edge-based MultiFab.
+    /**
+     * \brief Average down edge-centered MultiFabs.
+     *
+     * \param fine   Edge-centered data on the fine level (vector or array form).
+     * \param crse   Edge-centered destinations on the coarse level.
+     * \param ratio  Refinement ratio between fine and coarse levels.
+     * \param ngcrse Number of coarse ghost cells to fill.
+     */
     void average_down_edges (const Vector<const MultiFab*>& fine,
                              const Vector<MultiFab*>& crse,
                              const IntVect& ratio,
                              int ngcrse = 0);
+    //! Same as the `Vector` overload but accepts directional Arrays.
     void average_down_edges (const Array<const MultiFab*,AMREX_SPACEDIM>& fine,
                              const Array<MultiFab*,AMREX_SPACEDIM>& crse,
                              const IntVect& ratio,
                              int ngcrse = 0);
-    //! This version does average down for one direction.
-    //! It uses the IndexType of MultiFabs to determine the direction.
-    //! It is expected that one direction is cell-centered and the rest are nodal.
+    /**
+     * \brief Average down edges when only one direction is edge-centered.
+     *
+     * The nodal/cell nature is inferred from the MultiFab IndexType.
+     */
     void average_down_edges (const MultiFab& fine, MultiFab& crse,
                              const IntVect& ratio, int ngcrse=0);
 
-    //! Average fine node-based MultiFab onto crse node-centered MultiFab.
+    /**
+     * \brief Average nodal FabArrays down to a coarser resolution.
+     *
+     * \param fine    Source nodal data on the fine mesh.
+     * \param crse    Destination nodal data on the coarse mesh.
+     * \param ratio   Refinement ratio between the grids.
+     * \param ngcrse  Number of coarse ghost cells to fill.
+     * \param mfiter_is_definitely_safe Whether a single MFIter can be reused safely (optimization hint).
+     */
     template <typename FAB>
-    void average_down_nodal (const FabArray<FAB>& S_fine,
-                             FabArray<FAB>& S_crse,
+    void average_down_nodal (const FabArray<FAB>& fine,
+                             FabArray<FAB>& crse,
                              const IntVect& ratio,
                              int ngcrse = 0,
                              bool mfiter_is_definitely_safe=false);
@@ -158,37 +288,82 @@ namespace amrex
     void average_down (const MultiFab& S_fine, MultiFab& S_crse,
                        const Geometry& fgeom, const Geometry& cgeom,
                        int scomp, int ncomp, const IntVect& ratio);
+    //! Scalar-ratio overload that forwards to the IntVect version.
     void average_down (const MultiFab& S_fine, MultiFab& S_crse,
                        const Geometry& fgeom, const Geometry& cgeom,
                        int scomp, int ncomp, int rr);
 
-    //! Average MultiFab onto crse MultiFab without volume weighting. This
-    //! routine DOES NOT assume that the crse BoxArray is a coarsened version of
-    //! the fine BoxArray. Work for both cell-centered and nodal MultiFabs.
+    /**
+     * \brief Average FabArrays without volume weighting.
+     *
+     * Works for cell-centered or nodal data and does not require
+     * the coarse BoxArray to be a coarsened version of the fine one.
+     */
     template<typename FAB>
     void average_down (const FabArray<FAB>& S_fine, FabArray<FAB>& S_crse,
                        int scomp, int ncomp, const IntVect& ratio);
+    //! Convenience overload that accepts a scalar refinement ratio.
     template<typename FAB>
     void average_down (const FabArray<FAB>& S_fine, FabArray<FAB>& S_crse,
                        int scomp, int ncomp, int rr);
 
-    //! Add a coarsened version of the data contained in the S_fine MultiFab to
-    //! S_crse, including ghost cells.
+    /**
+     * \brief Add a coarsened version of \p S_Fine into \p S_crse (including ghosts).
+     *
+     * \param S_Fine Fine-level source MultiFab.
+     * \param S_crse Coarse-level accumulation target.
+     * \param scomp  First component to add.
+     * \param ncomp  Number of components to add.
+     * \param ratio  Refinement ratio between the meshes.
+     * \param cgeom  Geometry of the coarse level.
+     * \param fgeom  Geometry of the fine level.
+     */
     void sum_fine_to_coarse (const MultiFab& S_Fine, MultiFab& S_crse,
                              int scomp, int ncomp,
                              const IntVect& ratio,
                              const Geometry& cgeom, const Geometry& fgeom);
 
-    //! Output state data for a single zone
+    /**
+     * \brief Print state data for a single cell to the default stream.
+     *
+     * \param mf   MultiFab containing the data.
+     * \param cell Cell index to dump.
+     * \param n    Component index (all components if negative).
+     * \param ng   Ghost-cell vector describing how many extra cells to include per direction.
+     */
     void print_state (const MultiFab& mf, const IntVect& cell, int n=-1,
                       const IntVect& ng = IntVect::TheZeroVector());
 
-    //! Write each fab individually
+    /**
+     * \brief Write each FAB in \p mf to its own file (components are contiguous).
+     *
+     * \param mf   MultiFab to dump.
+     * \param name Base filename/prefix.
+     */
     void writeFabs (const MultiFab& mf, const std::string& name);
+    /**
+     * \brief Write a subset of components from each FAB to disk.
+     *
+     * \param mf    MultiFab to dump.
+     * \param comp  First component to write.
+     * \param ncomp Number of components to write.
+     * \param name  Base filename/prefix.
+     */
     void writeFabs (const MultiFab& mf, int comp, int ncomp, const std::string& name);
 
-    //! Extract a slice from the given cell-centered MultiFab at coordinate
-    //! "coord" along direction "dir".
+    /**
+     * \brief Extract a slice from a cell-centered MultiFab at physical coordinate \p coord.
+     *
+     * \param dir         Coordinate direction (0=x, 1=y, 2=z).
+     * \param coord       Physical coordinate at which to slice.
+     * \param cc          Source cell-centered MultiFab.
+     * \param geom        Geometry describing the grid layout.
+     * \param start_comp  First component to copy.
+     * \param ncomp       Number of components to copy.
+     * \param interpolate Whether to interpolate when the slice doesn’t align with cell centers.
+     * \param bnd_rbx     Optional bounding RealBox limiting interpolation.
+     * \return Newly allocated MultiFab containing the slice.
+     */
     std::unique_ptr<MultiFab> get_slice_data(int dir, Real coord,
                                              const MultiFab& cc,
                                              const Geometry& geom, int start_comp, int ncomp,
@@ -196,48 +371,122 @@ namespace amrex
                                              RealBox const& bnd_rbx = RealBox());
 
     /**
-     * \brief Get data in a cell of MultiFab/FabArray
+     * \brief Gather the data stored in a given cell.
      *
-     * This returns a Vector containing the data in a given cell, if it's
-     * available on a process. The returned Vector is empty if a process
-     * does not have the given cell.
+     * \tparam MF FabArray type.
+     * \param mf   Source FabArray.
+     * \param cell Cell index to query.
+     * \return Vector containing the cell’s components on this rank (empty if not owned).
      */
     template <typename MF, std::enable_if_t<IsFabArray<MF>::value,int> FOO = 0>
     Vector<typename MF::value_type> get_cell_data (MF const& mf, IntVect const& cell);
 
     /**
-     * \brief Get data in a line of MultiFab/FabArray
+     * \brief Extract data along a line extending from \p cell in direction \p dir.
      *
-     * This returns a MultiFab/FabArray containing the data in a line
-     * specified by a direction and a cell.
+     * \param mf      Source FabArray.
+     * \param dir     Direction index (0=x, 1=y, 2=z).
+     * \param cell    Base cell index.
+     * \param bnd_bx  Optional bounding box limiting the returned line.
+     * \return FabArray containing the line data.
      */
     template <typename MF, std::enable_if_t<IsFabArray<MF>::value,int> FOO = 0>
     MF get_line_data (MF const& mf, int dir, IntVect const& cell, Box const& bnd_bx = Box());
 
-    //! Return an iMultiFab that has the same BoxArray and DistributionMapping
-    //! as the coarse MultiFab cmf. Cells covered by the coarsened fine grids
-    //! are set to fine_value, whereas other cells are set to crse_value.
+    /**
+     * \brief Build a mask marking coarse cells covered by a fine grid.
+     *
+     * \param cmf         Coarse-level FabArray providing the layout.
+     * \param fba         Fine-level BoxArray to cover.
+     * \param ratio       Refinement ratio.
+     * \param crse_value  Value assigned to uncovered coarse cells.
+     * \param fine_value  Value assigned to covered cells.
+     * \param info        MFInfo passed to fine mask constuctor.
+     */
     template <typename FAB>
     iMultiFab makeFineMask (const FabArray<FAB>& cmf, const BoxArray& fba, const IntVect& ratio,
-                            int crse_value = 0, int fine_value = 1,
-                            MFInfo const& info = MFInfo());
+                            int crse_value = 0, int fine_value = 1);
+    /**
+     * \brief Build a fine-coverage mask using explicit layout metadata.
+     *
+     * \param cba         Coarse-level BoxArray describing the mask grids.
+     * \param cdm         Distribution mapping for the coarse layout.
+     * \param fba         Fine-level BoxArray to mark as covered.
+     * \param ratio       Refinement ratio between fine and coarse meshes.
+     * \param crse_value  Value assigned to uncovered coarse cells.
+     * \param fine_value  Value assigned where fine grids overlap.
+     * \param info        MFInfo passed to fine mask constuctor.
+     */
     iMultiFab makeFineMask (const BoxArray& cba, const DistributionMapping& cdm,
                             const BoxArray& fba, const IntVect& ratio,
                             int crse_value = 0, int fine_value = 1,
                             MFInfo const& info = MFInfo());
+
+    /**
+     * \brief Build a fine-coverage mask honoring periodicity.
+     *
+     * \param cmf         Coarse FabArray that supplies layout, ghosts, and ownership.
+     * \param fba         Fine-level BoxArray to mark as covered.
+     * \param ratio       Refinement ratio between fine and coarse meshes.
+     * \param period      Periodicity description applied to the coarse layout.
+     * \param crse_value  Value assigned to uncovered coarse cells.
+     * \param fine_value  Value assigned where fine grids overlap.
+     * \param info        MFInfo passed to fine mask constuctor.
+     */
     template <typename FAB>
     iMultiFab makeFineMask (const FabArray<FAB>& cmf, const BoxArray& fba, const IntVect& ratio,
                             Periodicity const& period, int crse_value, int fine_value,
                             MFInfo const& info = MFInfo());
+
+    /**
+     * \brief Build a fine-coverage mask with explicit coarse ghost specification.
+     *
+     * \param cba         Coarse-level BoxArray.
+     * \param cdm         Distribution mapping that owns \p cba.
+     * \param cnghost     Number of ghost cells to allocate on the mask.
+     * \param fba         Fine-level BoxArray to mark as covered.
+     * \param ratio       Refinement ratio between levels.
+     * \param period      Periodicity description applied to the coarse layout.
+     * \param crse_value  Value assigned to uncovered coarse cells.
+     * \param fine_value  Value assigned where fine grids overlap.
+     * \param info        MFInfo passed to fine mask constuctor.
+     */
     iMultiFab makeFineMask (const BoxArray& cba, const DistributionMapping& cdm,
                             const IntVect& cnghost, const BoxArray& fba, const IntVect& ratio,
                             Periodicity const& period, int crse_value, int fine_value,
                             MFInfo const& info = MFInfo());
+
+    /**
+     * \brief Build a fine-coverage mask pulling layouts directly from coarse and fine FabArrays.
+     *
+     * \param cmf         Coarse FabArray with target layout and ghosts.
+     * \param fmf         Fine FabArray specifying the refined coverage.
+     * \param cnghost     Number of coarse ghost cells in the output mask.
+     * \param ratio       Refinement ratio between levels.
+     * \param period      Periodicity description applied to the coarse layout.
+     * \param crse_value  Value assigned to uncovered coarse cells.
+     * \param fine_value  Value assigned where fine grids overlap.
+     * \param info        MFInfo passed to fine mask constuctor.
+     */
     template <typename FAB>
     iMultiFab makeFineMask (const FabArray<FAB>& cmf, const FabArray<FAB>& fmf,
                             const IntVect& cnghost, const IntVect& ratio,
                             Periodicity const& period, int crse_value, int fine_value,
                             MFInfo const& info = MFInfo());
+
+    /**
+     * \brief Build a fine-coverage mask and record which tiles abut coarse/fine interfaces.
+     *
+     * \param cmf         Coarse FabArray with target layout and ghosts.
+     * \param fmf         Fine FabArray specifying the refined coverage.
+     * \param cnghost     Number of coarse ghost cells in the output mask.
+     * \param ratio       Refinement ratio between levels.
+     * \param period      Periodicity description applied to the coarse layout.
+     * \param crse_value  Value assigned to uncovered coarse cells.
+     * \param fine_value  Value assigned where fine grids overlap.
+     * \param has_cf      Output layout mask that flags boxes touching coarse/fine boundaries.
+     * \param info        MFInfo passed to fine mask constuctor.
+     */
     template <typename FAB>
     iMultiFab makeFineMask (const FabArray<FAB>& cmf, const FabArray<FAB>& fmf,
                             const IntVect& cnghost, const IntVect& ratio,
@@ -245,29 +494,69 @@ namespace amrex
                             LayoutData<int>& has_cf,
                             MFInfo const& info = MFInfo());
 
+    /**
+     * \brief Real-valued counterpart to makeFineMask.
+     *
+     * \param cba         Coarse-level BoxArray describing the mask grids.
+     * \param cdm         Distribution mapping for the coarse layout.
+     * \param fba         Fine-level BoxArray to mark as covered.
+     * \param ratio       Refinement ratio between fine and coarse meshes.
+     * \param crse_value  Value assigned to uncovered coarse cells.
+     * \param fine_value  Value assigned where fine grids overlap.
+     * \return A MultiFab storing \p crse_value or \p fine_value in each coarse cell.
+     * \param info        MFInfo passed to fine mask constuctor.
+     */
     MultiFab makeFineMask (const BoxArray& cba, const DistributionMapping& cdm,
                            const BoxArray& fba, const IntVect& ratio,
                            Real crse_value, Real fine_value,
                            MFInfo const& info = MFInfo());
 
-    //! Computes divergence of face-data stored in the umac MultiFab.
+    /**
+     * \brief Compute the divergence of face-centered velocity fields.
+     *
+     * \param[out] divu Destination scalar MultiFab.
+     * \param umac      Face-centered velocity components.
+     * \param geom      Geometry describing the grid spacing.
+     */
     void computeDivergence (MultiFab& divu, const Array<MultiFab const*,AMREX_SPACEDIM>& umac,
                             const Geometry& geom);
 
-    //! Computes gradient of face-data stored in the umac MultiFab.
+    /**
+     * \brief Compute the face-centered gradient.
+     *
+     * \param[out] grad Destination MultiFab storing gradients.
+     * \param umac      Face-centered field to differentiate.
+     * \param geom      Geometry describing the grid spacing.
+     */
     void computeGradient (MultiFab& grad, const Array<MultiFab const*,AMREX_SPACEDIM>& umac,
                           const Geometry& geom);
 
-    //! Convert iMultiFab to MultiFab
+    //! Convert an integer MultiFab to a Real-valued MultiFab.
     MultiFab ToMultiFab (const iMultiFab& imf);
-    //! Convert iMultiFab to Long
+    //! Convert an integer MultiFab to a FabArray of Longs.
     FabArray<BaseFab<Long> > ToLongMultiFab (const iMultiFab& imf);
 
-    //! Periodic shift MultiFab
+    /**
+     * \brief Create a periodic shift of \p mf by \p offset.
+     *
+     * \param mf      Source MultiFab.
+     * \param offset  Integer shift vector.
+     * \param period  Periodicity descriptor.
+     * \return Shifted copy of \p mf.
+     */
     MultiFab periodicShift (MultiFab const& mf, IntVect const& offset,
                             Periodicity const& period);
 
-    //! example: auto mf = amrex::cast<MultiFab>(imf);
+    /**
+     * \brief Convert between Array-of-FAB container types.
+     *
+     * Example: `auto mf = amrex::cast<MultiFab>(imf);`
+     *
+     * \tparam T Destination FabArray type.
+     * \tparam U Source FabArray type.
+     * \param mf_in Source FabArray.
+     * \return Copy of \p mf_in stored in the destination type.
+     */
     template <typename T, typename U>
     T cast (U const& mf_in)
     {
@@ -570,15 +859,13 @@ namespace amrex
     void FillRandomNormal (MultiFab& mf, int scomp, int ncomp, Real mean, Real stddev);
 
     /**
-     * \brief Convexify AMR data
+     * \brief Convexify AMR data.
      *
-     * This function "convexifies" the AMR data by removing cells that are
-     * covered by fine levels from coarse level MultiFabs. This could be
-     * useful for visualization. The returned MultiFabs on coarse levels
-     * have different BoxArrays from the original BoxArrays. For the finest
-     * level, the data is simply copied to the returned object. The returned
-     * MultiFabs have no ghost cells. For nodal data, the nodes on the
-     * coarse/fine interface exist on both levels.
+     * Removes cells covered by finer levels so each returned MultiFab contains only uncovered cells.
+     *
+     * \param mf   Vector of level pointers whose data should be convexified.
+     * \param refinement_ratio Refinement ratios between consecutive levels.
+     * \return Vector of convexified MultiFabs (one per level), each without ghost cells.
      */
     [[nodiscard]] Vector<MultiFab> convexify (Vector<MultiFab const*> const& mf,
                                 Vector<IntVect> const& refinement_ratio);
@@ -644,8 +931,6 @@ makeFineMask (const FabArray<FAB>& cmf, const FabArray<FAB>& fmf,
     return mask;
 }
 
-//! Average fine node-based MultiFab onto crse node-based MultiFab.
-//! This routine assumes that the crse BoxArray is a coarsened version of the fine BoxArray.
 template <typename FAB>
 void average_down_nodal (const FabArray<FAB>& fine, FabArray<FAB>& crse,
                          const IntVect& ratio, int ngcrse, bool mfiter_is_definitely_safe)
@@ -685,15 +970,34 @@ void average_down_nodal (const FabArray<FAB>& fine, FabArray<FAB>& crse,
 
 // *************************************************************************************************************
 
-// Average fine cell-based MultiFab onto crse cell-centered MultiFab.
-// We do NOT assume that the coarse layout is a coarsened version of the fine layout.
-// This version does NOT use volume-weighting
+/**
+ * \brief Average fine FabArray data down to a coarser layout without volume weighting.
+ *
+ * Works for nodal and cell-centered data even when the coarse layout is not a direct coarsening.
+ *
+ * \tparam FAB FabArray type (MultiFab or compatible).
+ * \param S_fine Fine-level source data.
+ * \param S_crse Coarse-level destination.
+ * \param scomp  Starting component in \p S_fine to average.
+ * \param ncomp  Number of components to average.
+ * \param rr     Isotropic refinement ratio.
+ */
 template<typename FAB>
 void average_down (const FabArray<FAB>& S_fine, FabArray<FAB>& S_crse, int scomp, int ncomp, int rr)
 {
     average_down(S_fine,S_crse,scomp,ncomp,rr*IntVect::TheUnitVector());
 }
 
+/**
+ * \brief Average fine FabArray data down to a coarser layout without volume weighting.
+ *
+ * \tparam FAB FabArray type (MultiFab or compatible).
+ * \param S_fine Fine-level source data.
+ * \param S_crse Coarse-level destination.
+ * \param scomp  Starting component in \p S_fine to average.
+ * \param ncomp  Number of components to average.
+ * \param ratio  Directional refinement ratio (allows anisotropy).
+ */
 template<typename FAB>
 void average_down (const FabArray<FAB>& S_fine, FabArray<FAB>& S_crse,
                    int scomp, int ncomp, const IntVect& ratio)
@@ -825,11 +1129,19 @@ void average_down (const FabArray<FAB>& S_fine, FabArray<FAB>& S_crse,
 
 
 /**
- * \brief Returns part of a norm based on two MultiFabs.
+ * \brief Accumulate a partial norm using two MultiFabs.
  *
- * The MultiFabs MUST have the same underlying BoxArray.
- * The function f is applied elementwise as f(x(i,j,k,n),y(i,j,k,n))
- * inside the summation (subject to a valid mask entry pf(mask(i,j,k,n)
+ * The MultiFabs must share the same layout and DistributionMapping. The callable \p f
+ * is applied elementwise to accumulate norm contributions.
+ *
+ * \param x        First MultiFab operand.
+ * \param xcomp    Starting component in \p x.
+ * \param y        Second MultiFab operand.
+ * \param ycomp    Starting component in \p y.
+ * \param f        Callable returning the contribution for each component pair.
+ * \param numcomp  Number of components to include.
+ * \param nghost   Ghost width to cover when looping.
+ * \param local    If false, perform an MPI sum reduction before returning.
  */
 template <typename F>
 Real
@@ -884,12 +1196,18 @@ NormHelper (const MultiFab& x, int xcomp,
 }
 
 /**
- * \brief Returns part of a norm based on three MultiFabs
+ * \brief Accumulate a partial norm using two MultiFabs filtered by a mask.
  *
- * The MultiFabs MUST have the same underlying BoxArray.
- * The Predicate pf is used to test the mask
- * The function f is applied elementwise as f(x(i,j,k,n),y(i,j,k,n))
- * inside the summation (subject to a valid mask entry pf(mask(i,j,k,n)
+ * \param mask     Masked region to include (predicate \p pf decides which values count).
+ * \param x        First MultiFab operand.
+ * \param xcomp    Starting component in \p x.
+ * \param y        Second MultiFab operand.
+ * \param ycomp    Starting component in \p y.
+ * \param pf       Predicate applied to the mask value before accumulating.
+ * \param f        Callable returning the contribution for each component pair.
+ * \param numcomp  Number of components to include.
+ * \param nghost   Ghost width to cover when looping.
+ * \param local    If false, perform an MPI sum reduction before returning.
  */
 template <typename MMF, typename Pred, typename F>
 Real
@@ -1029,6 +1347,7 @@ void average_face_to_cellcenter (CMF& cc, int dcomp,
     }
 }
 
+//! Helper overload forwarding a Vector of MultiFabs to the Array-based implementation.
 template <typename MF, std::enable_if_t<IsFabArray<MF>::value,int>>
 void average_down_faces (const Vector<const MF*>& fine,
                          const Vector<MF*>& crse,
@@ -1042,6 +1361,7 @@ void average_down_faces (const Vector<const MF*>& fine,
                        ratio, ngcrse);
 }
 
+//! Scalar refinement-ratio overload for the Vector form.
 template <typename MF, std::enable_if_t<IsFabArray<MF>::value,int>>
 void average_down_faces (const Vector<const MF*>& fine,
                          const Vector<MF*>& crse, int ratio, int ngcrse)
@@ -1049,6 +1369,7 @@ void average_down_faces (const Vector<const MF*>& fine,
     average_down_faces(fine,crse,IntVect{ratio},ngcrse);
 }
 
+//! Scalar refinement-ratio overload for the Array form.
 template <typename MF, std::enable_if_t<IsFabArray<MF>::value,int>>
 void average_down_faces (const Array<const MF*,AMREX_SPACEDIM>& fine,
                          const Array<MF*,AMREX_SPACEDIM>& crse,
@@ -1057,6 +1378,7 @@ void average_down_faces (const Array<const MF*,AMREX_SPACEDIM>& fine,
     average_down_faces(fine,crse,IntVect{ratio},ngcrse);
 }
 
+//! Array-based helper that loops over each direction and invokes the FabArray overload.
 template <typename MF, std::enable_if_t<IsFabArray<MF>::value,int>>
 void average_down_faces (const Array<const MF*,AMREX_SPACEDIM>& fine,
                          const Array<MF*,AMREX_SPACEDIM>& crse,
@@ -1067,6 +1389,7 @@ void average_down_faces (const Array<const MF*,AMREX_SPACEDIM>& fine,
     }
 }
 
+//! Calls the FabArray overload on each directional component.
 template <typename FAB>
 void average_down_faces (const FabArray<FAB>& fine, FabArray<FAB>& crse,
                          const IntVect& ratio, int ngcrse)
@@ -1127,6 +1450,7 @@ void average_down_faces (const FabArray<FAB>& fine, FabArray<FAB>& crse,
     }
 }
 
+//! Apply the face-averaging routine while supplying a coarse-level Geometry per direction.
 template <typename MF, std::enable_if_t<IsFabArray<MF>::value,int>>
 void average_down_faces (const Array<const MF*,AMREX_SPACEDIM>& fine,
                          const Array<MF*,AMREX_SPACEDIM>& crse,
@@ -1137,6 +1461,7 @@ void average_down_faces (const Array<const MF*,AMREX_SPACEDIM>& fine,
     }
 }
 
+//! Geometry-aware overload that works on FabArrays rather than directional Arrays.
 template <typename FAB>
 void average_down_faces (const FabArray<FAB>& fine, FabArray<FAB>& crse,
                          const IntVect& ratio, const Geometry& crse_geom)

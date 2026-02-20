@@ -6,6 +6,11 @@
 #include <AMReX_Gpu.H>
 #include <AMReX_Arena.H>
 
+/**
+ * \file AMReX_Scan.H
+ * \brief Parallel prefix-sum utilities for GPU and CPU backends.
+ */
+
 #if defined(AMREX_USE_CUDA) && defined(__CUDACC__) && (__CUDACC_VER_MAJOR__ >= 11)
 #  include <cub/cub.cuh>
 #  ifdef AMREX_CUDA_CCCL_VER_GE_2_8
@@ -25,15 +30,28 @@
 namespace amrex {
 namespace Scan {
 
+/**
+ * \struct amrex::Scan::RetSum
+ * \ingroup amrex_collectives
+ * \brief Helper flag that controls whether scan routines return the total sum.
+ *
+ * Passing #retSum requests that PrefixSum/InclusiveSum/ExclusiveSum return the
+ * final reduction value.  Pass #noRetSum when the caller does not need it.
+ */
 struct RetSum {
-    bool flag = true;
+    bool flag = true;  ///< Whether the caller wants the final sum returned.
+    //! Allow implicit use in boolean contexts.
     explicit operator bool() const noexcept { return flag; }
 };
+//! Request that the prefix-sum routine return the overall sum.
 static constexpr RetSum   retSum{true};
+//! Request that the prefix-sum routine skip returning the overall sum.
 static constexpr RetSum noRetSum{false};
 
 namespace Type {
+    //! Tag selecting an inclusive prefix scan (each output includes its own value).
     static constexpr struct Inclusive {} inclusive{};
+    //! Tag selecting an exclusive prefix scan (outputs omit the current value).
     static constexpr struct Exclusive {} exclusive{};
 }
 
@@ -393,6 +411,28 @@ T PrefixSum_mp (N n, FIN const& fin, FOUT const& fout, TYPE, RetSum a_ret_sum)
 }
 #endif
 
+/**
+ * \ingroup amrex_collectives
+ *
+ * \brief Perform an inclusive or exclusive prefix scan of arbitrary data.
+ *
+ * The scan reads elements by invoking the callable \p fin for each index
+ * in the range `[0,n)` and writes the running totals via the callable \p fout.
+ * The \p type argument controls whether the running total includes the current
+ * element (inclusive) or not (exclusive).  The return value is the total sum
+ * when \p a_ret_sum equals #retSum; otherwise zero is returned.
+ *
+ * \tparam T      value type stored in the scan.
+ * \tparam N      integral index type.
+ * \tparam FIN    callable type returning the value at a given index.
+ * \tparam FOUT   callable type that receives `(index, prefix_value)`.
+ * \tparam TYPE   either Type::inclusive or Type::exclusive.
+ * \param n       number of elements to process.
+ * \param fin     callable that yields the input value at index \p i.
+ * \param fout    callable that receives the prefix value for index \p i.
+ * \param type    selects inclusive or exclusive behavior.
+ * \param a_ret_sum whether to return the final sum to the caller.
+ */
 template <typename T, typename N, typename FIN, typename FOUT, typename TYPE,
           typename M=std::enable_if_t<std::is_integral_v<N> &&
                                       (std::is_same_v<std::decay_t<TYPE>,Type::Inclusive> ||
@@ -1361,13 +1401,35 @@ T ExclusiveSum (N n, T const* in, T * out, RetSum a_ret_sum = retSum)
 
 #else
 //  !defined(AMREX_USE_GPU)
+/**
+ * \ingroup amrex_collectives
+ *
+ * \brief CPU fallback for amrex::Scan::PrefixSum.
+ *
+ * Invokes the user callables \p fin and \p fout in the range `[0,n)` and
+ * performs either an inclusive or exclusive scan depending on \p TYPE.
+ * The total sum is returned regardless of \p TYPE value so callers can
+ * mirror the GPU interface without extra conditionals.
+ *
+ * \tparam T      value type stored in the scan.
+ * \tparam N      integral index type.
+ * \tparam FIN    callable type returning the value at a given index.
+ * \tparam FOUT   callable type that receives `(index, prefix_value)`.
+ * \tparam TYPE   either Type::inclusive or Type::exclusive.
+ * \param n       number of elements to process.
+ * \param fin     callable that yields the input value at index \p i.
+ * \param fout    callable that receives the prefix value for index \p i.
+ * \param type    selects inclusive or exclusive behavior.
+ * \return Running total after processing all \p n entries.
+ */
 template <typename T, typename N, typename FIN, typename FOUT, typename TYPE,
           typename M=std::enable_if_t<std::is_integral_v<N> &&
                                       (std::is_same_v<std::decay_t<TYPE>,Type::Inclusive> ||
                                        std::is_same_v<std::decay_t<TYPE>,Type::Exclusive>)> >
-T PrefixSum (N n, FIN const& fin, FOUT const& fout, TYPE, RetSum = retSum)
+T PrefixSum (N n, FIN const& fin, FOUT const& fout, TYPE type, RetSum = retSum)
 {
     if (n <= 0) { return 0; }
+    static_cast<void>(type);
     T totalsum = 0;
     for (N i = 0; i < n; ++i) {
         T x = fin(i);
@@ -1381,7 +1443,17 @@ T PrefixSum (N n, FIN const& fin, FOUT const& fout, TYPE, RetSum = retSum)
     return totalsum;
 }
 
-// The return value is the total sum.
+/**
+ * \ingroup amrex_collectives
+ *
+ * \brief CPU-only inclusive prefix sum mirroring the GPU helper.
+ *
+ * \param n        number of elements to process.
+ * \param in       pointer to the first input element.
+ * \param out      pointer to the first output element (can alias \p in).
+ * \param a_ret_sum ignored on CPU builds (return value always provided).
+ * \return Total sum of the \p n elements.
+ */
 template <typename N, typename T, typename M=std::enable_if_t<std::is_integral_v<N>> >
 T InclusiveSum (N n, T const* in, T * out, RetSum /*a_ret_sum*/ = retSum)
 {
@@ -1394,7 +1466,17 @@ T InclusiveSum (N n, T const* in, T * out, RetSum /*a_ret_sum*/ = retSum)
     return (n > 0) ? out[n-1] : T(0);
 }
 
-// The return value is the total sum.
+/**
+ * \ingroup amrex_collectives
+ *
+ * \brief CPU-only exclusive prefix sum mirroring the GPU helper.
+ *
+ * \param n        number of elements to process.
+ * \param in       pointer to the first input element.
+ * \param out      pointer to the first output element.
+ * \param a_ret_sum ignored on CPU builds (return value always provided).
+ * \return Total sum of the input sequence.
+ */
 template <typename N, typename T, typename M=std::enable_if_t<std::is_integral_v<N>> >
 T ExclusiveSum (N n, T const* in, T * out, RetSum /*a_ret_sum*/ = retSum)
 {
@@ -1418,6 +1500,17 @@ T ExclusiveSum (N n, T const* in, T * out, RetSum /*a_ret_sum*/ = retSum)
 namespace Gpu
 {
     /// \ingroup amrex_collectives
+    /**
+     * \brief Inclusive prefix-sum over the iterator range `[begin,end)`.
+     *
+     * On GPU builds this dispatches to amrex::Scan helpers; on CPU builds it
+     * falls back to `std::inclusive_scan` (or `std::partial_sum`).
+     *
+     * \param begin iterator to the first input element.
+     * \param end   iterator one past the last input element.
+     * \param result iterator where results are written.
+     * \return iterator one past the last written element.
+     */
     template<class InIter, class OutIter>
     OutIter inclusive_scan (InIter begin, InIter end, OutIter result)
     {
@@ -1436,6 +1529,17 @@ namespace Gpu
     }
 
     /// \ingroup amrex_collectives
+    /**
+     * \brief Exclusive prefix-sum over the iterator range `[begin,end)`.
+     *
+     * On GPU builds this dispatches to amrex::Scan helpers; on CPU builds it
+     * falls back to `std::exclusive_scan` (or `std::partial_sum`).
+     *
+     * \param begin iterator to the first input element.
+     * \param end   iterator one past the last input element.
+     * \param result iterator where results are written.
+     * \return iterator one past the last written element.
+     */
     template<class InIter, class OutIter>
     OutIter exclusive_scan (InIter begin, InIter end, OutIter result)
     {

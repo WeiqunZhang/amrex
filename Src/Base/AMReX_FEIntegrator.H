@@ -5,9 +5,23 @@
 #include <AMReX_IntegratorBase.H>
 #include <functional>
 
+/**
+ * \file AMReX_FEIntegrator.H
+ * \brief Forward-Euler implementation of IntegratorBase.
+ */
+
 namespace amrex {
 
 template<class T>
+/**
+ * \class amrex::FEIntegrator
+ * \brief Single-stage forward Euler time integrator for IntegratorBase clients.
+ *
+ * Stores scratch RHS data and current state, exposing the IntegratorBase API
+ * so it can be swapped interchangeably with higher-order schemes.
+ *
+ * \tparam T State container type compatible with IntegratorOps helpers.
+ */
 class FEIntegrator : public IntegratorBase<T>
 {
 private:
@@ -33,8 +47,14 @@ private:
     }
 
 public:
+    //! Construct an empty integrator; call initialize() before use.
     FEIntegrator () {}
 
+    /**
+     * \brief Construct and immediately initialize the integrator state.
+     * \param S_data Prototype state used to size internal storage.
+     * \param time   Initial physical time for the state.
+     */
     FEIntegrator (const T& S_data, const amrex::Real time = 0.0)
     {
         initialize(S_data, time);
@@ -42,11 +62,28 @@ public:
 
     virtual ~FEIntegrator () {}
 
+    /**
+     * \brief Allocate/reset the internal storage based on \p S_data.
+     * \param S_data Prototype data (copied into the first stage buffer).
+     * \param time   Time associated with \p S_data.
+     */
     void initialize (const T& S_data, const amrex::Real time = 0.0)
     {
         initialize_stages(S_data, time);
     }
 
+    /**
+     * \brief Perform one forward-Euler update.
+     *
+     * Copies \p S_old into \p S_new, evaluates the RHS, and advances by
+     * \p dt. The supplied time is used when evaluating the RHS and post-step hook.
+     *
+     * \param S_old State at the start of the step (unchanged on return).
+     * \param S_new Destination for the updated state.
+     * \param time  Physical time associated with \p S_old.
+     * \param dt    Timestep size.
+     * \return The timestep actually applied (equal to \p dt).
+     */
     amrex::Real advance (T& S_old, T& S_new, amrex::Real time, const amrex::Real dt) override
     {
         // Assume before step() that S_old is valid data at the current time ("time" argument)
@@ -67,6 +104,15 @@ public:
         return dt;
     }
 
+    /**
+     * \brief Integrate from the last initialized time to \p time_out.
+     *
+     * Uses fixed steps of `BaseT::time_step`, trimming the final step so the
+     * output lands exactly on \p time_out.
+     *
+     * \param S_out Buffer receiving the state at \p time_out.
+     * \param time_out Target time to advance to.
+     */
     void evolve (T& S_out, const amrex::Real time_out) override
     {
         amrex::Real dt = BaseT::time_step;
@@ -95,11 +141,19 @@ public:
         }
     }
 
+    /**
+     * \brief Forward Euler does not currently support time interpolation.
+     * \throw aborts unconditionally.
+     */
     virtual void time_interpolate (const T& /* S_new */, const T& /* S_old */, amrex::Real /* timestep_fraction */, T& /* data */) override
     {
         amrex::Error("Time interpolation not yet supported by the forward euler integrator.");
     }
 
+    /**
+     * \brief Apply a functor to every internally stored state/RHS buffer.
+     * \param Map Callable invoked with each buffer so callers can remap data pointers.
+     */
     virtual void map_data (std::function<void(T&)> Map) override
     {
         for (auto& F : F_nodes) {

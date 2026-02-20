@@ -2,6 +2,11 @@
 #define AMREX_ALGORITHM_H_
 #include <AMReX_Config.H>
 
+/**
+ * \file AMReX_Algorithm.H
+ * \brief General-purpose algorithm utilities available on both host and device.
+ */
+
 #include <AMReX_GpuQualifiers.H>
 #include <AMReX_Extension.H>
 #include <AMReX_Dim3.H>
@@ -16,6 +21,7 @@
 
 namespace amrex
 {
+    /// \ingroup amrex_utilities
     //! Return the smaller value. This function was added to AMReX to
     //! support GPU before `std::min` was constexpr in C++14. `std::min` can
     //! now be used directly instead.
@@ -26,6 +32,7 @@ namespace amrex
         return std::min(a,b);
     }
 
+    /// \ingroup amrex_utilities
     //! Return the smallest value. This function was added to AMReX to
     //! support GPU before `std::min` was constexpr in C++14. `std::min` can
     //! now be used directly instead.
@@ -36,6 +43,7 @@ namespace amrex
         return min(min(a,b),c...);
     }
 
+    /// \ingroup amrex_utilities
     //! Return the greater value. This function was added to AMReX to
     //! support GPU before `std::max` was constexpr in C++14. `std::max` can
     //! now be used directly instead.
@@ -46,6 +54,7 @@ namespace amrex
         return std::max(a,b);
     }
 
+    /// \ingroup amrex_utilities
     //! Return the greatest value. This function was added to AMReX to
     //! support GPU before `std::max` was constexpr in C++14. `std::max` can
     //! now be used directly instead.
@@ -56,14 +65,16 @@ namespace amrex
         return max(max(a,b),c...);
     }
 
-    //! Return the element-wise minimum of the given values for types like XDim3.
+    /// \ingroup amrex_utilities
+    //! Return the element-wise minimum of \p a and \p b for types like XDim3.
     template <class T>
     AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE constexpr
     T elemwiseMin (T const& a, T const& b) noexcept {
         return T{amrex::min(a.x,b.x),amrex::min(a.y,b.y),amrex::min(a.z,b.z)};
     }
 
-    //! Return the element-wise minimum of the given values for types like XDim3.
+    /// \ingroup amrex_utilities
+    //! Return the element-wise minimum of \p a, \p b, and the rest of the pack \p c.
     template <class T, class ... Ts>
     AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE constexpr
     T elemwiseMin (const T& a, const T& b, const Ts& ... c) noexcept
@@ -71,14 +82,16 @@ namespace amrex
         return elemwiseMin(elemwiseMin(a,b),c...);
     }
 
-    //! Return the element-wise maximum of the given values for types like XDim3.
+    /// \ingroup amrex_utilities
+    //! Return the element-wise maximum of \p a and \p b for types like XDim3.
     template <class T>
     AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE constexpr
     T elemwiseMax (T const& a, T const& b) noexcept {
         return T{amrex::max(a.x,b.x),amrex::max(a.y,b.y),amrex::max(a.z,b.z)};
     }
 
-    //! Return the element-wise maximum of the given values for types like XDim3.
+    /// \ingroup amrex_utilities
+    //! Return the element-wise maximum of \p a, \p b, and every entry in \p c.
     template <class T, class ... Ts>
     AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE constexpr
     T elemwiseMax (const T& a, const T& b, const Ts& ... c) noexcept
@@ -86,7 +99,8 @@ namespace amrex
         return elemwiseMax(elemwiseMax(a,b),c...);
     }
 
-    //! Swap the given values. `std::swap` can be used directly instead in
+    /// \ingroup amrex_utilities
+    //! Swap the contents of \p t1 and \p t2. `std::swap` can be used directly instead in
     //! GPU codes since C++20.
     template<typename T>
     AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
@@ -97,8 +111,9 @@ namespace amrex
         t2 = std::move(temp);
     }
 
-    //! Return the reference to `lo` if `v < lo`; return the reference to
-    //! `hi` if `hi < v`; otherwise return the reference to `v. This
+    /// \ingroup amrex_utilities
+    //! Return the reference to \p lo if \p v < \p lo; return the reference to
+    //! \p hi if \p hi < \p v; otherwise return the reference to \p v. This
     //! function was added to AMReX before switching to C++17. `std::clamp`
     //! can now be used directly instead.
     template <typename T>
@@ -114,8 +129,9 @@ namespace amrex
         }
     }
 
-    //! Return if the difference between two values are small as measured by
-    //! the given `ulp` (units in the last place).
+    /// \ingroup amrex_utilities
+    //! Return true when the difference between \p x and \p y is small, as measured by
+    //! the given \p ulp (units in the last place).
     template <typename T>
     AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
     std::enable_if_t<std::is_floating_point_v<T>,bool>
@@ -130,6 +146,7 @@ namespace amrex
     }
 
     /**
+     * \ingroup amrex_utilities
      * \brief Find a root of a scalar function on a bracketing interval
      * using bisection.
      *
@@ -184,6 +201,7 @@ namespace amrex
     }
 
     /**
+     * \ingroup amrex_utilities
      * \brief Find the index of the interval containing a value in a sorted
      * array.
      *
@@ -218,6 +236,7 @@ namespace amrex
     }
 
     /**
+     * \ingroup amrex_utilities
      * \brief Return an iterator to the first element greater than a given
      * value.
      *
@@ -257,6 +276,7 @@ namespace amrex
     }
 
     /**
+     * \ingroup amrex_utilities
      * \brief Return an iterator to the first element not less than a given
      * value.
      *
@@ -298,6 +318,7 @@ namespace amrex
     }
 
     /**
+     * \ingroup amrex_utilities
      * \brief Fill a range with linearly spaced values over a closed interval.
      *
      * This function assigns linearly spaced floating-point values to the
@@ -333,6 +354,7 @@ namespace amrex
     }
 
     /**
+     * \ingroup amrex_utilities
      * \brief Fill a range with logarithmically spaced values over a closed interval.
      *
      * This function assigns logarithmically spaced floating-point values to
@@ -404,7 +426,8 @@ int builtin_clz_wrapper (clzll_tag, T x) noexcept
 }
 /// \endcond
 
-//! Return the number of leading zeros of the given integer.
+/// \ingroup amrex_utilities
+//! Return the number of leading zeros present in the unsigned integer \p x.
 template <class T, std::enable_if_t<std::is_same_v<std::decay_t<T>,std::uint8_t>  ||
                                     std::is_same_v<std::decay_t<T>,std::uint16_t> ||
                                     std::is_same_v<std::decay_t<T>,std::uint32_t> ||

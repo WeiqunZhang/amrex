@@ -2,6 +2,11 @@
 #define AMREX_TINY_PROFILER_H_
 #include <AMReX_Config.H>
 
+/**
+ * \file AMReX_TinyProfiler.H
+ * \brief Lightweight RAII profiler that records inclusive and exclusive timing.
+ */
+
 #include <AMReX_INT.H>
 #include <AMReX_REAL.H>
 
@@ -17,6 +22,11 @@
 
 namespace amrex {
 
+/**
+ * \struct amrex::MemStat
+ * \ingroup amrex_utilities
+ * \brief Per-region memory accounting counters updated by TinyProfiler.
+ */
 struct MemStat
 {
     Long nalloc = 0;        //!< number of allocations
@@ -26,13 +36,25 @@ struct MemStat
     Long maxmem = 0;        //!< running maximum of currentmem
 };
 
-//! A simple profiler that returns basic performance information (e.g. min, max, and average running time)
+/**
+ * \class amrex::TinyProfiler
+ * \ingroup amrex_utilities
+ * \brief Lightweight RAII profiler that records per-function timing statistics.
+ *
+ * Construct a TinyProfiler at the entry of a region to be timed;
+ * it automatically starts the timer and stops it when destroyed.
+ * Timing is accumulated across calls and reported at finalization.
+ */
 class TinyProfiler
 {
 public:
+    //! Construct and immediately start timing the region named \p funcname.
     explicit TinyProfiler (std::string funcname) noexcept;
+    //! Construct; start timing if \p start_ is \c true.
     TinyProfiler (std::string funcname, bool start_) noexcept;
+    //! Construct and immediately start timing the region named \p funcname.
     explicit TinyProfiler (const char* funcname) noexcept;
+    //! Construct; start timing if \p start_ is \c true.
     TinyProfiler (const char* funcname, bool start_) noexcept;
     ~TinyProfiler ();
 
@@ -41,31 +63,51 @@ public:
     TinyProfiler& operator= (TinyProfiler const&) = delete;
     TinyProfiler& operator= (TinyProfiler &&) = delete;
 
+    //! Start (or resume) the timer for this region.
     void start () noexcept;
+    //! Stop (or pause) the timer for this region.
     void stop () noexcept;
 
+    //! Record a memory-tracking start event for this region.
     void memory_start () const noexcept;
+    //! Record a memory-tracking stop event for this region.
     void memory_stop () const noexcept;
 
+    //! Record an allocation of \p nbytes to the named memory-stat entry; returns the stat pointer.
     static MemStat* memory_alloc (std::size_t nbytes,
                                   std::map<std::string, MemStat>& memstats) noexcept;
+    //! Record a deallocation of \p nbytes from the stat entry \p stat.
     static void memory_free (std::size_t nbytes, MemStat* stat) noexcept;
 
+    //! Initialize the TinyProfiler subsystem.
     static void Initialize ();
+    //! Finalize the TinyProfiler subsystem and print a timing report (set \p bFlushing when aborting early).
     static void Finalize (bool bFlushing = false) noexcept;
 
+    //! Initialize memory-tracking subsystem.
     static void MemoryInitialize ();
+    //! Finalize memory-tracking subsystem and print a memory report (set \p bFlushing when aborting early).
     static void MemoryFinalize (bool bFlushing = false) noexcept;
 
+    /**
+     * \brief Register an arena's memory-stat map so TinyProfiler can report it.
+     * \param memory_name Label shown in the report.
+     * \param memstats    Map tracking allocation statistics for the arena.
+     */
     static bool RegisterArena (const std::string& memory_name,
                                std::map<std::string, MemStat>& memstats) noexcept;
 
+    //! Deregister the arena identified by \p memstats (undoes RegisterArena).
     static void DeregisterArena (std::map<std::string, MemStat>& memstats) noexcept;
 
+    //! Open a named timing region \p regname.
     static void StartRegion (std::string regname) noexcept;
+    //! Close the named timing region \p regname.
     static void StopRegion (const std::string& regname) noexcept;
 
+    //! Print the current call stack to \p os.
     static void PrintCallStack (std::ostream& os);
+    //! Print memory usage statistics to \p os.
     static void PrintMemoryUsage (std::ostream* os, bool only_local) noexcept;
 
 private:
@@ -154,15 +196,26 @@ private:
                                double t_final, std::ostream* os, bool only_local);
 };
 
+/**
+ * \class amrex::TinyProfileRegion
+ * \brief RAII helper that brackets a named profiling region via TinyProfiler.
+ *
+ * Constructing the object calls TinyProfiler::StartRegion and destruction
+ * automatically stops the region, ensuring balanced calls even when exceptions
+ * occur.
+ */
 class TinyProfileRegion
 {
 public:
+    //! Start a profiling region named \p a_regname.
     explicit TinyProfileRegion (std::string a_regname) noexcept;
+    //! Start a profiling region named \p a_regname.
     explicit TinyProfileRegion (const char* a_regname) noexcept;
     TinyProfileRegion (TinyProfileRegion const&) = delete;
     TinyProfileRegion (TinyProfileRegion &&) = delete;
     TinyProfileRegion& operator= (TinyProfileRegion const&) = delete;
     TinyProfileRegion& operator= (TinyProfileRegion &&) = delete;
+    //! Stop the profiling region on destruction.
     ~TinyProfileRegion ();
 private:
     std::string regname;

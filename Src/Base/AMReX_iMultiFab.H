@@ -10,6 +10,11 @@
 #include <AMReX_Geometry.H>
 #include <memory>
 
+/**
+ * \file AMReX_iMultiFab.H
+ * \brief Integer-valued MultiFab container and helpers.
+ */
+
 namespace amrex {
 
 /**
@@ -167,7 +172,11 @@ public:
     [[nodiscard]] Long sum (int comp, int nghost = 0, bool local = false) const;
 
     /**
-    * \brief Returns the sum of component "comp" in the given "region". -- no ghost cells are included.
+    * \brief Sum component \p comp over \p region (no ghost cells are included).
+    *
+    * \param region Box defining the region of interest (intersected with the valid domain).
+    * \param comp   Component index to accumulate.
+    * \param local  When true, skip the parallel reduction and return the local rank sum only.
     */
     [[nodiscard]] Long sum (Box const& region, int comp = 0, bool local = false) const;
 
@@ -413,15 +422,18 @@ public:
                  int             nghost);
 
     /**
-    * \brief Add src to dst including nghost ghost cells.
-    * The two iMultiFabs MUST have the same underlying BoxArray.
+    * \brief Add \p src into \p dst over the specified component range.
     *
-    * \param dst
-    * \param src
-    * \param srccomp
-    * \param dstcomp
-    * \param numcomp
-    * \param nghost
+    * Both iMultiFabs must share the same BoxArray. Components
+    * `srccomp..srccomp+numcomp-1` are added into the corresponding destination
+    * components `dstcomp..dstcomp+numcomp-1`, including \p nghost ghost cells.
+    *
+    * \param dst     Destination MultiFab updated in place.
+    * \param src     Source MultiFab providing the values to add.
+    * \param srccomp First component in \p src to read.
+    * \param dstcomp First component in \p dst to update.
+    * \param numcomp Number of components to process.
+    * \param nghost  Number of ghost cells to include.
     */
     static void Add (iMultiFab&       dst,
                      const iMultiFab& src,
@@ -438,15 +450,16 @@ public:
                      const IntVect&   nghost);
 
     /**
-    * \brief Copy from src to dst including nghost ghost cells.
-    * The two iMultiFabs MUST have the same underlying BoxArray.
+    * \brief Copy components from \p src to \p dst, including \p nghost ghost cells.
     *
-    * \param dst
-    * \param src
-    * \param srccomp
-    * \param dstcomp
-    * \param numcomp
-    * \param nghost
+    * Both iMultiFabs must share the same BoxArray so their valid regions align.
+    *
+    * \param dst     Destination MultiFab updated in place.
+    * \param src     Source MultiFab providing the values to copy.
+    * \param srccomp First component in \p src to read.
+    * \param dstcomp First component in \p dst to update.
+    * \param numcomp Number of components to process.
+    * \param nghost  Number of ghost cells to include.
     */
     static void Copy (iMultiFab&       dst,
                       const iMultiFab& src,
@@ -463,9 +476,10 @@ public:
                       const IntVect&  nghost);
 
     /**
-    * \brief Swap from src to dst including nghost ghost cells.
-    * The two iMultiFabs MUST have the same underlying BoxArray.
-    * The swap is local.
+    * \brief Swap component ranges between two iMultiFabs, including \p nghost ghost cells.
+    *
+    * Both arrays must share the same BoxArray, and the swap is purely local
+    * (no MPI communication).
     */
     static void Swap (iMultiFab&      dst,
                       iMultiFab&      src,
@@ -482,15 +496,9 @@ public:
                       const IntVect&  nghost);
 
     /**
-    * \brief Subtract src from dst including nghost ghost cells.
-    * The two iMultiFabs MUST have the same underlying BoxArray.
+    * \brief Subtract \p src from \p dst across \p numcomp components and \p nghost ghosts.
     *
-    * \param dst
-    * \param src
-    * \param srccomp
-    * \param dstcomp
-    * \param numcomp
-    * \param nghost
+    * The operands must have identical BoxArrays.
     */
     static void Subtract (iMultiFab&       dst,
                           const iMultiFab& src,
@@ -507,15 +515,9 @@ public:
                           const IntVect&   nghost);
 
     /**
-    * \brief Multiply dst by src including nghost ghost cells.
-    * The two iMultiFabs MUST have the same underlying BoxArray.
+    * \brief Multiply \p dst by \p src component-wise, including \p nghost ghosts.
     *
-    * \param dst
-    * \param src
-    * \param srccomp
-    * \param dstcomp
-    * \param numcomp
-    * \param nghost
+    * The operands must have identical BoxArrays.
     */
     static void Multiply (iMultiFab&       dst,
                           const iMultiFab& src,
@@ -532,15 +534,9 @@ public:
                           const IntVect&   nghost);
 
     /**
-    * \brief Divide dst by src including nghost ghost cells.
-    * The two iMultiFabs MUST have the same underlying BoxArray.
+    * \brief Divide \p dst by \p src component-wise, including \p nghost ghosts.
     *
-    * \param dst
-    * \param src
-    * \param srccomp
-    * \param dstcomp
-    * \param numcomp
-    * \param nghost
+    * The operands must have identical BoxArrays. No protection against divide-by-zero is provided.
     */
     static void Divide (iMultiFab&       dst,
                         const iMultiFab& src,
@@ -556,6 +552,16 @@ public:
                         int              numcomp,
                         const IntVect&   nghost);
 
+    /**
+    * \brief Define/resize the iMultiFab with explicit grow vector.
+    *
+    * \param bxs    BoxArray describing the valid region.
+    * \param dm     Distribution mapping assigning boxes to ranks.
+    * \param nvar   Number of components.
+    * \param ngrow  Grow vector (per-direction ghost cells).
+    * \param info   Optional MFInfo controlling allocation options.
+    * \param factory Fab factory used to instantiate IArrayBoxes.
+    */
     void define (const BoxArray&            bxs,
                  const DistributionMapping& dm,
                  int                        nvar,
@@ -568,6 +574,16 @@ public:
                  const FabFactory<IArrayBox>& factory = DefaultFabFactory<IArrayBox>());
 #endif
 
+    /**
+    * \brief Define/resize the iMultiFab with an isotropic grow value.
+    *
+    * \param bxs    BoxArray describing the valid region.
+    * \param dm     Distribution mapping assigning boxes to ranks.
+    * \param nvar   Number of components.
+    * \param ngrow  Number of ghost cells in every direction.
+    * \param info   Optional MFInfo controlling allocation options.
+    * \param factory Fab factory used to instantiate IArrayBoxes.
+    */
     void define (const BoxArray&            bxs,
                  const DistributionMapping& dm,
                  int                        nvar,
@@ -580,12 +596,25 @@ public:
                  const FabFactory<IArrayBox>& factory = DefaultFabFactory<IArrayBox>());
 #endif
 
+    //! Initialize iMultiFab static state (allocator tracking).
     static void Initialize ();
+    //! Tear down any static state created by Initialize().
     static void Finalize ();
 };
 
 // ngrow != IntVect{0} is a special case that should not be used in normal cases,
 // because it may mark valid cells as non-owner and ghost cells as owners.
+/**
+ * \brief Build a mask identifying the owner of each cell across overlapping boxes.
+ *
+ * Cells marked 1 belong to the canonical owner, whereas 0 marks non-owners.
+ * Ghost-cell grow vectors other than zero are discouraged because they can flip
+ * ownership.
+ *
+ * \param mf     MultiFab-like object whose ownership is being queried.
+ * \param period Domain periodicity used for ghost resolution.
+ * \param ngrow  Optional extra grow cells for the mask (default zero).
+ */
 std::unique_ptr<iMultiFab>
 OwnerMask (FabArrayBase const& mf, const Periodicity& period, const IntVect& ngrow=IntVect{0});
 

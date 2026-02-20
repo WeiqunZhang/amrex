@@ -13,6 +13,11 @@
 #include <functional>
 #include <type_traits>
 
+/**
+ * \file AMReX_IntegratorBase.H
+ * \brief Abstract interface plus helper traits for time integrators.
+ */
+
 namespace amrex {
 
 template<class T, typename Tv = void> struct IntegratorOps;
@@ -98,6 +103,15 @@ struct IntegratorOps<T, std::enable_if_t<std::is_same_v<amrex::Vector<amrex::Mul
         }
     }
 
+    /**
+     * \brief Copy each MultiFab in \p Other into the corresponding MultiFab in \p Y.
+     *
+     * \param Y       Destination vector resized to match \p Other beforehand.
+     * \param Other   Source vector to copy.
+     * \param scomp   Optional per-level source component offsets.
+     * \param ncomp   Optional per-level component counts (defaults to all components).
+     * \param Grow    If true, includes the grow region when copying.
+     */
     static void Copy (T& Y, const T& Other, const Vector<int>& scomp={}, const Vector<int>& ncomp={}, bool Grow = true)
     {
         // Copy the contents of Other into Y
@@ -113,6 +127,16 @@ struct IntegratorOps<T, std::enable_if_t<std::is_same_v<amrex::Vector<amrex::Mul
         }
     }
 
+    /**
+     * \brief Perform `Y[i] += a * X[i]` for each MultiFab in \p Y and \p X.
+     *
+     * \param Y       Destination vector mutated in place.
+     * \param a       Scalar weight applied to \p X.
+     * \param X       Source vector.
+     * \param scomp   Optional per-level component offsets.
+     * \param ncomp   Optional per-level component counts (defaults to all components).
+     * \param Grow    If true, includes the grow region when updating.
+     */
     static void Saxpy (T& Y, const amrex::Real a, const T& X, const Vector<int>& scomp={}, const Vector<int>& ncomp={}, bool Grow = false)
     {
         // Calculate Y += a * X
@@ -141,6 +165,7 @@ struct IntegratorOps<T, std::enable_if_t<std::is_same_v<amrex::MultiFab, T> > >
         V.emplace_back(std::make_unique<T>(Other.boxArray(), Other.DistributionMap(), Other.nComp(), nGrow));
     }
 
+    //! Copy components `[scomp, scomp+ncomp)` from \p Other into \p Y (optionally including grow cells when \p Grow is true).
     static void Copy (T& Y, const T& Other, const int scomp=0, const int ncomp=-1, bool Grow = true)
     {
         // Copy the contents of Other into Y
@@ -149,6 +174,7 @@ struct IntegratorOps<T, std::enable_if_t<std::is_same_v<amrex::MultiFab, T> > >
         amrex::MultiFab::Copy(Y, Other, scomp, scomp, mf_ncomp, nGrow);
     }
 
+    //! Perform `Y += a * X` on the specified component range (optionally including grow cells when \p Grow is true).
     static void Saxpy (T& Y, const amrex::Real a, const T& X, const int scomp=0, const int ncomp=-1, bool Grow = false)
     {
         // Calculate Y += a * X

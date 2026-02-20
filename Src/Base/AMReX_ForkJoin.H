@@ -6,8 +6,20 @@
 #include <AMReX_MultiFab.H>
 #include <utility>
 
+/**
+ * \file AMReX_ForkJoin.H
+ * \brief Cooperative-scheduling helper that splits ranks into tasks.
+ */
+
 namespace amrex {
 
+/**
+ * \class amrex::ForkJoin
+ * \brief Splits an MPI job into multiple "tasks" that operate on duplicated/split data.
+ *
+ * Register MultiFabs with intents/strategies, then iterate tasks with Fork()/Join()
+ * (see implementation) to run different code paths per task.
+ */
 class ForkJoin
 {
   public:
@@ -30,50 +42,91 @@ class ForkJoin
         int hi; //!< exclusive bound
     };
 
+    /**
+     * \brief Partition the MPI ranks into tasks according to \p task_rank_n.
+     *
+     * \param task_rank_n Number of ranks assigned to each task (must sum to ParallelDescriptor::NProcs()).
+     */
     ForkJoin (const Vector<int> &task_rank_n);
 
+    /**
+     * \brief Partition the MPI ranks into tasks according to fractional weights.
+     *
+     * \param task_rank_pct Fraction of the total ranks assigned to each task (renormalized internally).
+     */
     ForkJoin (const Vector<double> &task_rank_pct);
 
+    /**
+     * \brief Create \p ntasks equally sized task groups.
+     *
+     * \param ntasks Number of tasks that will be created (ranks are split evenly).
+     */
     ForkJoin (int ntasks)
         : ForkJoin( Vector<double>(ntasks, 1.0 / ntasks) ) { }
 
+    //! \return Total number of tasks created by this ForkJoin instance.
     int NTasks () const { return static_cast<int>(split_bounds.size() - 1); }
 
+    //! \return The task id that owns the caller.
     int MyTask () const { return task_me; }
 
+    //! \return True if verbose logging is enabled.
     bool Verbose () const { return flag_verbose; }
 
+    //! Enable (\p true) or disable (\p false) verbose logging.
     void SetVerbose (bool verbose_in) { flag_verbose = verbose_in; }
 
+    /**
+     * \brief Return the component range assigned to task-local MultiFabs.
+     *
+     * \param name Registered MultiFab set name.
+     * \param idx  MultiFab index inside the registered vector (defaults to zero).
+     */
     ComponentSet ComponentBounds(const std::string& name, int idx=0) const;
 
+    /**
+     * \brief Return the number of ranks assigned to task \p task.
+     *
+     * \param task Task index in [0,NTasks()).
+     */
     int NProcsTask (int task) const {
         AMREX_ASSERT(task + 1 < split_bounds.size());
         return split_bounds[task + 1] - split_bounds[task];
     }
 
+    /**
+     * \brief Register MultiFab \p mf under logical dataset \p name.
+     *
+     * Slot \p idx selects which entry within the dataset is being registered.
+     * Components are distributed according to \p strategy and exposed with
+     * access intent \p intent.  Use \p owner to override which rank supplies
+     * the original data (defaults to IOProc when -1).
+     */
     void reg_mf (MultiFab &mf, const std::string &name, int idx,
                  Strategy strategy, Intent intent, int owner = -1);
 
+    /// \overload
     void reg_mf (MultiFab &mf, const std::string &name,
                  Strategy strategy, Intent intent, int owner = -1) {
         reg_mf(mf, name, 0, strategy, intent, owner);
     }
 
-    //! these overloads are for in case the MultiFab argument is const
-    //! intent must be in
-    //!
+    //! const-qualified overloads must be registered with Intent::in.
     void reg_mf (const MultiFab &mf, const std::string &name, int idx,
                  Strategy strategy, Intent intent, int owner = -1) {
         AMREX_ASSERT_WITH_MESSAGE(intent == Intent::in,
                                   "const MultiFab must be registered read-only");
         reg_mf(const_cast<MultiFab&>(mf), name, idx, strategy, intent, owner);
     }
+    /// \overload
     void reg_mf (const MultiFab &mf, const std::string &name,
                  Strategy strategy, Intent intent, int owner = -1) {
         reg_mf(mf, name, 0, strategy, intent, owner);
     }
 
+    /**
+     * \brief Register a vector of MultiFabs under the same logical name.
+     */
     void reg_mf_vec (const Vector<MultiFab *> &mfs, const std::string &name,
                      Strategy strategy, Intent intent, int owner = -1) {
         data[name].reserve(mfs.size());
@@ -82,7 +135,7 @@ class ForkJoin
         }
     }
 
-    //! overload in case of vector of pointer to const MultiFab
+    //! Const-pointer overload; MultiFabs must be Intent::in.
     void reg_mf_vec (const Vector<MultiFab const *> &mfs, const std::string &name,
                      Strategy strategy, Intent intent, int owner = -1) {
         data[name].reserve(mfs.size());
@@ -92,12 +145,18 @@ class ForkJoin
     }
 
     //! modify the number of grow cells associated with the multifab
+    /**
+     * \brief Override the grow vector used when copying \p name[:idx] into tasks.
+     */
     void modify_ngrow (const std::string &name, int idx, IntVect ngrow);
     void modify_ngrow (const std::string &name, IntVect ngrow) {
         modify_ngrow(name, 0, ngrow);
     }
 
     //! modify how the multifab is split along components across the tasks
+    /**
+     * \brief Override the component partition for \p name[:idx] when strategy == split.
+     */
     void modify_split (const std::string &name, int idx, Vector<ComponentSet> comp_split);
     void modify_split (const std::string &name, Vector<ComponentSet> comp_split) {
         modify_split(name, 0, std::move(comp_split));
@@ -105,13 +164,19 @@ class ForkJoin
 
     // TODO: may want to de-register MFs if they change across invocations
 
+    /**
+     * \brief Access the task-local MultiFab for \p name[:idx].
+     *
+     * \param name Registered dataset name.
+     * \param idx  Slot index (defaults to zero).
+     */
     MultiFab &get_mf (const std::string &name, int idx = 0) {
         AMREX_ASSERT_WITH_MESSAGE(data.count(name) > 0 && idx < data[name].size(), "get_mf(): name or index not found");
         AMREX_ASSERT(task_me >= 0 && task_me < data[name][idx].forked.size());
         return data[name][idx].forked[task_me];
     }
 
-    //! vector of pointers to all MFs under a name
+    //! Return pointers to every task-local MultiFab registered under \p name.
     Vector<MultiFab *> get_mf_vec (const std::string &name) {
         int dim = static_cast<int>(data.at(name).size());
         Vector<MultiFab *> result(dim);
@@ -121,16 +186,24 @@ class ForkJoin
         return result;
     }
 
+    //! Set the directory used when storing per-task diagnostics/checkpoints.
     void set_task_output_dir (const std::string & dir)
     {
         task_output_dir = dir;
     }
 
+    //! Set the basename used when writing task output logs.
     static void set_task_output_file (const std::string & filename)
     {
         ParallelContext::set_last_frame_ofs(filename);
     }
 
+    /**
+     * \brief Execute \p fn(*this) once per task on its private communicator.
+     *
+     * \tparam F Callable type invocable as `fn(ForkJoin&)`.
+     * \param fn Functor that performs task-local work with access to task-local MultiFabs.
+     */
     template <class F>
     void fork_join (const F &fn)
     {

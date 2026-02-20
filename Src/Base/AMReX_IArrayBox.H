@@ -3,6 +3,11 @@
 #define BL_IFARRAYBOX_H
 #include <AMReX_Config.H>
 
+/**
+ * \file AMReX_IArrayBox.H
+ * \brief Integer-valued FAB (Field Array Box) type.
+ */
+
 #include <AMReX_Box.H>
 #include <AMReX_BaseFab.H>
 #include <AMReX_SPACE.H>
@@ -14,10 +19,17 @@ namespace amrex {
 class IArrayBox;
 class IntDescriptor;
 
+/**
+ * \class amrex::IFABio
+ * \ingroup amrex_fab_containers
+ * \brief Low-level I/O helper for IArrayBox; handles header writing and binary reading.
+ */
 class IFABio
 {
 public:
+    //! Write the IArrayBox header for \p nvar components to \p os.
     static void write_header (std::ostream& os, const IArrayBox& fab, int nvar) ;
+    //! Read IArrayBox data from \p is using the given \p data_descriptor.
     static void read (std::istream& is, IArrayBox& fab, IntDescriptor const& data_descriptor) ;
 };
 
@@ -53,8 +65,10 @@ public:
     //! Construct an invalid FAB with no memory.
     IArrayBox () noexcept = default;
 
+    //! Construct an empty FAB that allocates from arena \p ar.
     explicit IArrayBox (Arena* ar) noexcept;
 
+    //! Construct a FAB over \p b with \p ncomp components, allocated from \p ar.
     IArrayBox (const Box& b, int ncomp, Arena* ar);
 
     /**
@@ -68,14 +82,42 @@ public:
                         bool       shared=false,
                         Arena*     ar = nullptr);
 
+    //! Construct an alias FAB viewing components [\p scomp, \p scomp+\p ncomp) of \p rhs.
+    /**
+     * \brief Create an alias that views components [\p scomp, \p scomp+\p ncomp) of \p rhs.
+     *
+     * No storage is allocated; the new IArrayBox references the existing data.
+     */
     IArrayBox (const IArrayBox& rhs, MakeType make_type, int scomp, int ncomp);
 
+    /**
+     * \brief Wrap an existing Array4 buffer without allocating new storage.
+     *
+     * \param a Array4 providing the integer data.
+     */
     explicit IArrayBox (Array4<int> const& a) noexcept : BaseFab<int>(a) {}
 
+    /**
+     * \brief Wrap an existing Array4 buffer with an explicit IndexType \p t.
+     *
+     * \param a Array4 providing the integer data.
+     * \param t IndexType describing cell/node centering.
+     */
     explicit IArrayBox (Array4<int> const& a, IndexType t) noexcept : BaseFab<int>(a,t) {}
 
+    /**
+     * \brief Wrap a const Array4 buffer; no allocations are performed.
+     *
+     * \param a Const Array4 to view.
+     */
     explicit IArrayBox (Array4<int const> const& a) noexcept : BaseFab<int>(a) {}
 
+    /**
+     * \brief Wrap a const Array4 buffer with IndexType \p t.
+     *
+     * \param a Const Array4 to view.
+     * \param t IndexType describing cell/node centering.
+     */
     explicit IArrayBox (Array4<int const> const& a, IndexType t) noexcept : BaseFab<int>(a,t) {}
 
     //!  The destructor.
@@ -87,22 +129,41 @@ public:
     IArrayBox (const IArrayBox&) = delete;
     IArrayBox& operator= (const IArrayBox&) = delete;
 
-    //! Set the fab to the value r.
+    /**
+     * \brief Set every component of the FAB to the scalar value \p v.
+     *
+     * \tparam run_on Execution context tag indicating host or device execution.
+     * \param v       Integer written into every cell/component.
+     */
     template <RunOn run_on>
     IArrayBox& operator= (int v) noexcept;
 
-    //! For debugging purposes we hide BaseFab version and do some extra work.
+    /**
+     * \brief Resize the FAB to cover Box \p b with \p N components, allocating from \p ar.
+     *
+     * Retains existing data where possible; primarily used when debugging to track allocations.
+     *
+     * \param b  New index-space region.
+     * \param N  Number of components per cell (defaults to 1).
+     * \param ar Arena used for allocations (defaults to the FAB's current arena).
+     */
     void resize (const Box& b, int N = 1, Arena* ar = nullptr);
 
+    //! Read FAB data from binary stream \p is using the native IntDescriptor.
     void readFrom (std::istream& is);
 
+    //! Initialize the IArrayBox subsystem.
     static void Initialize ();
+    //! Finalize the IArrayBox subsystem.
     static void Finalize ();
 
+    //! Return the IntDescriptor describing the native integer format.
     static std::unique_ptr<IntDescriptor> getDataDescriptor ();
 
+    //! Return the I/O helper object.
     static IFABio const& getFABio ();
 
+    //! Return the class name string used for I/O.
     static std::string getClassName ();
 
 private:

@@ -2,6 +2,11 @@
 #define AMREX_RAND_H
 #include <AMReX_Config.H>
 
+/**
+ * \file AMReX_Random.H
+ * \brief Pseudo-random number generation utilities.
+ */
+
 #include <AMReX.H>
 #include <AMReX_GpuQualifiers.H>
 #include <AMReX_ParallelDescriptor.H>
@@ -14,7 +19,7 @@ namespace amrex
 {
     /**
     * \ingroup amrex_utilities
-    * \brief Generate a psuedo-random real from uniform distribution
+    * \brief Generate a pseudo-random real from uniform distribution
     *
     *  Generates one pseudorandom real number from a uniform
     *  distribution between 0.0 and 1.0 (0.0 included, 1.0 excluded)
@@ -54,10 +59,12 @@ namespace amrex
 
     /**
     * \ingroup amrex_utilities
-    * \brief Generate a psuedo-random real from a normal distribution
+    * \brief Generate a pseudo-random real from a normal distribution
     *
     *  Generates one pseudorandom real number from a normal
-    *  distribution with mean 'mean' and standard deviation 'stddev'.
+    *  distribution with mean \p mean and standard deviation \p stddev.
+    *  \param mean Location parameter of the Gaussian.
+    *  \param stddev Standard deviation of the Gaussian.
     *
     */
     Real RandomNormal (Real mean, Real stddev);
@@ -94,13 +101,13 @@ namespace amrex
 
     /**
     * \ingroup amrex_utilities
-    * \brief Generate a psuedo-random integer from a Poisson distribution
+    * \brief Generate a pseudo-random integer from a Poisson distribution.
     *
-    *  Generates one pseudorandom positive integer number
-    *  extracted from a Poisson distribution, given the Real parameter lambda.
-    *  The CPU version of this function relies on the standard Template Library
-    *  The GPU version of this function relies on the cuRAND library
+    * Draws one non-negative integer whose mean is \p lambda.  The CPU
+    * implementation uses C++ standard-library facilities, while the GPU
+    * path relies on cuRAND/hipRAND primitives.
     *
+    * \param lambda Mean of the Poisson distribution (must be > 0).
     */
     unsigned int RandomPoisson (Real lambda);
 
@@ -162,15 +169,14 @@ namespace amrex
 
     /**
     * \ingroup amrex_utilities
-    * \brief Generate a psuedo-random floating point number from the Gamma distribution
+    * \brief Generate a pseudo-random floating point number from the Gamma distribution.
     *
-    *  Generates one real number (single or double)
-    *  extracted from a Gamma distribution, given the Real parameters alpha and beta.
-    *  alpha and beta must both be > 0.
-    *  The CPU version of this function relies on the Standard Template Library
-    *  The GPU version of this function relies is implemented in terms of Random
-    *  and RandomNormal.
+    * Produces a variate with shape \p alpha and scale \p beta.  Both parameters
+    * must be positive.  On CPUs the implementation uses standard-library helpers;
+    * on GPUs it is implemented in terms of Random() and RandomNormal().
     *
+    * \param alpha Shape parameter (> 0).
+    * \param beta  Scale parameter (> 0).
     */
     Real RandomGamma (Real alpha, Real beta);
 
@@ -235,22 +241,37 @@ namespace amrex
 
     /**
     * \ingroup amrex_utilities
-    * \brief Generates one pseudorandom unsigned long which is
-    *  uniformly distributed on [0,n-1]-interval for each call. For
-    *  the special case of n = 0, it returns 0.
+    * \brief Generate a pseudo-random unsigned long in [0,n-1].
     *
-    * The CPU version of this function uses C++11's mt19937.
-    * There is no GPU version.
+    * The host implementation uses C++11's mt19937 engine; there is no GPU
+    * overload because CUDA/HIP do not provide 64-bit uniform integers. For
+    * the special case of n = 0, it returns 0.
+    *
+    * \param n Upper bound (exclusive) of the interval.
     */
     ULong Random_long (ULong n); // [0,n-1]
 
-    //! \ingroup amrex_utilities
-    //! Fill random numbers from uniform distribution.  The range is [0,1)
-    //! for CPU and SYCl, and (0,1] for CUADA and HIP.
+    /**
+     * \ingroup amrex_utilities
+     * \brief Fill \p N entries of array \p p with uniform random numbers.
+     *
+     * The CPU and SYCL implementations generate values in [0,1), while
+     * CUDA/HIP return results in (0,1].
+     *
+     * \param p Pointer to the destination array.
+     * \param N Number of entries to populate.
+     */
     void FillRandom (Real* p, Long N);
 
-    //! \ingroup amrex_utilities
-    //! Fill random numbers from normal distribution
+    /**
+     * \ingroup amrex_utilities
+     * \brief Fill \p N entries of array \p p with normal random numbers.
+     *
+     * \param p     Pointer to the destination array.
+     * \param N     Number of entries to populate.
+     * \param mean  Mean of the Gaussian distribution.
+     * \param stddev Standard deviation of the Gaussian distribution.
+     */
     void FillRandomNormal (Real* p, Long N, Real mean, Real stddev);
 
     /// \cond DOXYGEN_IGNORE
@@ -261,48 +282,55 @@ namespace amrex
     }
     /// \endcond
 
-    /** \brief Set the seed of the random number generator.
-    * \ingroup amrex_utilities
-    *
-    *  There is also an entry point for Fortran callable as:
-    *
-    *  INTEGER seed
-    *  call blutilinitrand(seed)
-    *
-    *  or
-    *
-    *  INTEGER seed
-    *  call blinitrand(seed)
-    */
+    /**
+     * \ingroup amrex_utilities
+     * \brief Set the seed of the random number generator.
+     * \param cpu_seed  Seed for the CPU random number generator.
+     * \param nprocs    Number of MPI processes (used to derive per-rank seeds).
+     * \param gpu_seed  Seed for the GPU random number generator.
+     */
     void InitRandom (ULong cpu_seed, int nprocs=ParallelDescriptor::NProcs(),
                      ULong gpu_seed = detail::DefaultGpuSeed());
 
     /// \ingroup amrex_utilities
+    /**
+     * \ingroup amrex_utilities
+     * \brief Reset both CPU and GPU seeds and reinitialize RNG state.
+     *
+     * Convenience wrapper that simply calls InitRandom() with the provided
+     * seeds and the current MPI size.
+     *
+     * \param cpu_seed Seed used for CPU RNG streams.
+     * \param gpu_seed Seed used for GPU RNG streams.
+     */
     void ResetRandomSeed (ULong cpu_seed, ULong gpu_seed = detail::DefaultGpuSeed());
 
-    /**
-    * \ingroup amrex_utilities
-    * \brief Save and restore random state.
-    *
-    */
+    /// \ingroup amrex_utilities
+    //! Save the current random number generator state to an output stream.
     void SaveRandomState (std::ostream& os);
 
     /// \ingroup amrex_utilities
+    //! Restore a previously saved random number generator state from an input stream.
     void RestoreRandomState (std::istream& is, int nthreads_old, int nstep_old);
 
     /**
     * \ingroup amrex_utilities
-    * \brief Create a unique subset of random numbers from a pool
-    *   of integers in the range [0, poolSize - 1]
-    *   the set will be in the order they are found
-    *   setSize must be <= poolSize
-    *   uSet will be resized to setSize
-    *   if you want all processors to have the same set,
-    *   call this on one processor and broadcast the array
+    * \brief Create a subset of unique random integers in [0, poolSize-1].
+    *
+    * The subset is resized to \p setSize, preserving the discovery order.
+    * When \p printSet is true, the chosen indices are printed via amrex::Print.
+    * If all ranks need the same subset, call this on one rank and broadcast.
+    *
+    * \param uSet      Output vector resized to \p setSize.
+    * \param setSize   Number of unique entries requested (must be <= \p poolSize).
+    * \param poolSize  Size of the integer pool to sample from.
+    * \param printSet  Whether to print the resulting subset for debugging.
     */
     void UniqueRandomSubset (Vector<int> &uSet, int setSize, int poolSize,
                              bool printSet = false);
 
+    /// \ingroup amrex_utilities
+    //! Deallocate the device array holding per-thread GPU random number generator states.
     void DeallocateRandomSeedDevArray ();
 }
 
