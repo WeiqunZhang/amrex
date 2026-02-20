@@ -380,6 +380,15 @@ MLEBNodeFDLaplacian::Fapply (int amrlev, int mglev, MultiFab& out, const MultiFa
 
     auto const& dmask = *m_dirichlet_mask[amrlev][mglev];
 
+    int n_cell, n_cell_pml;
+    bool nodal_pml_sigma = false;
+    {
+        ParmParse pp;
+        pp.get("n_cell", n_cell);
+        pp.get("n_cell_pml", n_cell_pml);
+        pp.query("nodal_pml_sigma", nodal_pml_sigma);
+    }
+
 #ifdef AMREX_USE_EB
     const auto phieb = (m_in_solution_mode && !this->m_precond_mode) ? m_s_phi_eb : Real(0.0);
     const auto *factory = dynamic_cast<EBFArrayBoxFactory const*>(m_factory[amrlev][mglev].get());
@@ -431,7 +440,7 @@ MLEBNodeFDLaplacian::Fapply (int amrlev, int mglev, MultiFab& out, const MultiFa
                     auto const& vfrc = factory->getVolFrac().const_array(mfi);
                     AMREX_HOST_DEVICE_FOR_3D(box, i, j, k,
                     {
-                        mlebndfdlap_sig_adotx_eb(i,j,k,yarr,xarr,levset,dmarr,AMREX_D_DECL(ecx,ecy,ecz),
+                        mlebndfdlap_sig_adotx_eb(nodal_pml_sigma,n_cell,n_cell_pml,i,j,k,yarr,xarr,levset,dmarr,AMREX_D_DECL(ecx,ecy,ecz),
                                                  sigarr, vfrc, phiebarr, AMREX_D_DECL(bx,by,bz));
                     });
                 } else {
@@ -466,7 +475,7 @@ MLEBNodeFDLaplacian::Fapply (int amrlev, int mglev, MultiFab& out, const MultiFa
                     auto const& vfrc = factory->getVolFrac().const_array(mfi);
                     AMREX_HOST_DEVICE_FOR_3D(box, i, j, k,
                     {
-                        mlebndfdlap_sig_adotx_eb(i,j,k,yarr,xarr,levset,dmarr,AMREX_D_DECL(ecx,ecy,ecz),
+                        mlebndfdlap_sig_adotx_eb(nodal_pml_sigma,n_cell,n_cell_pml,i,j,k,yarr,xarr,levset,dmarr,AMREX_D_DECL(ecx,ecy,ecz),
                                                  sigarr, vfrc, phieb, AMREX_D_DECL(bx,by,bz));
                     });
                 } else {
