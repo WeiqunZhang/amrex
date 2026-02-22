@@ -1211,15 +1211,15 @@ public:
         return ParticlesAt(lev, iter);
     }
 
-    /**
-    * \brief Functions depending the layout of the data.  Use with caution.
+   /**
+    * \brief Deposit particle mass to cell-centered densities across AMR levels.
     *
-    * \param rho_index
-    * \param mf_to_be_filled
-    * \param lev_min
-    * \param ncomp
-    * \param finest_level
-    * \param ngrow
+    * \param rho_index   Component in the StructReal array holding density (must be 0).
+    * \param mf_to_be_filled Per-level MultiFabs to be allocated/fill (one MultiFab per level, resized inside).
+    * \param lev_min     Coarsest AMR level to populate.
+    * \param ncomp       Number of components to deposit (1 or AMREX_SPACEDIM+1).
+    * \param finest_level Optional override for the finest level considered (-1 uses container finest).
+    * \param ngrow       Desired grow cells for level \p lev_min (others inferred from refRatio()).
     */
     void AssignDensity (int rho_index,
                         Vector<std::unique_ptr<MultiFab> >& mf_to_be_filled,
