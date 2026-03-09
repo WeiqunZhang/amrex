@@ -41,7 +41,7 @@ jobs:
       run: |
         export CCACHE_COMPRESS=1
         export CCACHE_COMPRESSLEVEL=10
-        export CCACHE_MAXSIZE=150M
+        export CCACHE_MAXSIZE=200M
         ccache -z
 
         source /etc/profile.d/rocm.sh
@@ -64,7 +64,8 @@ jobs:
             -DCMAKE_CXX_COMPILER=$(which clang++)         \
             -DCMAKE_Fortran_COMPILER=$(which flang)       \
             -DCMAKE_CXX_STANDARD=17                       \
-            -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
+            -DCMAKE_CXX_COMPILER_LAUNCHER=ccache          \
+            -DCMAKE_FORTRAN_COMPILER_LAUNCHER=ccache
         cmake --build build -j 4
 
         ccache -s
