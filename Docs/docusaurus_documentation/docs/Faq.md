@@ -1,0 +1,88 @@
+# Frequently Asked Questions
+
+**Q.** Why am I getting a segmentation fault after my code runs?
+
+**A.** Do you have `amrex::Initialize(); {` and `} amrex::Finalize();` at the beginning and end of your code? For all AMReX commands to function properly, including to release resources, they need to be contained between these two curly braces or in a separate function. These commands are discussed in more detail in the Initialize and Finalize section of the docs.
+
+**Q.** I want to use a different compiler with GNU Make to compile AMReX. How do I do this?
+
+**A.** In the file `amrex/Tools/GNUMake/Make.local` you can specify your own compile commands by setting the variables `CXX`, `CC`, `FC`, and `F90`. The section on specifying your own compiler contains an example. Additional customizations are described in the file `amrex/Tools/GNUMake/Make.local.template`. In the same directory, `amrex/Tools/GNUMake/README.md` contains detailed information on compiler commands.
+
+**Q.** I'm having trouble compiling my code.
+
+**A.** AMReX developers have found that running the command `make clean` can resolve many compilation issues.
+
+If you are working in an environment that uses a module system, please ensure you have the correct modules loaded. Typically, to do this, type `module list` at the command prompt.
+
+**Q.** When I profile my code that uses GPUs with `TINY_PROFILE=TRUE` or `PROFILE=TRUE` my timings are inconsistent.
+
+**A.** Due to the asynchronous nature of GPU execution, profilers might only measure the run time on CPU, if there is no explicit synchronization. For `TINY_PROFILE`, one could use `ParmParse` parameter `tiny_profiler.device_synchronize_around_region=1` to add synchronization. Note that this may degrade performance.
+
+**Q.** How do I know I am getting the right answer?
+
+**A.** AMReX provides support for verifying output with several tools. To briefly mention a few:
+
+- The `print_state` function can be used to output the data of a single cell.
+- `VisMF::Write` can be used to write MultiFab data to disk that can be viewed with [Amrvis](https://amrex-codes.github.io/amrex/docs_html/Visualization.html#sec-amrvis).
+- `amrex::Print()` and `amrex::AllPrint()` are useful for printing output when using multiple processes or threads as it prevents messages from getting mixed up.
+- [fcompare](https://amrex-codes.github.io/amrex/docs_html/Post_Processing.html#fcompare) compares two plotfiles and reports absolute and relative error.
+
+Additional tools and discussion on this topic is contained in the section [Debugging](https://amrex-codes.github.io/amrex/docs_html/Basics.html#debugging).
+
+**Q.** What's the difference between `Copy` and `ParallelCopy` for `MultiFab` data?
+
+**A.** `MultiFab::Copy` is for two `MultiFab`s built with the same `BoxArray` and `DistributionMapping`, whereas `ParallelCopy` is for parallel communication of two `MultiFab`s with different `BoxArray` and/or `DistributionMapping`.
+
+**Q.** How do I fill ghost cells?
+
+**A.** See [Ghost Cells](https://amrex-codes.github.io/amrex/docs_html/Basics.html#ghost-cells) in the AMReX Source Documentation.
+
+**Q.** What's the difference between `AmrCore` and `AmrLevel`? How do I decide which to use?
+
+**A.** The `AmrLevel` class is an abstract base class that holds data for a single AMR level. A vector of `AmrLevel` is stored in the `Amr` class, which is derived from `AmrCore`. An application code can derive from `AmrLevel` and override functions. `AmrCore` contains the meta-data for the AMR hierarchy, but it does not contain any floating point mesh data. Instead of using `Amr`/`AmrLevel`, an application can also derive from `AmrCore`. If you want flexibility, you might choose the `AmrCore` approach, otherwise the `AmrLevel` approach might be easier because it already has a lot of built-in capabilities that are common for AMR applications.
+
+**Q.** For GPU usage, how can I perform explicit host to device and device to host copies without relying on managed memory?
+
+**A.** Use `The_Pinned_Arena()` (See [Memory Allocation](https://amrex-codes.github.io/amrex/docs_html/GPU.html#memory-allocation) in the AMReX Source Documentation.) and
+
+``` 
+void htod_memcpy (void* p_d, const void* p_h, const std::size_t sz);
+void dtoh_memcpy (void* p_h, const void* p_d, const std::size_t sz);
+void dtoh_memcpy (FabArray<FAB>& dst, FabArray<FAB> const& src, int scomp, int dcomp, int ncomp);
+void htod_memcpy (FabArray<FAB>& dst, FabArray<FAB> const& src, int scomp, int dcomp, int ncomp);
+```
+
+**Q.** How do I generate random numbers with AMReX? Can I set the seed? Are they thread safe with MPI and OpenMP?
+
+**A.** (Thread safe) Yes, `amrex::Random()` is thread safe. When OpenMP is on, each thread will have its own dedicated Random Number Generator that is totally independent of the others.
+
+**Q.** Is Dirichlet boundary condition data loaded into cell-centered, or face-centered containers? How is it used in AMReX-based codes like MLMG and the advection routines in AMReX-Hydro?
+
+**A.** In the cell-centered MLMG solver, the Dirichlet boundary data are stored in containers that have the information of the location of the data.
+
+**Q.** How does coarse-grained OpenMP parallelism work in AMReX? How is it different from the fine-grained approach?
+
+**A.** Our OpenMP strategy is explained in this paper, https://arxiv.org/abs/1604.03570.
+
+**Q.** How to avoid running into `Formal parameter space overflowed` CUDA error while building complex EB geometries using AMReX implicit functions and CSG functionalities ?
+
+**A.** AMReX enables logical operations and transformations to assemble basic shapes [Implicit Functions](https://amrex-codes.github.io/amrex/docs_html/EB.html#initializing-the-geometric-database) into complex geometries. Each operation results in a more complex type which can eventually overflow the parameter space (4096 bytes on CUDA 11.4 for instance). To circumvent the problem, explicitly copy the object to the device and pass a device pointer function object <span class="title-ref">DevicePtrIF</span> into the <span class="title-ref">EB2</span> function using:
+
+``` 
+using IF_t = decltype(myComplexIF);
+IF_t* dp = (IF_t*)The_Arena()->alloc(sizeof(myComplexIF));
+Gpu::htod_memcpy_async(dp, &myComplexIF, sizeof(IF_t));
+Gpu::streamSynchronize();
+EB2::DevicePtrIF<IF_t> dp_myComplexIF{dp};
+auto gshop = EB2::makeShop(dp_myComplexIF);
+```
+
+## \|
+
+**Q.** I'm getting errors when running with GPU-aware MPI
+
+**A.** While other problems may exist. One thing to check, if the machine is using Slurm, is the <span class="title-ref">cgroup.conf</span> file. If it contains <span class="title-ref">ConstrainDevices=yes</span>, then IPC can be impacted, which means bindings such as <span class="title-ref">--gpu-bind=closest</span> should not be used. Instead try <span class="title-ref">--gpu-bind=none</span>.
+
+### More Questions
+
+If your question was not addressed here, you are encouraged to search and ask for help on the [AMReX GitHub Discussions](https://github.com/AMReX-Codes/amrex/discussions) page.
