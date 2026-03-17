@@ -137,13 +137,15 @@ void SpMV (Long nrows, Long ncols, T* AMREX_RESTRICT py, CsrView<T const> const&
         rocsparse_spmv_set_input(handle, spmv_descr, rocsparse_spmv_input_operation,
                                  &spmv_operation, sizeof(spmv_operation), p_error));
 
+    const rocsparse_datatype scalar_datatype = data_type;
     AMREX_ROCSPARSE_SAFE_CALL(
         rocsparse_spmv_set_input(handle, spmv_descr, rocsparse_spmv_input_scalar_datatype,
-                                 &data_type, sizeof(data_type), p_error));
+                                 &scalar_datatype, sizeof(scalar_datatype), p_error));
 
+    const rocsparse_datatype compute_datatype = data_type;
     AMREX_ROCSPARSE_SAFE_CALL(
         rocsparse_spmv_set_input(handle, spmv_descr, rocsparse_spmv_input_compute_datatype,
-                                 &data_type, sizeof(data_type), p_error));
+                                 &compute_datatype, sizeof(compute_datatype), p_error));
 
     std::size_t buffer_size = 0;
     AMREX_ROCSPARSE_SAFE_CALL(
