@@ -2,6 +2,11 @@
 #define AMREX_FILE_SYSTEM_H_
 #include <AMReX_Config.H>
 
+/**
+ * \file AMReX_FileSystem.H
+ * \brief File-system utility functions (directory creation, path query, removal).
+ */
+
 #include <string>
 
 #ifdef _WIN32
@@ -18,7 +23,8 @@ namespace amrex::FileSystem {
  * @param path directory path to create
  * @param mode requested permissions for newly-created directories on POSIX
  *        platforms; ignored on Windows
- * @param verbose print a diagnostic message when directory creation fails
+ * @param verbose request diagnostic output; on POSIX platforms, failures are
+ *        reported regardless of this flag
  * @return true if the directory already existed or was created without error,
  *         false if directory creation failed. This differs from the return
  *         value of `std::filesystem::create_directories`, which is true only
