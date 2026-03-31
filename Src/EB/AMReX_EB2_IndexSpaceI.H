@@ -1,3 +1,4 @@
+#include <algorithm>
 
 /**
  * \file AMReX_EB2_IndexSpaceI.H
@@ -116,6 +117,13 @@ IndexSpaceImp<G>::getGeometry (const Box& dom) const
                                      "IndexSpaceImp::getLevel: domain not found");
     int i = std::distance(m_domain.begin(), it);
     return m_geom[i];
+}
+
+template <typename G>
+bool
+IndexSpaceImp<G>::hasGeometry (const Box& dom) const
+{
+    return (std::find(std::begin(m_domain), std::end(m_domain), dom) != std::end(m_domain));
 }
 
 template <typename G>

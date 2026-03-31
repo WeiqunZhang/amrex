@@ -49,6 +49,8 @@ public:
     [[nodiscard]] const Level& getLevel (const Geometry& geom) const final;
     //! Return the Geometry whose domain equals \p dom.
     [[nodiscard]] const Geometry& getGeometry (const Box& dom) const final;
+    //! Return whether there is Geometry whose domain equals \p dom.
+    [[nodiscard]] bool hasGeometry (const Box& dom) const final;
     //! Domain of the coarsest level loaded from the checkpoint.
     [[nodiscard]] const Box& coarsestDomain () const final {
         return m_geom.back().Domain();

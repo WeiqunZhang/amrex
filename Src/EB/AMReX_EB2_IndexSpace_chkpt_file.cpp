@@ -1,5 +1,7 @@
 #include <AMReX_EB2_IndexSpace_chkpt_file.H>
 
+#include <algorithm>
+
 namespace amrex::EB2 {
 
 IndexSpaceChkptFile::IndexSpaceChkptFile (const ChkptFile& chkpt_file,
@@ -75,6 +77,12 @@ IndexSpaceChkptFile::getGeometry (const Box& dom) const
     auto it = std::find(std::begin(m_domain), std::end(m_domain), dom);
     auto i = std::distance(m_domain.begin(), it);
     return m_geom[i];
+}
+
+bool
+IndexSpaceChkptFile::hasGeometry (const Box& dom) const
+{
+    return (std::find(std::begin(m_domain), std::end(m_domain), dom) != std::end(m_domain));
 }
 
 void

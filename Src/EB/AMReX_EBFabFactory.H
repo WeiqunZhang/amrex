@@ -2,6 +2,10 @@
 #define AMREX_EBFABFACTORY_H_
 #include <AMReX_Config.H>
 
+#include <array>
+#include <memory>
+
+#include <AMReX_BaseFwd.H>
 #include <AMReX_FabFactory.H>
 
 #include <AMReX_EBData.H>
@@ -25,6 +29,8 @@ namespace EB2 {
     class IndexSpace;
 }
 
+class EBStaggeredData;
+
 /// \ingroup amrex_eb
 //! FabFactory specialization that exposes EB geometry alongside state FABs.
 class EBFArrayBoxFactory
@@ -45,14 +51,13 @@ public:
     EBFArrayBoxFactory (const EB2::Level& a_level, const Geometry& a_geom,
                         const BoxArray& a_ba, const DistributionMapping& a_dm,
                         const Vector<int>& a_ngrow, EBSupport a_support);
-    ~EBFArrayBoxFactory () override = default;
+    ~EBFArrayBoxFactory () override;
 
-    EBFArrayBoxFactory (const EBFArrayBoxFactory&) = default;
+    EBFArrayBoxFactory (const EBFArrayBoxFactory&);
+    EBFArrayBoxFactory& operator= (const EBFArrayBoxFactory&);
     EBFArrayBoxFactory (EBFArrayBoxFactory&&) noexcept = default;
-
-    EBFArrayBoxFactory () = delete;
-    EBFArrayBoxFactory& operator= (const EBFArrayBoxFactory&) = delete;
     EBFArrayBoxFactory& operator= (EBFArrayBoxFactory&&) = delete;
+    EBFArrayBoxFactory () = delete;
 
     //! Allocate an EB-aware FAB for `box` with `ncomps` components.
     AMREX_NODISCARD
@@ -137,13 +142,23 @@ public:
     //! Return GPU-accessible array views for all FABs owned by this factory.
     [[nodiscard]] EBDataArrays getEBDataArrays () const noexcept;
 
+    [[nodiscard]] const EBStaggeredData* getStaggeredData (int direction) const noexcept;
+
 private:
 
     EBSupport m_support;
     Geometry m_geom;
     std::shared_ptr<EBDataCollection> m_ebdc;
-    EB2::Level const* m_parent = nullptr;
+    mutable EB2::Level const* m_parent = nullptr;
     Gpu::DeviceVector<Array4<Real const>> m_eb_data;
+    Vector<int> m_ngrow;
+    std::array<std::unique_ptr<EBStaggeredData>,AMREX_SPACEDIM> m_stag_data;
+    mutable std::unique_ptr<EBDataCollection> m_stag_refined_data;
+    mutable Geometry m_stag_refined_geom;
+    mutable bool m_has_stag_refined_geom = false;
+
+    const EB2::Level* getRefinedLevel (int refinement_ratio) const;
+    void buildStaggeredData (int direction);
 };
 
 /// \ingroup amrex_eb

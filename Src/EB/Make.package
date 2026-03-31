@@ -14,6 +14,9 @@ CEXE_sources += AMReX_EBCellFlag.cpp
 
 CEXE_headers += AMReX_EBData.H
 
+CEXE_headers += AMReX_EBStaggeredData.H
+CEXE_sources += AMReX_EBStaggeredData.cpp
+
 CEXE_headers += AMReX_EBDataCollection.H
 CEXE_sources += AMReX_EBDataCollection.cpp
 

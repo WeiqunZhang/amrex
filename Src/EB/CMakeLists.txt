@@ -21,6 +21,8 @@ foreach(D IN LISTS AMReX_SPACEDIM)
        AMReX_EBCellFlag.H
        AMReX_EBCellFlag.cpp
        AMReX_EBData.H
+       AMReX_EBStaggeredData.H
+       AMReX_EBStaggeredData.cpp
        AMReX_EBDataCollection.H
        AMReX_EBDataCollection.cpp
        AMReX_MultiCutFab.H

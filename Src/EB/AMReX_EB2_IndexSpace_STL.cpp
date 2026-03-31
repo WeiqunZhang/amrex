@@ -1,5 +1,7 @@
 #include <AMReX_EB2_IndexSpace_STL.H>
 
+#include <algorithm>
+
 namespace amrex::EB2 {
 
 IndexSpaceSTL::IndexSpaceSTL (const std::string& stl_file, Real stl_scale,
@@ -85,6 +87,12 @@ IndexSpaceSTL::getGeometry (const Box& dom) const
     auto it = std::find(std::begin(m_domain), std::end(m_domain), dom);
     auto i = std::distance(m_domain.begin(), it);
     return m_geom[i];
+}
+
+bool
+IndexSpaceSTL::hasGeometry (const Box& dom) const
+{
+    return (std::find(std::begin(m_domain), std::end(m_domain), dom) != std::end(m_domain));
 }
 
 void

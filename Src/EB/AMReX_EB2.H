@@ -58,6 +58,7 @@ public:
 
     [[nodiscard]] virtual const Level& getLevel (const Geometry & geom) const = 0;
     [[nodiscard]] virtual const Geometry& getGeometry (const Box& domain) const = 0;
+    [[nodiscard]] virtual bool hasGeometry (const Box& domain) const = 0;
     [[nodiscard]] virtual const Box& coarsestDomain () const = 0;
     virtual void addFineLevels (int num_new_fine_levels) = 0;
     virtual void addRegularCoarseLevels (int num_new_coarse_levels) = 0;
@@ -99,6 +100,7 @@ public:
 
     [[nodiscard]] const Level& getLevel (const Geometry& geom) const final;
     [[nodiscard]] const Geometry& getGeometry (const Box& dom) const final;
+    [[nodiscard]] bool hasGeometry (const Box& dom) const final;
     [[nodiscard]] const Box& coarsestDomain () const final {
         return m_geom.back().Domain();
     }
