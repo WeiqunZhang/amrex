@@ -22,7 +22,7 @@ def doit(defines, undefines, comp, allow_diff_comp):
                 print("#define",v[0],1)
             print("#endif")
 
-    for ud in undefines:
+    for ud in undefines.split():
         print("#undef",ud)
 
     print("#ifdef __cplusplus");
