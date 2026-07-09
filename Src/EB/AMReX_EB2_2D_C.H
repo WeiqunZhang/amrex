@@ -66,12 +66,14 @@ amrex_eb2_build_types (Box const& tbx, Box const& bxg2,
     });
 }
 
+/// \cond DOXYGEN_IGNORE
 namespace detail {
     AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
     int num_cuts (Real a, Real b) noexcept {
         return (a >= 0.0_rt && b < 0.0_rt) || (b >= 0.0_rt && a < 0.0_rt);
     }
 }
+/// \endcond
 
 AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
 int check_mvmc (int i, int j, int, Array4<Real const> const& fine)
@@ -180,24 +182,38 @@ int coarsen_from_fine (int i, int j, Box const& bx, int ngrow,
                  fba(ii  ,jj+1,k)*(0.5_rt*fbc(ii  ,jj+1,k,1)+0.25_rt) +
                  fba(ii+1,jj+1,k)*(0.5_rt*fbc(ii+1,jj+1,k,1)+0.25_rt));
 
-             Real nx = fbn(ii  ,jj  ,k,0)*fba(ii  ,jj  ,k)
-                 +     fbn(ii+1,jj  ,k,0)*fba(ii+1,jj  ,k)
-                 +     fbn(ii  ,jj+1,k,0)*fba(ii  ,jj+1,k)
-                 +     fbn(ii+1,jj+1,k,0)*fba(ii+1,jj+1,k);
-             Real ny = fbn(ii  ,jj  ,k,1)*fba(ii  ,jj  ,k)
-                 +     fbn(ii+1,jj  ,k,1)*fba(ii+1,jj  ,k)
-                 +     fbn(ii  ,jj+1,k,1)*fba(ii  ,jj+1,k)
-                 +     fbn(ii+1,jj+1,k,1)*fba(ii+1,jj+1,k);
-             Real nfac = 1.0_rt/std::sqrt(nx*nx+ny*ny+1.e-30_rt);
-             cbn(i,j,k,0) = nx*nfac;
-             cbn(i,j,k,1) = ny*nfac;
-             ierr = (nx == 0.0_rt && ny == 0.0_rt)
-                 // we must check the enclosing surface to make sure the coarse cell does not
-                 // fully contains the geometry object.
-                 || ( fapx(ii,jj  ,k)==1.0_rt && fapx(ii+2,jj  ,k)==1.0_rt
-                  && fapx(ii,jj+1,k)==1.0_rt && fapx(ii+2,jj+1,k)==1.0_rt
-                  && fapy(ii,jj  ,k)==1.0_rt && fapy(ii+1,jj  ,k)==1.0_rt
-                  && fapy(ii,jj+2,k)==1.0_rt && fapy(ii+1,jj+2,k)==1.0_rt);
+            Real nx = fbn(ii  ,jj  ,k,0)*fba(ii  ,jj  ,k)
+                +     fbn(ii+1,jj  ,k,0)*fba(ii+1,jj  ,k)
+                +     fbn(ii  ,jj+1,k,0)*fba(ii  ,jj+1,k)
+                +     fbn(ii+1,jj+1,k,0)*fba(ii+1,jj+1,k);
+            Real ny = fbn(ii  ,jj  ,k,1)*fba(ii  ,jj  ,k)
+                +     fbn(ii+1,jj  ,k,1)*fba(ii+1,jj  ,k)
+                +     fbn(ii  ,jj+1,k,1)*fba(ii  ,jj+1,k)
+                +     fbn(ii+1,jj+1,k,1)*fba(ii+1,jj+1,k);
+            Real nxy = std::hypot(nx, ny);
+            constexpr Real tiny = Real(16) * std::numeric_limits<Real>::min();
+            if (nxy > tiny) {
+                Real nfac = 1.0_rt / nxy;
+                cbn(i,j,k,0) = nx * nfac;
+                cbn(i,j,k,1) = ny * nfac;
+            } else {
+                Real absnx = std::abs(nx);
+                Real absny = std::abs(ny);
+                if (absnx >= absny) {
+                    cbn(i,j,k,0) = std::copysign(1.0_rt, nx);
+                    cbn(i,j,k,1) = 0.0_rt;
+                } else {
+                    cbn(i,j,k,0) = 0.0_rt;
+                    cbn(i,j,k,1) = std::copysign(1.0_rt, ny);
+                }
+            }
+            ierr = (nx == 0.0_rt && ny == 0.0_rt)
+                // we must check the enclosing surface to make sure the coarse cell does not
+                // fully contains the geometry object.
+                || ( fapx(ii,jj  ,k)==1.0_rt && fapx(ii+2,jj  ,k)==1.0_rt
+                 && fapx(ii,jj+1,k)==1.0_rt && fapx(ii+2,jj+1,k)==1.0_rt
+                 && fapy(ii,jj  ,k)==1.0_rt && fapy(ii+1,jj  ,k)==1.0_rt
+                 && fapy(ii,jj+2,k)==1.0_rt && fapy(ii+1,jj+2,k)==1.0_rt);
         }
     }
     else if (gbx.contains(i,j,k))

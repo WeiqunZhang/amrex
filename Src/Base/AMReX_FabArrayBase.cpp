@@ -124,10 +124,7 @@ FabArrayBase::Initialize ()
     }
 
     pp.query("maxcomp", FabArrayBase::MaxComp);
-
-    if (MaxComp < 1) {
-        MaxComp = 1;
-    }
+    MaxComp = std::max(MaxComp, 1);
 
     ParmParse ppmf("amrex.mf");
     ppmf.queryAdd("alloc_single_chunk", FabArrayBase::m_alloc_single_chunk);
@@ -636,10 +633,11 @@ FabArrayBase::getCPC (const IntVect& dstng, const FabArrayBase& src, const IntVe
 FabArrayBase::FB::FB (const FabArrayBase& fa, const IntVect& nghost,
                       bool cross, const Periodicity& period,
                       bool enforce_periodicity_only, bool override_sync,
-                      bool multi_ghost)
+                      bool multi_ghost, IntVect const& sumboundary_src_nghost)
     : m_id(comm_meta_data_id++),
       m_typ(fa.boxArray().ixType()), m_crse_ratio(fa.boxArray().crseRatio()),
-      m_ngrow(nghost), m_cross(cross), m_epo(enforce_periodicity_only),
+      m_ngrow(nghost), m_sb_snghost(sumboundary_src_nghost),
+      m_cross(cross), m_epo(enforce_periodicity_only),
       m_override_sync(override_sync),  m_period(period),
       m_multi_ghost(multi_ghost)
 {
@@ -656,6 +654,8 @@ FabArrayBase::FB::FB (const FabArrayBase& fa, const IntVect& nghost,
         } else if (override_sync) {
             BL_ASSERT(m_cross==false);
             define_os(fa);
+        } else if (sumboundary_src_nghost.allGE(0)) {
+            define_sb(fa);
         } else {
             define_fb(fa);
         }
@@ -966,8 +966,8 @@ FabArrayBase::FB::define_epo (const FabArrayBase& fa)
     m_threadsafe_rcv = true;
     for (int i = 0; i < nlocal; ++i)
     {
-        BoxList bl_local(ba.ixType());
-        BoxList bl_remote(ba.ixType());
+        BoxList bl_local(typ);
+        BoxList bl_remote(typ);
 
         const int   krcv = imap[i];
         const Box& vbx   = ba[krcv];
@@ -1184,6 +1184,86 @@ FabArrayBase::FB::define_os (const FabArrayBase& fa)
 }
 
 void
+FabArrayBase::FB::define_sb (const FabArrayBase& fa)
+{
+    const int                  MyProc   = ParallelDescriptor::MyProc();
+    const BoxArray&            ba       = fa.boxArray();
+    const DistributionMapping& dm       = fa.DistributionMap();
+    const Vector<int>&         imap     = fa.IndexArray();
+
+    const int nlocal = static_cast<int>(imap.size());
+    const IntVect& ngdst = m_ngrow;
+    const IntVect& ngsrc = m_sb_snghost;
+
+    std::vector<std::pair<int,Box>> isects;
+    const std::vector<IntVect>& pshifts = m_period.shiftIntVect(amrex::max(ngdst,ngsrc));
+
+    // In almost all cases of SumBoundary, the operation is not thread
+    // safe. So we will assume it's always thread unsafe, which is the
+    // default of CommMetaData. Thus, we will not modify the thread safety
+    // flags in this function.
+    //
+    // Also it's not safe to use MPI shared memory (i.e., team).
+
+    auto& send_tags = *m_SndTags;
+
+    for (int i = 0; i < nlocal; ++i) {
+        int const ksnd = imap[i];
+        if (MyProc != dm[ksnd]) { continue; }
+        Box const& bxsnd = amrex::grow(ba[ksnd], ngsrc);
+        for (auto const& pit : pshifts) {
+            ba.intersections(bxsnd+pit, isects, false, ngdst);
+            for (auto const& is : isects) {
+                int const krcv = is.first;
+                if (ksnd != krcv || pit != 0) {
+                    Box const& bxrcv    = is.second;
+                    int const dst_owner = dm[krcv];
+                    if (MyProc == dst_owner) {
+                        continue;  // local copy will be dealt with later
+                    } else {
+                        send_tags[dst_owner].emplace_back(bxrcv, bxrcv-pit, krcv, ksnd);
+                    }
+                }
+            }
+        }
+    }
+
+    auto& recv_tags = *m_RcvTags;
+    auto& loca_tags = *m_LocTags;
+
+    for (int i = 0; i < nlocal; ++i) {
+        int const krcv = imap[i];
+        if (MyProc != dm[krcv]) { continue; }
+        Box const& bxrcv = amrex::grow(ba[krcv], ngdst);
+        for (auto const& pit : pshifts) {
+            ba.intersections(bxrcv+pit, isects, false, ngsrc);
+            for (auto const& is : isects) {
+                int const ksnd = is.first;
+                if (ksnd != krcv || pit != 0) {
+                    Box const& src_bx = is.second;
+                    Box const& dst_bx = is.second - pit;
+                    int const src_owner = dm[ksnd];
+                    if (MyProc == src_owner) {
+                        loca_tags.emplace_back(dst_bx, src_bx, krcv, ksnd);
+                    } else {
+                        recv_tags[src_owner].emplace_back(dst_bx, src_bx, krcv, ksnd);
+                    }
+                }
+            }
+        }
+    }
+
+    for (int ipass = 0; ipass < 2; ++ipass) { // pass 0: send; pass 1: recv
+        auto& Tags = (ipass == 0) ? *m_SndTags : *m_RcvTags;
+        for (auto& [key, cctv] : Tags) {
+            amrex::ignore_unused(key);
+            // We need to fix the order so that the send and recv processes match.
+            std::sort(cctv.begin(), cctv.end());
+        }
+    }
+}
+
+void
 FabArrayBase::flushFB (bool no_assertion) const
 {
     amrex::ignore_unused(no_assertion);
@@ -1217,7 +1297,7 @@ FabArrayBase::flushFBCache ()
 const FabArrayBase::FB&
 FabArrayBase::getFB (const IntVect& nghost, const Periodicity& period,
                      bool cross, bool enforce_periodicity_only,
-                     bool override_sync) const
+                     bool override_sync, IntVect const& sumboundary_src_nghost) const
 {
     BL_PROFILE("FabArrayBase::getFB()");
 
@@ -1228,6 +1308,7 @@ FabArrayBase::getFB (const IntVect& nghost, const Periodicity& period,
         if (it->second->m_typ        == boxArray().ixType()      &&
             it->second->m_crse_ratio == boxArray().crseRatio()   &&
             it->second->m_ngrow      == nghost                   &&
+            it->second->m_sb_snghost == sumboundary_src_nghost   &&
             it->second->m_cross      == cross                    &&
             it->second->m_multi_ghost== m_multi_ghost            &&
             it->second->m_epo        == enforce_periodicity_only &&
@@ -1242,7 +1323,7 @@ FabArrayBase::getFB (const IntVect& nghost, const Periodicity& period,
 
     // Have to build a new one
     FB* new_fb = new FB(*this, nghost, cross, period, enforce_periodicity_only,
-                        override_sync, m_multi_ghost);
+                        override_sync, m_multi_ghost, sumboundary_src_nghost);
 
 #ifdef AMREX_MEM_PROFILING
     m_FBC_stats.bytes += new_fb->bytes();
@@ -1659,8 +1740,9 @@ FabArrayBase::PolarB::define (const FabArrayBase& fa)
                                                                     m_domain.length(1)+m_ngrow[1],
                                                                     0)})};
 
-    auto const convert = NonLocalBC::PolarFn{m_domain.length(0), m_domain.length(1)};
-    auto const convert_corner = NonLocalBC::PolarFn2{m_domain.length(0), m_domain.length(1)};
+    auto const convert = NonLocalBC::PolarFn{.Lx = m_domain.length(0), .Ly = m_domain.length(1)};
+    auto const convert_corner = NonLocalBC::PolarFn2{.Lx = m_domain.length(0),
+                                                     .Ly = m_domain.length(1)};
 
     Array<Box,8> const domain_src{convert(domain_dst[0]), convert(domain_dst[1]),
                                   convert(domain_dst[2]), convert(domain_dst[3]),
@@ -1951,9 +2033,15 @@ FabArrayBase::FPinfo::FPinfo (const FabArrayBase& srcfa,
                                            dm_patch,
                                            {0,0,0}, EBSupport::basic);
         int ng = 1; // to avoid dengerate box
+        BoxArray eb_ba_fine_patch = ba_fine_patch;
+        IntVect ratio = fdomain.length() / cdomain.length();
+        if ( ! ratio.allLE(2)) {
+            // This is needed for make_mf_refined_patch in FillPatch
+            eb_ba_fine_patch.coarsen(ratio).refine(ratio);
+        }
         fact_fine_patch = makeEBFabFactory(index_space,
                                            index_space->getGeometry(fdomain),
-                                           ba_fine_patch,
+                                           eb_ba_fine_patch,
                                            dm_patch,
                                            {ng,ng,ng}, EBSupport::basic);
     }
@@ -2316,9 +2404,9 @@ FabArrayBase::buildTileArray (const IntVect& tileSize, TileArray& ta) const
         const int nworkers = ParallelDescriptor::TeamSize();
         if (nworkers > 1) {
             // reorder it so that each worker will be more likely to work on their own fabs
-            std::stable_sort(local_idxs.begin(), local_idxs.end(), [this](int i, int j)
-                             { return  this->distributionMap[this->indexArray[i]]
-                                     < this->distributionMap[this->indexArray[j]]; });
+            std::ranges::stable_sort(local_idxs, [this](int i, int j)
+                                     { return  this->distributionMap[this->indexArray[i]]
+                                             < this->distributionMap[this->indexArray[j]]; });
         }
 #endif
 
@@ -2711,6 +2799,7 @@ FabArrayBase::getNextCommMetaDataId ()
     return comm_meta_data_id++;
 }
 
+/// \cond DOXYGEN_IGNORE
 namespace detail {
 
     SingleChunkArena::SingleChunkArena (Arena* a_arena, std::size_t a_size)
@@ -2758,6 +2847,7 @@ namespace detail {
         return m_dallocator.arena()->isPinned();
     }
 }
+/// \endcond
 
 int nComp (FabArrayBase const& fa)
 {

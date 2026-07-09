@@ -13,6 +13,7 @@
 #include <AMReX_VisMFBuffer.H>
 
 #include <fstream>
+#include <iterator>
 #include <iostream>
 #include <sstream>
 #include <deque>
@@ -26,6 +27,7 @@ namespace amrex {
 class IArrayBox;
 
 /**
+* \ingroup amrex_io
 * \brief File I/O for FabArray<FArrayBox>.
 *  Wrapper class for reading/writing FabArray<FArrayBox> objects to disk in various "smart" ways.
 */
@@ -380,21 +382,22 @@ std::ostream& operator<< (std::ostream& os, const VisMF::Header& hd);
 std::istream& operator>> (std::istream& is, VisMF::Header& hd);
 
 /**
- * \brief Write iMultiFab/FabArray<IArrayBox>
+ * \brief Write `iMultiFab/FabArray<IArrayBox>`
  *
- *  This writes an iMultiFab/FabArray<IArrayBox> to files on disk, including
+ *  This writes an `iMultiFab/FabArray<IArrayBox>` to files on disk, including
  *  a clear text file NAME_H and binary files NAME_D_00000 etc.
  *
  * \param fa is the iMultiFab to be written.
  * \param name is the base name for the files.
  */
 template <typename FAB>
+requires (std::same_as<FAB,IArrayBox>)
 // This function does work for MultiFab, but let's disable it to avoid confusion.
-std::enable_if_t<std::is_same_v<FAB,IArrayBox>>
+void
 Write (const FabArray<FAB>& fa, const std::string& name)
 {
     BL_PROFILE("Write(FabArray)");
-    AMREX_ASSERT(name.back() != '/');
+    AMREX_ASSERT(!name.empty() && name.back() != '/');
 
     auto data_descriptor = FAB::getDataDescriptor();
     int data_bytes = data_descriptor->numBytes();
@@ -407,7 +410,7 @@ Write (const FabArray<FAB>& fa, const std::string& name)
         procsWithData.insert(i);
     }
     const int nOutFiles = VisMF::GetNOutFiles();
-    if (static_cast<int>(procsWithData.size()) < nOutFiles) {
+    if (std::ssize(procsWithData) < nOutFiles) {
         useSparseFPP = true;
         for (auto i : procsWithData) {
             procsWithDataVector.push_back(i);
@@ -432,9 +435,8 @@ Write (const FabArray<FAB>& fa, const std::string& name)
             {
                 std::stringstream hss;
                 fio.write_header(hss, fab, fab.nComp());
-                auto hLength = static_cast<std::streamoff>(hss.tellp());
-                auto tstr = hss.str();
-                nfi.Stream().write(tstr.c_str(), hLength);
+                auto const tstr = hss.view();
+                nfi.Stream().write(tstr.data(), static_cast<std::streamsize>(tstr.size()));
                 nfi.Stream().flush();
             }
             auto const* fabdata = fab.dataPtr();
@@ -530,6 +532,7 @@ Write (const FabArray<FAB>& fa, const std::string& name)
     }
 }
 
+/// \cond DOXYGEN_IGNORE
 namespace detail {
 template <typename FAB>
 void read_fab (FAB& fab, VisMF::FabOnDisk const& fod, std::string const& name)
@@ -547,17 +550,18 @@ void read_fab (FAB& fab, VisMF::FabOnDisk const& fod, std::string const& name)
     fab.readFrom(ifs);
 }
 }
+/// \endcond
 
 /**
- * \brief Read iMultiFab/FabArray<IArrayBox>
+ * \brief Read `iMultiFab/FabArray<IArrayBox>`
  *
- * This reads an iMultiFab/FabArray<IArrayBox> from disk.  If it has been
+ * This reads an `iMultiFab/FabArray<IArrayBox>` from disk.  If it has been
  * fully defined, the BoxArray on the disk must match the BoxArray in the
- * given iMultiFab/FabArray<IArrayBox> object.  If it is only constructed
+ * given `iMultiFab/FabArray<IArrayBox>` object.  If it is only constructed
  * with the default constructor, the BoxArray on the disk will be used and a
  * new DistributionMapping will be made.  When this function is used to
  * restart a calculation from checkpoint files, one should use a fully
- * defined iMultiFab/FabArray<IArrayBox> except for the first one in a
+ * defined `iMultiFab/FabArray<IArrayBox>` except for the first one in a
  * series of iMultiFab/MultiFab objects that share the same
  * BoxArray/DistributionMapping.  This will ensure that they share the same
  * BoxArray/DistributionMapping after restart.
@@ -566,12 +570,13 @@ void read_fab (FAB& fab, VisMF::FabOnDisk const& fod, std::string const& name)
  * \param name is the base name for the files.
  */
 template <typename FAB>
+requires (std::same_as<FAB,IArrayBox>)
 // This function does work for MultiFab, but let's disable it to avoid confusion.
-std::enable_if_t<std::is_same_v<FAB,IArrayBox>>
+void
 Read (FabArray<FAB>& fa, const std::string& name)
 {
     BL_PROFILE("Read(FabArray)");
-    AMREX_ASSERT(name.back() != '/');
+    AMREX_ASSERT(!name.empty() && name.back() != '/');
 
     BoxArray ba;
     int ncomp;
@@ -668,7 +673,7 @@ Read (FabArray<FAB>& fa, const std::string& name)
                 auto whichread = allreads[fi].begin();
                 for ( ; whichread != allreads[fi].end(); ++whichread) {
                     const int tryproc = whichread->first;
-                    if (busyprocs.find(tryproc) == busyprocs.end()) { // not busy
+                    if (!busyprocs.contains(tryproc)) { // not busy
                         busyprocs.insert(tryproc);
                         Vector<int> vreads;
                         vreads.reserve(whichread->second.size());

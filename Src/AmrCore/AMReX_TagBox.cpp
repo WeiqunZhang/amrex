@@ -40,7 +40,7 @@ TagBox::coarsen (const IntVect& ratio, const Box& cbox) noexcept
     Array4<char> const& carr = cfab.array();
 
     Box fdomain = domain;
-    Dim3 r{1,1,1};
+    Dim3 r{.x = 1, .y = 1, .z = 1};
     AMREX_D_TERM(r.x = ratio[0];, r.y = ratio[1];, r.z = ratio[2]);
 
     AMREX_HOST_DEVICE_FOR_3D(cbox, i, j, k,
@@ -654,14 +654,15 @@ TagBoxArray::collate (Gpu::PinnedVector<IntVect>& TheGlobalCollateSpace) const
 #if !(defined(__FUJITSU) || defined(__CLANG_FUJITSU))
     ParallelDescriptor::Gatherv(psend, static_cast<int>(count), precv, countvec, offset, IOProcNumber);
 #else
-    const int* psend_int = psend->begin();
-    int* precv_int = precv->begin();
-    Long count_int = count * AMREX_SPACEDIM;
+    const int* psend_int = (count > 0) ? psend->begin() : nullptr;
+    int* precv_int = ParallelDescriptor::IOProcessor() ? precv->begin() : nullptr;
+    AMREX_ALWAYS_ASSERT(count <= (std::numeric_limits<int>::max() / AMREX_SPACEDIM));
+    int count_int = static_cast<int>(count) * AMREX_SPACEDIM;
     auto countvec_int = std::vector<int>(countvec.size());
     auto offset_int = std::vector<int>(offset.size());
     const auto mul_funct = [](const auto el){return el*AMREX_SPACEDIM;};
-    std::transform(countvec.begin(), countvec.end(), countvec_int.begin(), mul_funct);
-    std::transform(offset.begin(), offset.end(), offset_int.begin(), mul_funct);
+    std::ranges::transform(countvec, countvec_int.begin(), mul_funct);
+    std::ranges::transform(offset, offset_int.begin(), mul_funct);
     ParallelDescriptor::Gatherv(
         psend_int, count_int, precv_int, countvec_int, offset_int, IOProcNumber);
 #endif
@@ -693,7 +694,7 @@ TagBoxArray::setVal (const BoxArray& ba, TagBox::TagVal val)
                 Box const& b = is.second;
 #ifdef AMREX_USE_GPU
                 if (run_on_gpu) {
-                    tags.push_back({arr,b});
+                    tags.push_back(Array4BoxTag<char>{.dfab = arr, .dbox = b});
                 } else
 #endif
                 {

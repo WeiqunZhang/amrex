@@ -4,12 +4,13 @@
 
 #ifdef AMREX_USE_GPU
 
+#include <AMReX_Concepts.H>
 #include <algorithm>
 #include <cmath>
 #include <limits>
 
-namespace amrex {
-namespace detail {
+/// \cond DOXYGEN_IGNORE
+namespace amrex::detail {
 
 inline
 void build_par_for_boxes (char*& hp, BoxIndexer*& pboxes, Vector<Box> const& boxes)
@@ -34,9 +35,6 @@ void destroy_par_for_boxes (char* hp, char* dp)
     The_Pinned_Arena()->free(hp);
     The_Arena()->free(dp);
 }
-}
-
-namespace experimental::detail {
 
 namespace parfor_mf_detail {
     template <typename F>
@@ -58,9 +56,9 @@ namespace parfor_mf_detail {
     }
 }
 
-template <int MT, typename MF, typename F>
-std::enable_if_t<IsFabArray<MF>::value>
-ParallelFor (MF const& mf, IntVect const& nghost, int ncomp, IntVect const&, bool, F const& f)
+template <int MT, FabArrayType MF, typename F>
+void
+ParallelFor_doit (MF const& mf, IntVect const& nghost, int ncomp, IntVect const&, bool, F const& f)
 {
     const auto& index_array = mf.IndexArray();
     const int nboxes = index_array.size();
@@ -109,33 +107,32 @@ ParallelFor (MF const& mf, IntVect const& nghost, int ncomp, IntVect const&, boo
     AMREX_GPU_ERROR_CHECK();
 }
 
-template <typename MF, typename F>
-std::enable_if_t<IsFabArray<MF>::value>
-ParallelFor (MF const& mf, IntVect const& nghost, int ncomp, IntVect const& ts, bool dynamic, F&& f)
+template <FabArrayType MF, typename F>
+void
+ParallelFor_doit (MF const& mf, IntVect const& nghost, int ncomp, IntVect const& ts, bool dynamic, F&& f)
 {
 #ifdef AMREX_USE_CUDA
     constexpr int MT = 128;
 #else
     constexpr int MT = AMREX_GPU_MAX_THREADS;
 #endif
-    ParallelFor<MT>(mf, nghost, ncomp, ts, dynamic, std::forward<F>(f));
+    ParallelFor_doit<MT>(mf, nghost, ncomp, ts, dynamic, std::forward<F>(f));
 }
 
-template <typename MF, typename F>
-std::enable_if_t<IsFabArray<MF>::value>
-ParallelFor (MF const& mf, IntVect const& nghost, IntVect const& ts, bool dynamic, F&& f)
+template <FabArrayType MF, typename F>
+void
+ParallelFor_doit (MF const& mf, IntVect const& nghost, IntVect const& ts, bool dynamic, F&& f)
 {
 #ifdef AMREX_USE_CUDA
     constexpr int MT = 128;
 #else
     constexpr int MT = AMREX_GPU_MAX_THREADS;
 #endif
-    ParallelFor<MT>(mf, nghost, 1, ts, dynamic, std::forward<F>(f));
+    ParallelFor_doit<MT>(mf, nghost, 1, ts, dynamic, std::forward<F>(f));
 }
 
 }
-
-}
+/// \endcond
 
 #endif
 #endif

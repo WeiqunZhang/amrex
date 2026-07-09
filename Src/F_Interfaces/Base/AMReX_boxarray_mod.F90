@@ -32,9 +32,7 @@ module amrex_boxarray_module
      procedure, private :: amrex_boxarray_maxsize_int3
      procedure, private :: amrex_boxarray_maxsize_iv
      procedure, private :: amrex_boxarray_intersects_box
-#if !defined(__GFORTRAN__) || (__GNUC__ > 4)
      final :: amrex_boxarray_destroy
-#endif
   end type amrex_boxarray
 
   interface operator(==)
@@ -50,9 +48,11 @@ module amrex_boxarray_module
      module procedure amrex_boxarray_print
   end interface amrex_print
 
+#ifdef __NVCOMPILER
   interface amrex_boxarray_destroy
      module procedure amrex_boxarray_destroy
   end interface amrex_boxarray_destroy
+#endif
 
   ! interfaces to cpp functions
 
@@ -146,6 +146,7 @@ contains
   subroutine amrex_boxarray_build_bx (ba, bx)
     type(amrex_boxarray) :: ba
     type(amrex_box), intent(in ) :: bx
+    call amrex_boxarray_destroy(ba)
     ba%owner = .true.
     call amrex_fi_new_boxarray(ba%p, bx%lo, bx%hi)
   end subroutine amrex_boxarray_build_bx
@@ -153,6 +154,7 @@ contains
   subroutine amrex_boxarray_build_bxs (ba, bxs)
     type(amrex_boxarray) :: ba
     integer,intent(in) :: bxs(:,:,:) ! (lo:hi,dim,#ofboxs)
+    call amrex_boxarray_destroy(ba)
     ba%owner = .true.
     call amrex_fi_new_boxarray_from_bxfarr(ba%p, bxs, size(bxs,1), size(bxs,2), size(bxs,3))
   end subroutine amrex_boxarray_build_bxs
@@ -179,6 +181,7 @@ contains
   subroutine amrex_boxarray_install (this, p)
     class(amrex_boxarray), intent(inout) :: this
     type(c_ptr), intent(in) :: p
+    call amrex_boxarray_destroy(this)
     this%owner = .false.
     this%p     = p
   end subroutine amrex_boxarray_install
@@ -186,6 +189,7 @@ contains
   subroutine amrex_boxarray_clone (dst, src)
     class(amrex_boxarray), intent(inout) :: dst
     type (amrex_boxarray), intent(in   ) :: src
+    call amrex_boxarray_destroy(dst)
     dst%owner = .true.
     call amrex_fi_clone_boxarray(dst%p, src%p)
   end subroutine amrex_boxarray_clone

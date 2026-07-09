@@ -24,7 +24,10 @@ struct Table1D
 
     constexpr Table1D () noexcept = default;
 
-    template <class U=T, std::enable_if_t<std::is_const_v<U>,int> = 0>
+    // Use a template so this constructor never suppresses the
+    // implicit copy constructor when T is non-const.
+    template <class U=T>
+    requires (std::is_const_v<U>)
     AMREX_GPU_HOST_DEVICE
     constexpr Table1D (Table1D<std::remove_const_t<T>> const& rhs) noexcept
         : p(rhs.p),
@@ -42,9 +45,10 @@ struct Table1D
     AMREX_GPU_HOST_DEVICE
     explicit operator bool () const noexcept { return p != nullptr; }
 
-    template <class U=T, std::enable_if_t<!std::is_void_v<U>,int> = 0>
     AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
-    U& operator() (IDX i) const noexcept {
+    T& operator() (IDX i) const noexcept
+        requires (!std::is_void_v<T>)
+    {
 #if defined(AMREX_DEBUG) || defined(AMREX_BOUND_CHECK)
         index_assert(i);
 #endif
@@ -52,7 +56,7 @@ struct Table1D
     }
 
 #if defined(AMREX_DEBUG) || defined(AMREX_BOUND_CHECK)
-    AMREX_GPU_HOST_DEVICE inline
+    AMREX_GPU_HOST_DEVICE
     void index_assert (IDX i) const
     {
         if (i < begin || i >= end) {
@@ -98,7 +102,10 @@ struct Table2D
 
     constexpr Table2D () noexcept = default;
 
-    template <class U=T, std::enable_if_t<std::is_const_v<U>,int> = 0>
+    // Use a template so this constructor never suppresses the
+    // implicit copy constructor when T is non-const.
+    template <class U=T>
+    requires (std::is_const_v<U>)
     AMREX_GPU_HOST_DEVICE
     constexpr Table2D (Table2D<std::remove_const_t<T>, ORDER> const& rhs) noexcept
         : p(rhs.p),
@@ -120,9 +127,10 @@ struct Table2D
     AMREX_GPU_HOST_DEVICE
     explicit operator bool () const noexcept { return p != nullptr; }
 
-    template <class U=T, std::enable_if_t<!std::is_void_v<U>,int> = 0>
     AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
-    U& operator() (int i, int j) const noexcept {
+    T& operator() (int i, int j) const noexcept
+        requires (!std::is_void_v<T>)
+    {
 #if defined(AMREX_DEBUG) || defined(AMREX_BOUND_CHECK)
         index_assert(i,j);
 #endif
@@ -134,7 +142,7 @@ struct Table2D
     }
 
 #if defined(AMREX_DEBUG) || defined(AMREX_BOUND_CHECK)
-    AMREX_GPU_HOST_DEVICE inline
+    AMREX_GPU_HOST_DEVICE
     void index_assert (int i, int j) const
     {
         if (i < begin[0] || i >= end[0] ||
@@ -179,7 +187,10 @@ struct Table3D
 
     constexpr Table3D () noexcept = default;
 
-    template <class U=T, std::enable_if_t<std::is_const_v<U>,int> = 0>
+    // Use a template so this constructor never suppresses the
+    // implicit copy constructor when T is non-const.
+    template <class U=T>
+    requires (std::is_const_v<U>)
     AMREX_GPU_HOST_DEVICE
     constexpr Table3D (Table3D<std::remove_const_t<T>,ORDER> const& rhs) noexcept
         : p(rhs.p),
@@ -203,9 +214,10 @@ struct Table3D
     AMREX_GPU_HOST_DEVICE
     explicit operator bool () const noexcept { return p != nullptr; }
 
-    template <class U=T, std::enable_if_t<!std::is_void_v<U>,int> = 0>
     AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
-    U& operator() (int i, int j, int k) const noexcept {
+    T& operator() (int i, int j, int k) const noexcept
+        requires (!std::is_void_v<T>)
+    {
 #if defined(AMREX_DEBUG) || defined(AMREX_BOUND_CHECK)
         index_assert(i,j,k);
 #endif
@@ -217,7 +229,7 @@ struct Table3D
     }
 
 #if defined(AMREX_DEBUG) || defined(AMREX_BOUND_CHECK)
-    AMREX_GPU_HOST_DEVICE inline
+    AMREX_GPU_HOST_DEVICE
     void index_assert (int i, int j, int k) const
     {
         if (i < begin[0] || i >= end[0] ||
@@ -272,7 +284,10 @@ struct Table4D
 
     constexpr Table4D () noexcept = default;
 
-    template <class U=T, std::enable_if_t<std::is_const_v<U>,int> = 0>
+    // Use a template so this constructor never suppresses the
+    // implicit copy constructor when T is non-const.
+    template <class U=T>
+    requires (std::is_const_v<U>)
     AMREX_GPU_HOST_DEVICE
     constexpr Table4D (Table4D<std::remove_const_t<T>,ORDER> const& rhs) noexcept
         : p(rhs.p),
@@ -298,9 +313,10 @@ struct Table4D
     AMREX_GPU_HOST_DEVICE
     explicit operator bool () const noexcept { return p != nullptr; }
 
-    template <class U=T, std::enable_if_t<!std::is_void_v<U>,int> = 0>
     AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
-    U& operator() (int i, int j, int k, int n) const noexcept {
+    T& operator() (int i, int j, int k, int n) const noexcept
+        requires (!std::is_void_v<T>)
+    {
 #if defined(AMREX_DEBUG) || defined(AMREX_BOUND_CHECK)
         index_assert(i,j,k,n);
 #endif
@@ -312,7 +328,7 @@ struct Table4D
     }
 
 #if defined(AMREX_DEBUG) || defined(AMREX_BOUND_CHECK)
-    AMREX_GPU_HOST_DEVICE inline
+    AMREX_GPU_HOST_DEVICE
     void index_assert (int i, int j, int k, int n) const
     {
         if (i < begin[0] || i >= end[0] ||
@@ -384,7 +400,7 @@ private:
  * that is initialized on CPU and is read-only by all GPU threads on the
  * device.
  *
- * \code
+ * \code{.cpp}
  *      Array<int,3> tlo{0,0,0}; // lower bounds
  *      Array<int,3> thi{100,100,100}; // upper bounds
  *      TableData<Real,3> table_data(tlo, thi);
@@ -580,6 +596,7 @@ TableData<T,N,ORDER>::define ()
     }
 }
 
+/// \cond DOXYGEN_IGNORE
 namespace detail {
     template <typename T, Order>
     Table1D<T> make_table (T* p, Array<int,1> const& lo, Array<int,1> const& hi) {
@@ -590,14 +607,15 @@ namespace detail {
         return Table2D<T,ORDER>(p, {lo[0],lo[1]}, {hi[0]+1,hi[1]+1});
     }
     template <typename T, Order ORDER>
-    Table3D<T> make_table (T* p, Array<int,3> const& lo, Array<int,3> const& hi) {
+    Table3D<T,ORDER> make_table (T* p, Array<int,3> const& lo, Array<int,3> const& hi) {
         return Table3D<T,ORDER>(p, {lo[0],lo[1],lo[2]}, {hi[0]+1,hi[1]+1,hi[2]+1});
     }
     template <typename T, Order ORDER>
-    Table4D<T> make_table (T* p, Array<int,4> const& lo, Array<int,4> const& hi) {
+    Table4D<T,ORDER> make_table (T* p, Array<int,4> const& lo, Array<int,4> const& hi) {
         return Table4D<T,ORDER>(p, {lo[0],lo[1],lo[2],lo[3]}, {hi[0]+1,hi[1]+1,hi[2]+1,hi[3]+1});
     }
 }
+/// \endcond
 
 template <typename T, int N, Order ORDER>
 typename TableData<T,N,ORDER>::table_type
@@ -625,6 +643,8 @@ void
 TableData<T,N,ORDER>::copy (TableData<T,N,ORDER> const& rhs) noexcept
 {
     std::size_t count = sizeof(T)*size();
+    if (count == 0) { return; }
+    AMREX_ASSERT(count == sizeof(T)*rhs.size());
 #ifdef AMREX_USE_GPU
     bool this_on_device = arena()->isManaged() || arena()->isDevice();
     bool rhs_on_device = rhs.arena()->isManaged() || rhs.arena()->isDevice();

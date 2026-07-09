@@ -22,9 +22,6 @@ C$(AMREX_BASE)_headers += AMReX_GpuComplex.H
 C$(AMREX_BASE)_headers += AMReX_PODVector.H
 C$(AMREX_BASE)_sources += AMReX_PODVector.cpp
 
-C$(AMREX_BASE)_headers += AMReX_BlockMutex.H
-C$(AMREX_BASE)_sources += AMReX_BlockMutex.cpp
-
 C$(AMREX_BASE)_headers += AMReX_Stack.H
 
 C$(AMREX_BASE)_headers += AMReX_String.H
@@ -56,8 +53,8 @@ C$(AMREX_BASE)_headers += AMReX_ParallelReduce.H
 C$(AMREX_BASE)_headers += AMReX_ForkJoin.H AMReX_ParallelContext.H
 C$(AMREX_BASE)_sources += AMReX_ForkJoin.cpp AMReX_ParallelContext.cpp
 
-C$(AMREX_BASE)_sources += AMReX_VisMF.cpp AMReX_Arena.cpp AMReX_BArena.cpp AMReX_CArena.cpp AMReX_PArena.cpp
-C$(AMREX_BASE)_headers += AMReX_VisMFBuffer.H AMReX_VisMF.H AMReX_Arena.H AMReX_BArena.H AMReX_CArena.H AMReX_PArena.H
+C$(AMREX_BASE)_sources += AMReX_VisMF.cpp AMReX_Arena.cpp AMReX_BArena.cpp AMReX_CArena.cpp AMReX_PArena.cpp AMReX_SArena.cpp
+C$(AMREX_BASE)_headers += AMReX_VisMFBuffer.H AMReX_VisMF.H AMReX_Arena.H AMReX_BArena.H AMReX_CArena.H AMReX_PArena.H AMReX_SArena.H
 
 C$(AMREX_BASE)_headers += AMReX_DataAllocator.H
 
@@ -86,7 +83,7 @@ C$(AMREX_BASE)_headers += AMReX_GpuKernelInfo.H
 
 C$(AMREX_BASE)_headers += AMReX_GpuLaunchMacrosG.H AMReX_GpuLaunchFunctsG.H
 C$(AMREX_BASE)_headers += AMReX_GpuLaunchMacrosG.nolint.H
-C$(AMREX_BASE)_headers += AMReX_GpuLaunchMacrosC.H AMReX_GpuLaunchFunctsC.H
+C$(AMREX_BASE)_headers += AMReX_GpuLaunchMacrosC.H AMReX_GpuLaunchFunctsC.H AMReX_GpuLaunchFunctsSIMD.H
 C$(AMREX_BASE)_headers += AMReX_GpuLaunchMacrosC.nolint.H
 C$(AMREX_BASE)_headers += AMReX_GpuLaunchGlobal.H
 C$(AMREX_BASE)_headers += AMReX_GpuLaunch.H
@@ -110,18 +107,26 @@ C$(AMREX_BASE)_sources += AMReX_GpuElixir.cpp
 
 C$(AMREX_BASE)_headers += AMReX_GpuReduce.H
 
-C$(AMREX_BASE)_headers += AMReX_CudaGraph.H AMReX_GpuContainers.H
+C$(AMREX_BASE)_headers += AMReX_CudaGraph.H
+C$(AMREX_BASE)_headers += AMReX_GpuContainers.H
+C$(AMREX_BASE)_headers += AMReX_TrackedVector.H
 
 C$(AMREX_BASE)_headers += AMReX_GpuAllocators.H
+C$(AMREX_BASE)_headers += AMReX_GpuParallelReduce.H
 
 C$(AMREX_BASE)_headers += AMReX_MFParallelFor.H
 C$(AMREX_BASE)_headers += AMReX_MFParallelForC.H
 C$(AMREX_BASE)_headers += AMReX_MFParallelForG.H
 
+C$(AMREX_BASE)_headers += AMReX_SIMD.H
+
 C$(AMREX_BASE)_headers += AMReX_TagParallelFor.H
 C$(AMREX_BASE)_headers += AMReX_CTOParallelForImpl.H
 
 C$(AMREX_BASE)_headers += AMReX_ParReduce.H
+
+C$(AMREX_BASE)_headers += AMReX_Concepts.H
+
 
 #
 # I/O stuff.
@@ -133,7 +138,7 @@ C${AMREX_BASE}_headers += AMReX_IOFormat.H
 #
 # Index space.
 #
-C$(AMREX_BASE)_sources += AMReX_Box.cpp AMReX_BoxIterator.cpp AMReX_IntVect.cpp AMReX_IndexType.cpp AMReX_Orientation.cpp AMReX_Periodicity.cpp
+C$(AMREX_BASE)_sources += AMReX_Box.cpp AMReX_IndexType.cpp AMReX_Orientation.cpp AMReX_Periodicity.cpp
 C$(AMREX_BASE)_headers += AMReX_Box.H AMReX_BoxIterator.H AMReX_IntVect.H AMReX_IndexType.H AMReX_Orientation.H AMReX_Periodicity.H
 
 C$(AMREX_BASE)_headers += AMReX_Dim3.H AMReX_Loop.H AMReX_Loop.nolint.H
@@ -141,7 +146,7 @@ C$(AMREX_BASE)_headers += AMReX_Dim3.H AMReX_Loop.H AMReX_Loop.nolint.H
 #
 # Real space.
 #
-C$(AMREX_BASE)_sources += AMReX_RealBox.cpp AMReX_RealVect.cpp
+C$(AMREX_BASE)_sources += AMReX_RealBox.cpp
 C$(AMREX_BASE)_headers += AMReX_RealBox.H   AMReX_RealVect.H
 
 #
@@ -193,7 +198,7 @@ C$(AMREX_BASE)_sources += AMReX_MultiFabUtil.cpp
 C$(AMREX_BASE)_headers += AMReX_MultiFabUtilI.H
 
 #
-# Boundary-related 
+# Boundary-related
 #
 C$(AMREX_BASE)_sources += AMReX_BCRec.cpp
 C$(AMREX_BASE)_headers += AMReX_BCRec.H AMReX_BC_TYPES.H
@@ -308,7 +313,7 @@ INCLUDE_LOCATIONS += $(AMREX_HOME)/Src/Base
 
 CEXE_headers += amrex_parser.lex.h
 CEXE_headers += amrex_parser.lex.nolint.H
-CEXE_sources += amrex_parser.lex.cpp 
+CEXE_sources += amrex_parser.lex.cpp
 CEXE_headers += amrex_parser.tab.h
 CEXE_headers += amrex_parser.tab.nolint.H
 CEXE_sources += amrex_parser.tab.cpp
@@ -324,7 +329,7 @@ CEXE_sources += AMReX_Parser.cpp
 
 CEXE_headers += amrex_iparser.lex.h
 CEXE_headers += amrex_iparser.lex.nolint.H
-CEXE_sources += amrex_iparser.lex.cpp 
+CEXE_sources += amrex_iparser.lex.cpp
 CEXE_headers += amrex_iparser.tab.h
 CEXE_headers += amrex_iparser.tab.nolint.H
 CEXE_sources += amrex_iparser.tab.cpp

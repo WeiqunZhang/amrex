@@ -5,9 +5,13 @@
 #include <AMReX_GpuQualifiers.H>
 #include <AMReX_Extension.H>
 #include <AMReX_INT.H>
+#include <AMReX_SIMD.H>
 #include <AMReX_REAL.H>
+#include <concepts>
 #include <cmath>
 #include <cstdlib>
+#include <limits>
+#include <numbers>
 #include <type_traits>
 #include <utility>
 
@@ -15,20 +19,23 @@
 #  include <sycl/sycl.hpp>
 #endif
 
-namespace amrex { inline namespace disabled {
+namespace amrex { // NOLINT(modernize-concat-nested-namespaces)
+/// \cond DOXYGEN_IGNORE
+inline namespace disabled {
     // If it is inside namespace amrex, or amrex namespace is imported with using namespace amrex or
     // amrex::disabled, unqualified abs functions are disabled with a compile time error such as,
     // call of overload abs(int&) is ambiguous, or a link time error such as, undefined reference to
     // `amrex::disabled::abs(double)'.  To fix it, one can use `std::abs` or `amrex::Math::abs`.
-    // The latter works in both host and device functions, whereas `std::abs` does not currently
-    // work on device with HIP and SYCL.
+    // We have amrex::Math::abs, because std::abs did not work with HIP and SYCL in the past.
     AMREX_GPU_HOST_DEVICE double abs (double);
     AMREX_GPU_HOST_DEVICE float abs (float);
     AMREX_GPU_HOST_DEVICE long double abs (long double);
     AMREX_GPU_HOST_DEVICE int abs (int);
     AMREX_GPU_HOST_DEVICE long abs (long);
     AMREX_GPU_HOST_DEVICE long long abs (long long);
-}}
+}
+/// \endcond
+}
 
 namespace amrex::Math {
 
@@ -58,10 +65,10 @@ using std::isinf;
 
 #endif
 
-template <typename T>
-constexpr std::enable_if_t<std::is_floating_point_v<T>,T> pi ()
+template <std::floating_point T>
+constexpr T pi ()
 {
-    return T(3.1415926535897932384626433832795029L);
+    return std::numbers::pi_v<T>;
 }
 
 //! Return cos(x*pi) given x
@@ -112,6 +119,7 @@ float sinpi (float x)
 #endif
 }
 
+/// \cond DOXYGEN_IGNORE
 namespace detail {
     AMREX_FORCE_INLINE void sincos (double x, double* sinx, double* cosx) {
 #if defined(_GNU_SOURCE) && !defined(__APPLE__)
@@ -131,6 +139,22 @@ namespace detail {
 #endif
     }
 }
+/// \endcond
+
+#ifdef AMREX_USE_SIMD
+//! Return sine and cosine of given number
+template<typename T_Real>
+requires (amrex::simd::stdx::is_simd_v<T_Real>)
+AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+std::pair<T_Real,T_Real> sincos (T_Real x)
+{
+    using namespace amrex::simd::stdx;
+    std::pair<T_Real,T_Real> r;
+    r.first = sin(x);
+    r.second = cos(x);
+    return r;
+}
+#endif
 
 //! Return sine and cosine of given number
 AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
@@ -159,6 +183,22 @@ std::pair<float,float> sincos (float x)
 #endif
     return r;
 }
+
+#ifdef AMREX_USE_SIMD
+//! Return sin(pi*x) and cos(pi*x) given x
+template<typename T_Real>
+requires (amrex::simd::stdx::is_simd_v<T_Real>)
+AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+std::pair<T_Real,T_Real> sincospi (T_Real x)
+{
+    using namespace amrex::simd::stdx;
+    T_Real const px = pi<typename T_Real::value_type>() * x;
+    std::pair<T_Real,T_Real> r;
+    r.first = sin(px);
+    r.second = cos(px);
+    return r;
+}
+#endif
 
 //! Return sin(pi*x) and cos(pi*x) given x
 AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
@@ -189,8 +229,8 @@ std::pair<float,float> sincospi (float x)
 }
 
 //! Return pow(x, Power), where Power is an integer known at compile time
-template <int Power, typename T,
-    typename = std::enable_if_t<!std::is_integral<T>() || Power>=0>>
+template <int Power, typename T>
+requires (!std::integral<T> || Power >= 0)
 AMREX_FORCE_INLINE
 constexpr T powi (T x) noexcept
 {
@@ -208,6 +248,60 @@ constexpr T powi (T x) noexcept
     } else {
         return x*powi<Power-1>(x);
     }
+}
+
+} // namespace amrex::Math
+
+#if defined(AMREX_USE_CUDA)
+// Forward-declare libdevice integer-exponent intrinsics. They are part of
+// NVIDIA's libdevice and linked at PTX time but are not declared in standard
+// CUDA cmath headers outside __CUDACC_RTC__ / _LIBCPP_VERSION blocks.
+// See https://docs.nvidia.com/cuda/libdevice-users-guide/__nv_powif.html
+extern "C" __device__ float  __nv_powif (float,  int);
+extern "C" __device__ double __nv_powi  (double, int);
+#endif
+
+namespace amrex::Math {
+
+//! Return pow(x, n) with a runtime integer exponent.
+//!
+//! On GPU backends this routes to the integer-exponent intrinsic
+//! (libdevice __nv_powif / __nv_powi on CUDA, __ocml_pown_f32 /
+//! __ocml_pown_f64 on HIP, sycl::pown on SYCL), which is faster than the
+//! general pow and avoids the C++11 mixed-arg promotion that would
+//! otherwise call the slower double-precision pow(double, double) and
+//! narrow on return. On host it casts the int exponent to the
+//! floating-point type and calls std::pow.
+AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+float powi (float x, int n) noexcept
+{
+#if defined(AMREX_USE_SYCL)
+    return sycl::pown(x, n);
+#elif defined(AMREX_USE_HIP)
+    AMREX_IF_ON_DEVICE(( return ::powif(x, n); ))
+    AMREX_IF_ON_HOST(( return std::pow(x, static_cast<float>(n)); ))
+#elif defined(AMREX_USE_CUDA)
+    AMREX_IF_ON_DEVICE(( return __nv_powif(x, n); ))
+    AMREX_IF_ON_HOST(( return std::pow(x, static_cast<float>(n)); ))
+#else
+    return std::pow(x, static_cast<float>(n));
+#endif
+}
+
+AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+double powi (double x, int n) noexcept
+{
+#if defined(AMREX_USE_SYCL)
+    return sycl::pown(x, n);
+#elif defined(AMREX_USE_HIP)
+    AMREX_IF_ON_DEVICE(( return ::powi(x, n); ))
+    AMREX_IF_ON_HOST(( return std::pow(x, n); ))
+#elif defined(AMREX_USE_CUDA)
+    AMREX_IF_ON_DEVICE(( return __nv_powi(x, n); ))
+    AMREX_IF_ON_HOST(( return std::pow(x, n); ))
+#else
+    return std::pow(x, n);
+#endif
 }
 
 #if defined(AMREX_INT128_SUPPORTED)
@@ -290,6 +384,62 @@ T comp_ellint_2 (T k)
     }
 
     return Kcomp*sum_val;
+}
+
+//! Return inverse square root of x
+AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+double rsqrt (double x)
+{
+    double r;
+#if defined(AMREX_USE_SYCL)
+    AMREX_IF_ON_DEVICE(( r = sycl::rsqrt(x); ))
+#else
+    AMREX_IF_ON_DEVICE(( r = ::rsqrt(x); ))
+#endif
+    AMREX_IF_ON_HOST(( r = 1. / std::sqrt(x); ))
+    return r;
+}
+
+//! Return inverse square root of x
+AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+float rsqrt (float x)
+{
+    float r;
+#if defined(AMREX_USE_SYCL)
+    AMREX_IF_ON_DEVICE(( r = sycl::rsqrt(x); ))
+#else
+    AMREX_IF_ON_DEVICE(( r = ::rsqrtf(x); ))
+#endif
+    AMREX_IF_ON_HOST(( r = 1.F / std::sqrt(x); ))
+    return r;
+}
+
+//! Return 10**x
+AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+double exp10 (double x)
+{
+    double r;
+#if defined(AMREX_USE_SYCL)
+    AMREX_IF_ON_DEVICE(( r = sycl::exp10(x); ))
+#else
+    AMREX_IF_ON_DEVICE(( r = ::exp10(x); ))
+#endif
+    AMREX_IF_ON_HOST(( r = std::pow(10.0, x); ))
+    return r;
+}
+
+//! Return 10**x
+AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+float exp10 (float x)
+{
+    float r;
+#if defined(AMREX_USE_SYCL)
+    AMREX_IF_ON_DEVICE(( r = sycl::exp10(x); ))
+#else
+    AMREX_IF_ON_DEVICE(( r = ::exp10f(x); ))
+#endif
+    AMREX_IF_ON_HOST(( r = std::pow(10.0F, x); ))
+    return r;
 }
 
 /***************************************************************************************************

@@ -5,17 +5,25 @@
 #include <AMReX_MultiFab.H>
 #include <AMReX_FFT_Helper.H>
 #include <algorithm>
+#include <map>
 #include <numeric>
 #include <tuple>
 
 namespace amrex::FFT
 {
 
+/**
+ * \file AMReX_FFT_R2C.H
+ *
+ * Parallel real-to-complex FFT wrappers that operate on MultiFabs/FabArrays.
+ */
+
 template <typename T> class OpenBCSolver;
 template <typename T> class Poisson;
 template <typename T> class PoissonHybrid;
 
 /**
+ * \ingroup amrex_fft
  * \brief Parallel Discrete Fourier Transform
  *
  * This class supports Fourier transforms between real and complex data. The
@@ -95,8 +103,8 @@ public:
      * This should only be called once unless the domain decomposition
      * changes.
      *
-     * local_start starting indices of the local domain
-     * local_size size of the local domain
+     * \param local_start Starting indices of the local domain in each direction.
+     * \param local_size  Extent of the local domain handled by this rank.
      */
     void setLocalDomain (std::array<int,AMREX_SPACEDIM> const& local_start,
                          std::array<int,AMREX_SPACEDIM> const& local_size);
@@ -111,6 +119,8 @@ public:
      * This is needed, only if one uses the raw pointer interfaces, not the
      * amrex::MulitFab interfaces. Only one of the functions, setLocalDomain
      * and getLocalDomain, should be called.
+     *
+     * \return Pair of (local start indices, local extents).
      */
     std::pair<std::array<int,AMREX_SPACEDIM>,std::array<int,AMREX_SPACEDIM>>
     getLocalDomain () const;
@@ -140,8 +150,8 @@ public:
      * This should only be called once unless the domain decomposition
      * changes.
      *
-     * local_start starting indices of the local domain
-     * local_size size of the local domain
+     * \param local_start Starting indices of the local spectral sub-domain.
+     * \param local_size  Extent of the spectral data handled by this rank.
      */
     void setLocalSpectralDomain (std::array<int,AMREX_SPACEDIM> const& local_start,
                                  std::array<int,AMREX_SPACEDIM> const& local_size);
@@ -162,6 +172,7 @@ public:
      * decomposition. Also note that the entire spectral domain has the size
      * of (nx+1)/2 * ny * nz, if the real domain is nx * ny * nz.
      *
+     * \return Pair of (local start indices, local extents).
      */
     std::pair<std::array<int,AMREX_SPACEDIM>,std::array<int,AMREX_SPACEDIM>>
     getLocalSpectralDomain () const;
@@ -180,16 +191,21 @@ public:
      * \param outmf        output data in MultiFab or FabArray<BaseFab<float>>
      * \param post_forward a callable object for processing the post-forward
      *                     data before the backward transform. Its interface
-     *                     is `(int,int,int,GpuComplex<T>&)`, where the integers
+     *                     is `void(int,int,int,GpuComplex<T>&)`, where the integers
      *                     are indices in the spectral space, and the reference
      *                     to the complex number allows for the modification of
      *                     the spectral data at that location.
+     * \param incomp component index of input data
+     * \param outcomp component index of output data
      */
-    template <typename F, Direction DIR=D,
-              std::enable_if_t<DIR == Direction::both, int> = 0>
+    template <typename F, Direction DIR=D>
+    requires (DIR == Direction::both)
     void forwardThenBackward (MF const& inmf, MF& outmf, F const& post_forward,
                               int incomp = 0, int outcomp = 0)
     {
+        AMREX_ALWAYS_ASSERT_WITH_MESSAGE(
+            !m_info.twod_mode && m_info.batch_size == 1,
+            "FFT::R2C::forwardThenBackward(post_forward) currently supports only !twod_mode and batch_size==1");
         BL_PROFILE("FFT::R2C::forwardbackward");
         this->forward(inmf, incomp);
         this->post_forward_doit_0(post_forward);
@@ -204,9 +220,10 @@ public:
      * backward-only transform.
      *
      * \param inmf input data in MultiFab or FabArray<BaseFab<float>>
+     * \param incomp component index of input data
      */
-    template <Direction DIR=D, std::enable_if_t<DIR == Direction::forward ||
-                                                DIR == Direction::both, int> = 0>
+    template <Direction DIR=D>
+    requires ((DIR == Direction::forward) || (DIR == Direction::both))
     void forward (MF const& inmf, int incomp = 0);
 
     /**
@@ -217,9 +234,11 @@ public:
      *
      * \param inmf input data in MultiFab or FabArray<BaseFab<float>>
      * \param outmf output data in FabArray<BaseFab<GpuComplex<T>>>
+     * \param incomp component index of input data
+     * \param outcomp component index of output data
      */
-    template <Direction DIR=D, std::enable_if_t<DIR == Direction::forward ||
-                                                DIR == Direction::both, int> = 0>
+    template <Direction DIR=D>
+    requires ((DIR == Direction::forward) || (DIR == Direction::both))
     void forward (MF const& inmf, cMF& outmf, int incomp = 0, int outcomp = 0);
 
     /**
@@ -234,12 +253,14 @@ public:
      * because it has better performance. All processes need to call this
      * function even if their local size is zero. If the local size is zero,
      * one can pass nullptrs.
+     *
+     * \param in  Real-domain input data laid out as specified by setLocalDomain.
+     * \param out Complex-domain buffer that receives the Hermitian half-spectrum.
      */
-    template <typename RT, typename CT, Direction DIR=D, bool CP=C,
-              std::enable_if_t<(DIR == Direction::forward ||
-                                DIR == Direction::both)
-                               && ((sizeof(RT)*2 == sizeof(CT) && !CP) ||
-                                   (sizeof(RT) == sizeof(CT) && CP)), int> = 0>
+    template <typename RT, typename CT, Direction DIR=D, bool CP=C>
+    requires ((DIR == Direction::forward) || (DIR == Direction::both))
+          && (((sizeof(RT)*2 == sizeof(CT)) && (!CP))
+              || ((sizeof(RT) == sizeof(CT)) && CP))
     void forward (RT const* in, CT* out);
 
     /**
@@ -249,8 +270,10 @@ public:
      * instantiated for transforms in both directions.
      *
      * \param outmf output data in MultiFab or FabArray<BaseFab<float>>
+     * \param outcomp component index of output data
      */
-    template <Direction DIR=D, std::enable_if_t<DIR == Direction::both, int> = 0>
+    template <Direction DIR=D>
+    requires (DIR == Direction::both)
     void backward (MF& outmf, int outcomp = 0);
 
     /**
@@ -261,9 +284,11 @@ public:
      *
      * \param inmf input data in FabArray<BaseFab<GpuComplex<T>>>
      * \param outmf output data in MultiFab or FabArray<BaseFab<float>>
+     * \param incomp component index of input data
+     * \param outcomp component index of output data
      */
-    template <Direction DIR=D, std::enable_if_t<DIR == Direction::backward ||
-                                                DIR == Direction::both, int> = 0>
+    template <Direction DIR=D>
+    requires ((DIR == Direction::backward) || (DIR == Direction::both))
     void backward (cMF const& inmf, MF& outmf, int incomp = 0, int outcomp = 0);
 
     /**
@@ -278,17 +303,23 @@ public:
      * because it has better performance. All processes need to call this
      * function even if their local size is zero. If the local size is zero,
      * one can pass nullptrs.
+     *
+     * \param in  Complex-domain data.
+     * \param out Real-domain buffer that receives the transformed data.
      */
-    template <typename CT, typename RT, Direction DIR=D, bool CP=C,
-              std::enable_if_t<(DIR == Direction::backward ||
-                                DIR == Direction::both)
-                               && ((sizeof(RT)*2 == sizeof(CT) && !CP) ||
-                                   (sizeof(RT) == sizeof(CT) && CP)), int> = 0>
+    template <typename CT, typename RT, Direction DIR=D, bool CP=C>
+    requires ((DIR == Direction::backward) || (DIR == Direction::both))
+          && (((sizeof(RT)*2 == sizeof(CT)) && (!CP))
+              || ((sizeof(RT) == sizeof(CT)) && CP))
     void backward (CT const* in, RT* out);
 
-    //! Scaling factor. If the data goes through forward and then backward,
-    //! the result multiplied by the scaling factor is equal to the original
-    //! data.
+    /**
+     * \brief Scaling factor. If the data goes through forward and then backward,
+     * the result multiplied by the scaling factor is equal to the original
+     * data.
+     *
+     * \return Normalization factor (1 divided by the logical domain size).
+     */
     [[nodiscard]] T scalingFactor () const;
 
     /**
@@ -299,10 +330,13 @@ public:
      * the returned data array does not have the usual ordering of
      * `(x,y,z)`. The order is specified in the second part of the return
      * value.
+     *
+     * \return Pair of (spectral MultiFab pointer, permutation describing storage order).
      */
-    template <Direction DIR=D, std::enable_if_t<DIR == Direction::forward ||
-                                                DIR == Direction::both, int> = 0>
+    template <Direction DIR=D>
+    requires ((DIR == Direction::forward) || (DIR == Direction::both))
     std::pair<cMF*,IntVect> getSpectralData () const;
+
 
     /**
      * \brief Get BoxArray and DistributionMapping for spectral data
@@ -310,14 +344,25 @@ public:
      * The returned BoxArray and DistributionMapping can be used to build
      * FabArray<BaseFab<GpuComplex<T>>> for spectral data. The returned
      * BoxArray has the usual order of `(x,y,z)`.
+     *
+     * \return Layout describing the complex-space tiling and distribution.
      */
     [[nodiscard]] std::pair<BoxArray,DistributionMapping> getSpectralDataLayout () const;
 
-    // This is a private function, but it's public for cuda.
+    /**
+     * \brief CUDA-visible hook that walks internal spectral data and applies \p post_forward.
+     *
+     * \param post_forward Functor invoked on each spectral coefficient (`void(int,int,int,GpuComplex<T>&)`).
+     */
     template <typename F>
     void post_forward_doit_0 (F const& post_forward);
 
     template <typename F>
+    /**
+     * \brief CUDA-visible helper that redistributes and applies \p post_forward for the batched layout.
+     *
+     * \param post_forward Functor invoked on each spectral coefficient (`void(int,int,int,GpuComplex<T>&)`).
+     */
     void post_forward_doit_1 (F const& post_forward);
 
 private:
@@ -334,6 +379,11 @@ private:
                         int incomp = 0, int outcomp = 0);
 
     std::pair<Plan<T>,Plan<T>> make_c2c_plans (cMF& inout, int ndims) const;
+
+    [[nodiscard]] MF& make_m_rx_alias (IndexType const& ix_type);
+
+    [[nodiscard]] Periodicity make_m_rx_alias_periodicity (IndexType const& ix_type,
+                                                           Periodicity const& period) const;
 
     static Box make_domain_x (Box const& domain)
     {
@@ -423,6 +473,8 @@ private:
     mutable MF m_raw_mf;
     mutable cMF m_raw_cmf;
 
+    std::map<IntVect,MF> m_rx_aliases;
+
     std::unique_ptr<char,DataDeleter> m_data_1;
     std::unique_ptr<char,DataDeleter> m_data_2;
 
@@ -483,11 +535,7 @@ R2C<T,D,C>::R2C (Box const& domain, Info const& info)
 #if (AMREX_SPACEDIM == 3)
     if (m_info.domain_strategy == DomainStrategy::automatic) {
         if (m_info.twod_mode) {
-            if (m_real_domain.length(2) < nprocs) {
-                m_info.domain_strategy = DomainStrategy::pencil;
-            } else {
-                m_info.domain_strategy = DomainStrategy::slab;
-            }
+            m_info.domain_strategy = DomainStrategy::slab;
         } else {
             int shortside = m_real_domain.shortside();
             if (shortside < m_info.pencil_threshold*nprocs) {
@@ -497,10 +545,11 @@ R2C<T,D,C>::R2C (Box const& domain, Info const& info)
             }
         }
     }
-    if (m_info.domain_strategy == DomainStrategy::slab && (m_real_domain.length(1) > 1)) {
-        if (m_info.twod_mode && m_real_domain.length(2) == 1) {
-            m_slab_decomp = false;
-        } else {
+
+    if (!m_info.oned_mode) {
+        if (m_info.twod_mode) {
+            m_slab_decomp = true;
+        } else if (m_info.domain_strategy == DomainStrategy::slab && (m_real_domain.length(1) > 1)) {
             m_slab_decomp = true;
         }
     }
@@ -509,7 +558,8 @@ R2C<T,D,C>::R2C (Box const& domain, Info const& info)
     auto const ncomp = m_info.batch_size;
 
     auto bax = amrex::decompose(m_real_domain, nprocs,
-                                {AMREX_D_DECL(false,!m_slab_decomp,true)}, true);
+                                {AMREX_D_DECL(false,!m_slab_decomp,m_real_domain.length(2)>1)}, true);
+
     DistributionMapping dmx = detail::make_iota_distromap(bax.size());
     m_rx.define(bax, dmx, ncomp, 0, MFInfo().SetAlloc(false));
 
@@ -523,7 +573,8 @@ R2C<T,D,C>::R2C (Box const& domain, Info const& info)
         m_cx.define(cbax, dmx, ncomp, 0, MFInfo().SetAlloc(false));
     }
 
-    m_do_alld_fft = (ParallelDescriptor::NProcs() == 1) && (! m_info.twod_mode);
+    m_do_alld_fft = (ParallelDescriptor::NProcs() == 1) &&
+                    (! m_info.twod_mode) && (! m_info.oned_mode);
 
     if (!m_do_alld_fft) // do a series of 1d or 2d ffts
     {
@@ -532,13 +583,8 @@ R2C<T,D,C>::R2C (Box const& domain, Info const& info)
         //
 
 #if (AMREX_SPACEDIM >= 2)
-#if (AMREX_SPACEDIM == 2)
-        bool batch_on_y = false;
-#else
-        bool batch_on_y = m_info.twod_mode && (m_real_domain.length(2) == 1);
-#endif
         DistributionMapping cdmy;
-        if ((m_real_domain.length(1) > 1) && !m_slab_decomp && !batch_on_y)
+        if ((m_real_domain.length(1) > 1) && !m_slab_decomp && !m_info.oned_mode)
         {
             auto cbay = amrex::decompose(m_spectral_domain_y, nprocs,
                                          {AMREX_D_DECL(false,true,true)}, true);
@@ -552,8 +598,9 @@ R2C<T,D,C>::R2C (Box const& domain, Info const& info)
 #endif
 
 #if (AMREX_SPACEDIM == 3)
-        if (m_real_domain.length(1) > 1 &&
-            (! m_info.twod_mode && m_real_domain.length(2) > 1))
+        if (!m_info.oned_mode && !m_info.twod_mode &&
+            m_real_domain.length(1) > 1 &&
+            m_real_domain.length(2) > 1)
         {
             auto cbaz = amrex::decompose(m_spectral_domain_z, nprocs,
                                          {false,true,true}, true);
@@ -724,20 +771,18 @@ R2C<T,D,C>::make_layout_from_local_domain (std::array<int,AMREX_SPACEDIM> const&
     IntVect len(local_size);
     Box bx(lo, lo+len-1);
 #ifdef AMREX_USE_MPI
-    Vector<Box> allboxes(ParallelDescriptor::NProcs());
+    Vector<Box> allboxes(ParallelContext::NProcsSub());
     MPI_Allgather(&bx, 1, ParallelDescriptor::Mpi_typemap<Box>::type(),
                   allboxes.data(), 1, ParallelDescriptor::Mpi_typemap<Box>::type(),
-                  ParallelDescriptor::Communicator());
+                  ParallelContext::CommunicatorSub());
     Vector<int> pmap;
     pmap.reserve(allboxes.size());
     for (int i = 0; i < allboxes.size(); ++i) {
         if (allboxes[i].ok()) {
-            pmap.push_back(i);
+            pmap.push_back(ParallelContext::local_to_global_rank(i));
         }
     }
-    allboxes.erase(std::remove_if(allboxes.begin(), allboxes.end(),
-                                  [=] (Box const& b) { return b.isEmpty(); }),
-                   allboxes.end());
+    std::erase_if(allboxes, [=] (Box const& b) { return b.isEmpty(); });
     BoxList bl(std::move(allboxes));
     return std::make_pair(BoxArray(std::move(bl)), DistributionMapping(std::move(pmap)));
 #else
@@ -760,7 +805,7 @@ R2C<T,D,C>::getLocalDomain () const
     m_raw_mf = MF(m_rx.boxArray(), m_rx.DistributionMap(), m_rx.nComp(), 0,
                   MFInfo{}.SetAlloc(false));
 
-    auto const myproc = ParallelDescriptor::MyProc();
+    auto const myproc = ParallelContext::MyProcSub();
     if (myproc < m_rx.size()) {
         Box const& box = m_rx.box(myproc);
         return std::make_pair(box.smallEnd().toArray(),
@@ -788,7 +833,7 @@ R2C<T,D,C>::getLocalSpectralDomain () const
 
     m_raw_cmf = cMF(ba, dm, ncomp, 0, MFInfo{}.SetAlloc(false));
 
-    auto const myproc = ParallelDescriptor::MyProc();
+    auto const myproc = ParallelContext::MyProcSub();
     if (myproc < m_raw_cmf.size()) {
         Box const& box = m_raw_cmf.box(myproc);
         return std::make_pair(box.smallEnd().toArray(), box.length().toArray());
@@ -855,8 +900,51 @@ void R2C<T,D,C>::prepare_openbc ()
 }
 
 template <typename T, Direction D, bool C>
-template <Direction DIR, std::enable_if_t<DIR == Direction::forward ||
-                                          DIR == Direction::both, int> >
+typename R2C<T,D,C>::MF&
+R2C<T,D,C>::make_m_rx_alias (IndexType const& ix_type)
+{
+    auto const key = ix_type.ixType();
+    auto it = m_rx_aliases.find(key);
+    if (it != m_rx_aliases.end()) {
+        return it->second;
+    }
+
+    BoxList bl(ix_type);
+    for (auto b : m_rx.boxArray().boxList()) {
+        b.setType(ix_type);
+        bl.push_back(b);
+    }
+
+    MF alias(BoxArray(std::move(bl)), m_rx.DistributionMap(), m_rx.nComp(),
+             m_rx.nGrowVect(), MFInfo{}.SetAlloc(false));
+
+    using FAB = typename MF::fab_type;
+    for (MFIter mfi(alias, MFItInfo().DisableDeviceSync()); mfi.isValid(); ++mfi) {
+        alias.setFab(mfi, FAB(mfi.fabbox(), m_rx.nComp(), m_rx[mfi.index()].dataPtr()));
+    }
+
+    auto [alias_it, inserted] = m_rx_aliases.emplace(key, std::move(alias));
+    amrex::ignore_unused(inserted);
+    return alias_it->second;
+}
+
+template <typename T, Direction D, bool C>
+Periodicity
+R2C<T,D,C>::make_m_rx_alias_periodicity (IndexType const& ix_type,
+                                         Periodicity const& period) const
+{
+    IntVect per = period.intVect();
+    for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
+        if (ix_type.nodeCentered(idim) && per[idim] == 0) {
+            per[idim] = m_real_domain.length(idim);
+        }
+    }
+    return Periodicity(per);
+}
+
+template <typename T, Direction D, bool C>
+template <Direction DIR>
+requires ((DIR == Direction::forward) || (DIR == Direction::both))
 void R2C<T,D,C>::forward (MF const& inmf, int incomp)
 {
     BL_PROFILE("FFT::R2C::forward(in)");
@@ -875,7 +963,12 @@ void R2C<T,D,C>::forward (MF const& inmf, int incomp)
     }
 
     if (&m_rx != &inmf) {
-        m_rx.ParallelCopy(inmf, incomp, 0, ncomp);
+        if (m_rx.boxArray().ixType() == inmf.boxArray().ixType()) {
+            m_rx.ParallelCopy(inmf, incomp, 0, ncomp);
+        } else {
+            MF& rx_alias = make_m_rx_alias(inmf.boxArray().ixType());
+            rx_alias.ParallelCopy(inmf, incomp, 0, ncomp);
+        }
     }
 
     if (m_do_alld_fft) {
@@ -965,39 +1058,31 @@ R2C<T,D,C>::install_raw_ptr (FA& fa, RT const* p)
 
 
 template <typename T, Direction D, bool C>
-template <typename RT, typename CT, Direction DIR, bool CP,
-          std::enable_if_t<(DIR == Direction::forward ||
-                            DIR == Direction::both)
-                           && ((sizeof(RT)*2 == sizeof(CT) && !CP) ||
-                               (sizeof(RT) == sizeof(CT) && CP)), int> >
+template <typename RT, typename CT, Direction DIR, bool CP>
+requires ((DIR == Direction::forward) || (DIR == Direction::both))
+      && (((sizeof(RT)*2 == sizeof(CT)) && (!CP))
+          || ((sizeof(RT) == sizeof(CT)) && CP))
 void R2C<T,D,C>::forward (RT const* in, CT* out)
 {
     auto [rdata, rsz] = install_raw_ptr(m_raw_mf, in);
     auto [cdata, csz] = install_raw_ptr(m_raw_cmf, out);
 
     if (rsz > 0) {
-#ifdef AMREX_USE_GPU
         Gpu::dtod_memcpy_async(rdata.get(),in,rsz);
         Gpu::streamSynchronize();
-#else
-        std::memcpy(rdata.get(),in,rsz);
-#endif
     }
 
     forward(m_raw_mf, m_raw_cmf);
 
     if (csz) {
-#ifdef AMREX_USE_GPU
         Gpu::dtod_memcpy_async(out,cdata.get(),csz);
         Gpu::streamSynchronize();
-#else
-        std::memcpy(out,cdata.get(),csz);
-#endif
     }
 }
 
 template <typename T, Direction D, bool C>
-template <Direction DIR, std::enable_if_t<DIR == Direction::both, int> >
+template <Direction DIR>
+requires (DIR == Direction::both)
 void R2C<T,D,C>::backward (MF& outmf, int outcomp)
 {
     backward_doit(outmf, IntVect(0), Periodicity::NonPeriodic(), outcomp);
@@ -1032,8 +1117,16 @@ void R2C<T,D,C>::backward_doit (MF& outmf, IntVect const& ngout,
         } else {
             m_fft_bwd_x.template compute_r2c<Direction::backward>();
         }
-        outmf.ParallelCopy(m_rx, 0, outcomp, ncomp, IntVect(0),
-                           amrex::elemwiseMin(ngout,outmf.nGrowVect()), period);
+        auto const dst_nghost = amrex::elemwiseMin(ngout,outmf.nGrowVect());
+        if (m_rx.boxArray().ixType() == outmf.boxArray().ixType()) {
+            outmf.ParallelCopy(m_rx, 0, outcomp, ncomp, IntVect(0),
+                               dst_nghost, period);
+        } else {
+            MF& rx_alias = make_m_rx_alias(outmf.boxArray().ixType());
+            auto const copy_period = make_m_rx_alias_periodicity(outmf.boxArray().ixType(), period);
+            outmf.ParallelCopy(rx_alias, 0, outcomp, ncomp, IntVect(0),
+                               dst_nghost, copy_period);
+        }
         return;
     }
 
@@ -1059,39 +1152,38 @@ void R2C<T,D,C>::backward_doit (MF& outmf, IntVect const& ngout,
     } else {
         fft_x.template compute_r2c<Direction::backward>();
     }
-    outmf.ParallelCopy(m_rx, 0, outcomp, ncomp, IntVect(0),
-                       amrex::elemwiseMin(ngout,outmf.nGrowVect()), period);
+    auto const dst_nghost = amrex::elemwiseMin(ngout,outmf.nGrowVect());
+    if (m_rx.boxArray().ixType() == outmf.boxArray().ixType()) {
+        outmf.ParallelCopy(m_rx, 0, outcomp, ncomp, IntVect(0),
+                           dst_nghost, period);
+    } else {
+        MF& rx_alias = make_m_rx_alias(outmf.boxArray().ixType());
+        auto const copy_period = make_m_rx_alias_periodicity(outmf.boxArray().ixType(), period);
+        outmf.ParallelCopy(rx_alias, 0, outcomp, ncomp, IntVect(0),
+                           dst_nghost, copy_period);
+    }
 }
 
 template <typename T, Direction D, bool C>
-template <typename CT, typename RT, Direction DIR, bool CP,
-          std::enable_if_t<(DIR == Direction::backward ||
-                            DIR == Direction::both)
-                           && ((sizeof(RT)*2 == sizeof(CT) && !CP) ||
-                               (sizeof(RT) == sizeof(CT) && CP)), int> >
+template <typename CT, typename RT, Direction DIR, bool CP>
+requires ((DIR == Direction::backward) || (DIR == Direction::both))
+      && (((sizeof(RT)*2 == sizeof(CT)) && (!CP))
+          || ((sizeof(RT) == sizeof(CT)) && CP))
 void R2C<T,D,C>::backward (CT const* in, RT* out)
 {
     auto [rdata, rsz] = install_raw_ptr(m_raw_mf, out);
     auto [cdata, csz] = install_raw_ptr(m_raw_cmf, in);
 
     if (csz) {
-#ifdef AMREX_USE_GPU
         Gpu::dtod_memcpy_async(cdata.get(),in,csz);
         Gpu::streamSynchronize();
-#else
-        std::memcpy(cdata.get(),in,csz);
-#endif
     }
 
     backward(m_raw_cmf, m_raw_mf);
 
     if (rsz > 0) {
-#ifdef AMREX_USE_GPU
         Gpu::dtod_memcpy_async(out,rdata.get(),rsz);
         Gpu::streamSynchronize();
-#else
-        std::memcpy(out,rdata.get(),rsz);
-#endif
     }
 }
 
@@ -1193,7 +1285,7 @@ void R2C<T,D,C>::post_forward_doit_1 (F const& post_forward)
             auto* spectral_fab = detail::get_fab(m_cz);
             if (spectral_fab) {
                 auto const& a = spectral_fab->array(); // m_cz's ordering is z,x,y
-                ParallelFor(spectral_fab->box(),
+                ParallelForOMP(spectral_fab->box(),
                 [=] AMREX_GPU_DEVICE (int iz, int jx, int ky)
                 {
                     post_forward(jx,ky,iz,a(iz,jx,ky));
@@ -1203,7 +1295,7 @@ void R2C<T,D,C>::post_forward_doit_1 (F const& post_forward)
             auto* spectral_fab = detail::get_fab(m_cy);
             if (spectral_fab) {
                 auto const& a = spectral_fab->array(); // m_cy's ordering is y,x,z
-                ParallelFor(spectral_fab->box(),
+                ParallelForOMP(spectral_fab->box(),
                 [=] AMREX_GPU_DEVICE (int iy, int jx, int k)
                 {
                     post_forward(jx,iy,k,a(iy,jx,k));
@@ -1213,7 +1305,7 @@ void R2C<T,D,C>::post_forward_doit_1 (F const& post_forward)
             auto* spectral_fab = detail::get_fab(m_cx);
             if (spectral_fab) {
                 auto const& a = spectral_fab->array();
-                ParallelFor(spectral_fab->box(),
+                ParallelForOMP(spectral_fab->box(),
                 [=] AMREX_GPU_DEVICE (int i, int j, int k)
                 {
                     post_forward(i,j,k,a(i,j,k));
@@ -1227,13 +1319,15 @@ template <typename T, Direction D, bool C>
 T R2C<T,D,C>::scalingFactor () const
 {
 #if (AMREX_SPACEDIM == 3)
-    if (m_info.twod_mode) {
-        if (m_real_domain.length(2) > 1) {
-            return T(1)/T(Long(m_real_domain.length(0)) *
-                          Long(m_real_domain.length(1)));
-        } else {
-            return T(1)/T(m_real_domain.length(0));
-        }
+    if (m_info.oned_mode && !m_info.twod_mode) {
+        return T(1)/T(Long(m_real_domain.length(0)));
+    } else if (m_info.twod_mode) {
+        return T(1)/T(Long(m_real_domain.length(0)) *
+                      Long(m_real_domain.length(1)));
+    } else
+#elif (AMREX_SPACEDIM == 2)
+    if (m_info.oned_mode) {
+        return T(1)/T(Long(m_real_domain.length(0)));
     } else
 #endif
     {
@@ -1242,8 +1336,8 @@ T R2C<T,D,C>::scalingFactor () const
 }
 
 template <typename T, Direction D, bool C>
-template <Direction DIR, std::enable_if_t<DIR == Direction::forward ||
-                                          DIR == Direction::both, int> >
+template <Direction DIR>
+requires ((DIR == Direction::forward) || (DIR == Direction::both))
 std::pair<typename R2C<T,D,C>::cMF *, IntVect>
 R2C<T,D,C>::getSpectralData () const
 {
@@ -1263,8 +1357,8 @@ R2C<T,D,C>::getSpectralData () const
 }
 
 template <typename T, Direction D, bool C>
-template <Direction DIR, std::enable_if_t<DIR == Direction::forward ||
-                                          DIR == Direction::both, int> >
+template <Direction DIR>
+requires ((DIR == Direction::forward) || (DIR == Direction::both))
 void R2C<T,D,C>::forward (MF const& inmf, cMF& outmf, int incomp, int outcomp)
 {
     BL_PROFILE("FFT::R2C::forward(inout)");
@@ -1323,8 +1417,8 @@ void R2C<T,D,C>::forward (MF const& inmf, cMF& outmf, int incomp, int outcomp)
 }
 
 template <typename T, Direction D, bool C>
-template <Direction DIR, std::enable_if_t<DIR == Direction::backward ||
-                                          DIR == Direction::both, int> >
+template <Direction DIR>
+requires ((DIR == Direction::backward) || (DIR == Direction::both))
 void R2C<T,D,C>::backward (cMF const& inmf, MF& outmf, int incomp, int outcomp)
 {
     backward_doit(inmf, outmf, IntVect(0), Periodicity::NonPeriodic(), incomp, outcomp);

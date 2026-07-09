@@ -24,6 +24,19 @@ void OpenBCSolver::define (const Vector<Geometry>& a_geom,
     m_grids = a_grids;
     m_dmap = a_dmap;
     m_info = a_info;
+    m_box_offset.clear();
+    m_momtags_h.clear();
+    m_nblocks_local = 0;
+    m_nblocks = 0;
+#ifdef AMREX_USE_MPI
+    m_countvec.clear();
+    m_offset.clear();
+#endif
+#ifdef AMREX_USE_GPU
+    m_momtags_d.clear();
+    m_ngpublocks_h.clear();
+    m_ngpublocks_d.clear();
+#endif
     for (auto& grids : m_grids) {
         grids.enclosedCells();
     }
@@ -81,8 +94,8 @@ void OpenBCSolver::define (const Vector<Geometry>& a_geom,
             Orientation::Side side = (b2d.smallEnd(idim) == domain0.smallEnd(idim))
                 ? Orientation::low : Orientation::high;
             Orientation face(idim, side);
-            m_momtags_h.push_back({m_dpdn[idim].const_array(mfi), b2d, face,
-                                   nblocks});
+            m_momtags_h.push_back({.gp = m_dpdn[idim].const_array(mfi), .b2d = b2d,
+                                   .face = face, .offset = nblocks});
             nblocks += static_cast<int>(b2d.numPts())
                 / (m_coarsen_ratio*m_coarsen_ratio);
         }
@@ -191,7 +204,7 @@ void OpenBCSolver::setBottomVerbose (int v) noexcept
     m_bottom_verbose = v;
 }
 
-void OpenBCSolver::useHypre (bool use_hypre) noexcept
+void OpenBCSolver::useHypre (bool use_hypre)
 {
     if (use_hypre) {
         m_bottom_solver_type = BottomSolver::hypre;

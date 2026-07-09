@@ -2,13 +2,18 @@
 #include <AMReX_FBI.H>
 #include <AMReX_PCI.H>
 
+namespace amrex {
+
 template <class FAB>
-template <typename BUF, class F, std::enable_if_t<IsBaseFab<F>::value,int>Z>
+template <typename BUF, class F>
+requires (BaseFabType<F>)
 void
 FabArray<FAB>::FBEP_nowait (int scomp, int ncomp, const IntVect& nghost,
                             const Periodicity& period, bool cross,
                             bool enforce_periodicity_only,
-                            bool override_sync)
+                            bool override_sync,
+                            IntVect const& sumboundary_src_nghost,
+                            bool deterministic) // so far the deterministic is for sumboundary only
 {
     BL_PROFILE_SYNC_START_TIMED("SyncBeforeComms: FB");
     BL_PROFILE("FillBoundary_nowait()");
@@ -16,17 +21,21 @@ FabArray<FAB>::FBEP_nowait (int scomp, int ncomp, const IntVect& nghost,
     AMREX_ASSERT_WITH_MESSAGE(!fbd, "FillBoundary_nowait() called when comm operation already in progress.");
     AMREX_ASSERT(!enforce_periodicity_only || !override_sync);
 
+    bool sumboundary = sumboundary_src_nghost.allGE(0);
+
     bool work_to_do;
     if (enforce_periodicity_only) {
         work_to_do = period.isAnyPeriodic();
     } else if (override_sync) {
         work_to_do = (nghost.max() > 0) || !is_cell_centered();
+    } else if (sumboundary) {
+        work_to_do = true;
     } else {
         work_to_do = nghost.max() > 0;
     }
     if (!work_to_do) { return; }
 
-    const FB& TheFB = getFB(nghost, period, cross, enforce_periodicity_only, override_sync);
+    const FB& TheFB = getFB(nghost, period, cross, enforce_periodicity_only, override_sync, sumboundary_src_nghost);
 
     if (ParallelContext::NProcsSub() == 1)
     {
@@ -39,23 +48,39 @@ FabArray<FAB>::FBEP_nowait (int scomp, int ncomp, const IntVect& nghost,
         if (Gpu::inLaunchRegion())
         {
 #if defined(__CUDACC__) && defined(AMREX_USE_CUDA)
-            if (Gpu::inGraphRegion())
+            if (Gpu::inGraphRegion() && !sumboundary)
             {
                 FB_local_copy_cuda_graph_1(TheFB, scomp, ncomp);
             }
             else
 #endif
             {
-                FB_local_copy_gpu(TheFB, scomp, ncomp);
-                if (!Gpu::inNoSyncRegion()) {
-                    Gpu::streamSynchronize();
+                if (sumboundary) {
+                    if constexpr (amrex::IsAddAssignable<value_type>::value) {
+                        FB_local_add_gpu(TheFB, scomp, ncomp, deterministic);
+                    } else {
+                        amrex::Abort("SumBoundary requires operator+=");
+                    }
+                } else {
+                    FB_local_copy_gpu(TheFB, scomp, ncomp);
+                    if (!Gpu::inNoSyncRegion()) {
+                        Gpu::streamSynchronize();
+                    }
                 }
             }
         }
         else
 #endif
         {
-            FB_local_copy_cpu(TheFB, scomp, ncomp);
+            if (sumboundary) {
+                if constexpr (amrex::IsAddAssignable<value_type>::value) {
+                    FB_local_add_cpu(TheFB, scomp, ncomp);
+                } else {
+                    amrex::Abort("SumBoundary requires operator+=");
+                }
+            } else {
+                FB_local_copy_cpu(TheFB, scomp, ncomp);
+            }
         }
 
         return;
@@ -83,6 +108,7 @@ FabArray<FAB>::FBEP_nowait (int scomp, int ncomp, const IntVect& nghost,
     fbd->scomp = scomp;
     fbd->ncomp = ncomp;
     fbd->tag   = SeqNum;
+    fbd->deterministic = deterministic;
 
     //
     // Post rcvs. Allocate one chunk of space to hold'm all.
@@ -144,32 +170,53 @@ FabArray<FAB>::FBEP_nowait (int scomp, int ncomp, const IntVect& nghost,
         if (Gpu::inLaunchRegion())
         {
 #if defined(__CUDACC__) && defined(AMREX_USE_CUDA)
-            if (Gpu::inGraphRegion()) {
+            if (Gpu::inGraphRegion() && !sumboundary) {
                 FB_local_copy_cuda_graph_n(TheFB, scomp, ncomp);
             }
             else
 #endif
             {
-                FB_local_copy_gpu(TheFB, scomp, ncomp);
-                if (!Gpu::inNoSyncRegion() && N_rcvs == 0) {
-                    Gpu::streamSynchronize();
+                if (sumboundary) {
+                    if constexpr (amrex::IsAddAssignable<value_type>::value) {
+                        FB_local_add_gpu(TheFB, scomp, ncomp, deterministic);
+                    } else {
+                        amrex::Abort("SumBoundary requires operator+=");
+                    }
+                } else {
+                    FB_local_copy_gpu(TheFB, scomp, ncomp);
+                    if (!Gpu::inNoSyncRegion() && N_rcvs == 0) {
+                        Gpu::streamSynchronize();
+                    }
                 }
             }
         }
         else
 #endif
         {
-            FB_local_copy_cpu(TheFB, scomp, ncomp);
+            if (sumboundary) {
+                if constexpr (amrex::IsAddAssignable<value_type>::value) {
+                    FB_local_add_cpu(TheFB, scomp, ncomp);
+                } else {
+                    amrex::Abort("SumBoundary requires operator+=");
+                }
+            } else {
+                FB_local_copy_cpu(TheFB, scomp, ncomp);
+            }
         }
 
         FillBoundary_test();
     }
 
 #endif /*BL_USE_MPI*/
+
+#ifndef AMREX_USE_GPU
+    amrex::ignore_unused(deterministic);
+#endif
 }
 
 template <class FAB>
-template <typename BUF, class F, std::enable_if_t<IsBaseFab<F>::value,int>Z>
+template <typename BUF, class F>
+requires (BaseFabType<F>)
 void
 FabArray<FAB>::FillBoundary_finish ()
 {
@@ -181,6 +228,7 @@ FabArray<FAB>::FillBoundary_finish ()
     if (!fbd) { n_filled = IntVect::TheZeroVector(); return; }
 
     const FB* TheFB = fbd->fb;
+    bool sumboundary = TheFB->m_sb_snghost.allGE(0);
     const auto N_rcvs = static_cast<int>(TheFB->m_RcvTags->size());
     if (N_rcvs > 0)
     {
@@ -194,7 +242,7 @@ FabArray<FAB>::FillBoundary_finish ()
             }
         }
 
-        int actual_n_rcvs = N_rcvs - std::count(fbd->recv_data.begin(), fbd->recv_data.end(), nullptr);
+        int actual_n_rcvs = N_rcvs - std::ranges::count(fbd->recv_data, nullptr);
 
         if (actual_n_rcvs > 0) {
             ParallelDescriptor::Waitall(fbd->recv_reqs, fbd->recv_stat);
@@ -207,12 +255,13 @@ FabArray<FAB>::FillBoundary_finish ()
         }
 
         bool is_thread_safe = TheFB->m_threadsafe_rcv;
+        auto op = sumboundary ? FabArrayBase::ADD : FabArrayBase::COPY;
 
 #ifdef AMREX_USE_GPU
         if (Gpu::inLaunchRegion())
         {
 #if defined(__CUDACC__) && defined(AMREX_USE_CUDA)
-            if (Gpu::inGraphRegion())
+            if (Gpu::inGraphRegion() && !sumboundary)
             {
                 FB_unpack_recv_buffer_cuda_graph(*TheFB, fbd->scomp, fbd->ncomp,
                                                  fbd->recv_data, fbd->recv_size,
@@ -221,15 +270,16 @@ FabArray<FAB>::FillBoundary_finish ()
             else
 #endif
             {
+                bool deterministic = fbd->deterministic;
                 unpack_recv_buffer_gpu<BUF>(*this, fbd->scomp, fbd->ncomp, fbd->recv_data, fbd->recv_size,
-                                            recv_cctc, FabArrayBase::COPY, is_thread_safe, TheFB->m_id);
+                                            recv_cctc, op, is_thread_safe, TheFB->m_id, deterministic);
             }
         }
         else
 #endif
         {
             unpack_recv_buffer_cpu<BUF>(*this, fbd->scomp, fbd->ncomp, fbd->recv_data, fbd->recv_size,
-                                        recv_cctc, FabArrayBase::COPY, is_thread_safe);
+                                        recv_cctc, op, is_thread_safe);
         }
 
         if (fbd->the_recv_data)
@@ -252,7 +302,6 @@ FabArray<FAB>::FillBoundary_finish ()
 #endif
 }
 
-// \cond CODEGEN
 template <class FAB>
 void
 FabArray<FAB>::ParallelCopy (const FabArray<FAB>& src,
@@ -263,11 +312,13 @@ FabArray<FAB>::ParallelCopy (const FabArray<FAB>& src,
                              const IntVect&       dnghost,
                              const Periodicity&   period,
                              CpOp                 op,
-                             const FabArrayBase::CPC * a_cpc)
+                             const FabArrayBase::CPC * a_cpc,
+                             bool                 deterministic)
 {
     BL_PROFILE("FabArray::ParallelCopy()");
 
-    ParallelCopy_nowait(src, scomp, dcomp, ncomp, snghost, dnghost, period, op, a_cpc);
+    ParallelCopy_nowait(src, scomp, dcomp, ncomp, snghost, dnghost, period, op, a_cpc,
+                        false, deterministic);
     ParallelCopy_finish();
 }
 
@@ -346,10 +397,11 @@ FabArray<FAB>::ParallelCopy_nowait (const FabArray<FAB>& src,
                                     const Periodicity&   period,
                                     CpOp                 op,
                                     const FabArrayBase::CPC * a_cpc,
-                                    bool                 to_ghost_cells_only)
+                                    bool                 to_ghost_cells_only,
+                                    bool                 deterministic)
 {
     ParallelCopy_nowait(src,scomp,dcomp,ncomp,snghost,dnghost,IntVect(0),period,op,a_cpc,
-                        to_ghost_cells_only);
+                        to_ghost_cells_only, deterministic);
 }
 
 template <class FAB>
@@ -364,7 +416,8 @@ FabArray<FAB>::ParallelCopy_nowait (const FabArray<FAB>& src,
                                     const Periodicity&   period,
                                     CpOp                 op,
                                     const FabArrayBase::CPC * a_cpc,
-                                    bool                 to_ghost_cells_only)
+                                    bool                 to_ghost_cells_only,
+                                    bool                 deterministic)
 {
     BL_PROFILE_SYNC_START_TIMED("SyncBeforeComms: PC");
     BL_PROFILE("FabArray::ParallelCopy_nowait()");
@@ -483,7 +536,7 @@ FabArray<FAB>::ParallelCopy_nowait (const FabArray<FAB>& src,
 #ifdef AMREX_USE_GPU
         if (Gpu::inLaunchRegion())
         {
-            PC_local_gpu(thecpc, src, scomp, dcomp, ncomp, op);
+            PC_local_gpu(thecpc, src, scomp, dcomp, ncomp, op, deterministic);
         }
         else
 #endif
@@ -527,6 +580,8 @@ FabArray<FAB>::ParallelCopy_nowait (const FabArray<FAB>& src,
         pcd->src = &src;
         pcd->op = op;
         pcd->tag = tag;
+        // Deterministic GPU unpacking is currently implemented only for ADD.
+        pcd->deterministic = deterministic && (op == FabArrayBase::ADD);
 
         NC = std::min(NCompLeft,FabArrayBase::MaxComp);
         const bool last_iter = (NCompLeft == NC);
@@ -544,7 +599,7 @@ FabArray<FAB>::ParallelCopy_nowait (const FabArray<FAB>& src,
         if (N_rcvs > 0) {
             PostRcvs(*thecpc.m_RcvTags, pcd->the_recv_data,
                      pcd->recv_data, pcd->recv_size, pcd->recv_from, pcd->recv_reqs, NC, pcd->tag);
-            pcd->actual_n_rcvs = N_rcvs - std::count(pcd->recv_size.begin(), pcd->recv_size.end(), 0);
+            pcd->actual_n_rcvs = N_rcvs - std::ranges::count(pcd->recv_size, 0);
         }
 
         //
@@ -583,7 +638,7 @@ FabArray<FAB>::ParallelCopy_nowait (const FabArray<FAB>& src,
 #ifdef AMREX_USE_GPU
             if (Gpu::inLaunchRegion())
             {
-                PC_local_gpu(thecpc, src, SC, DC, NC, op);
+                PC_local_gpu(thecpc, src, SC, DC, NC, op, deterministic);
             }
             else
 #endif
@@ -605,6 +660,10 @@ FabArray<FAB>::ParallelCopy_nowait (const FabArray<FAB>& src,
     }
 
 #endif /*BL_USE_MPI*/
+
+#ifndef AMREX_USE_GPU
+    amrex::ignore_unused(deterministic);
+#endif
 }
 
 template <class FAB>
@@ -653,7 +712,8 @@ FabArray<FAB>::ParallelCopy_finish ()
         if (Gpu::inLaunchRegion())
         {
             unpack_recv_buffer_gpu(*this, pcd->DC, pcd->NC, pcd->recv_data, pcd->recv_size,
-                                   recv_cctc, pcd->op, is_thread_safe, thecpc->m_id);
+                                   recv_cctc, pcd->op, is_thread_safe, thecpc->m_id,
+                                   pcd->deterministic);
         }
         else
 #endif
@@ -710,7 +770,7 @@ FabArray<FAB>::copyTo (FAB& dest, int scomp, int dcomp, int ncomp, int nghost) c
         T* const p0 = dest.dataPtr(dcomp);
         T* pb = p0;
 #ifdef AMREX_USE_GPU
-        if (dest.arena()->isDevice()) {
+        if (dest.arena()->isDevice() && !ParallelDescriptor::UseGpuAwareMpi()) {
             pb = (T*)The_Pinned_Arena()->alloc(sizeof(T)*count);
             Gpu::dtoh_memcpy_async(pb, p0, sizeof(T)*count);
             Gpu::streamSynchronize();
@@ -722,12 +782,13 @@ FabArray<FAB>::copyTo (FAB& dest, int scomp, int dcomp, int ncomp, int nghost) c
         if (pb != p0) {
             Gpu::htod_memcpy_async(p0, pb, sizeof(T)*count);
             Gpu::streamSynchronize();
+            The_Pinned_Arena()->free(pb);
         }
 #endif
     }
 #endif
 }
-// \endcond
+
 #ifdef BL_USE_MPI
 template <class FAB>
 template <typename BUF>
@@ -954,6 +1015,7 @@ FabArray<FAB>::FillBoundary_test ()
 #endif
 }
 
+/// \cond DOXYGEN_IGNORE
 namespace detail {
 template <class TagT>
 void fbv_copy (Vector<TagT> const& tags)
@@ -987,9 +1049,160 @@ void fbv_copy (Vector<TagT> const& tags)
     }
 }
 }
+/// \endcond
 
-template <class MF>
-std::enable_if_t<IsFabArray<MF>::value>
+/** \brief Launch FillBoundary_nowait across a vector of FabArrays.
+ *
+ *  Invoke FillBoundary_finish on the same vector before reusing the data to
+ *  ensure the exchanges have completed.
+ *
+ *  \param mf     FabArray pointers that should be updated.
+ *  \param scomp  Starting component for each FabArray.
+ *  \param ncomp  Number of components to fill per FabArray.
+ *  \param nghost Number of ghost cells to populate per FabArray.
+ *  \param period Periodicity description per FabArray.
+ *  \param cross  Optional cross-stencil flags; non-zero entries skip
+ *                corner ghost cells for the corresponding FabArray.
+ */
+template <FabArrayType MF>
+void
+FillBoundary_nowait (Vector<MF*> const& mf, Vector<int> const& scomp,
+                     Vector<int> const& ncomp, Vector<IntVect> const& nghost,
+                     Vector<Periodicity> const& period,
+                     Vector<int> const& cross = {})
+{
+    BL_PROFILE("FillBoundary_nowait(Vector)");
+    const int N = mf.size();
+    for (int i = 0; i < N; ++i) {
+        mf[i]->FillBoundary_nowait(scomp[i], ncomp[i], nghost[i], period[i],
+                                   cross.empty() ? 0 : cross[i]);
+    }
+}
+
+/** \brief Launch FillBoundary_nowait across a vector of FabArrays.
+ *
+ *  Invoke FillBoundary_finish on the same vector before reusing the data to
+ *  ensure the exchanges have completed.
+ *
+ *  \param mf       FabArray pointers that should be updated.
+ *  \param a_period Periodicity applied to every FabArray.
+ */
+template <FabArrayType MF>
+void
+FillBoundary_nowait (Vector<MF*> const& mf,
+                     const Periodicity& a_period = Periodicity::NonPeriodic())
+{
+    Vector<int> scomp(mf.size(), 0);
+    Vector<int> ncomp;
+    Vector<IntVect> nghost;
+    Vector<Periodicity> period(mf.size(), a_period);
+    ncomp.reserve(mf.size());
+    nghost.reserve(mf.size());
+    for (auto const& x : mf) {
+        ncomp.push_back(x->nComp());
+        nghost.push_back(x->nGrowVect());
+    }
+    FillBoundary_nowait(mf, scomp, ncomp, nghost, period);
+}
+
+/** \brief Wait for outstanding FillBoundary_nowait operations launched with
+ *         the vector helper to complete.
+ *
+ *  \param mf FabArray pointers whose FillBoundary_nowait calls should finish.
+ */
+template <FabArrayType MF>
+void
+FillBoundary_finish (Vector<MF*> const& mf)
+{
+    BL_PROFILE("FillBoundary_finish(Vector)");
+    const int N = mf.size();
+    for (int i = 0; i < N; ++i) {
+        mf[i]->FillBoundary_finish();
+    }
+}
+
+/** \brief Launch FillBoundaryAndSync_nowait across a vector of FabArrays.
+ *
+ *  Similar to FillBoundary_nowait, this helper batches the asynchronous
+ *  FillBoundaryAndSync invocation while leaving completion to
+ *  FillBoundaryAndSync_finish.
+ *
+ *  \param mf     FabArray pointers that should be updated.
+ *  \param scomp  Starting component for each FabArray.
+ *  \param ncomp  Number of components to fill/sync per FabArray.
+ *  \param nghost Number of ghost cells to populate per FabArray.
+ *  \param period Periodicity description per FabArray.
+ */
+template <FabArrayType MF>
+void
+FillBoundaryAndSync_nowait (Vector<MF*> const& mf, Vector<int> const& scomp,
+                            Vector<int> const& ncomp, Vector<IntVect> const& nghost,
+                            Vector<Periodicity> const& period)
+{
+    BL_PROFILE("FillBoundaryAndSync_nowait(Vector)");
+    const int N = mf.size();
+    for (int i = 0; i < N; ++i) {
+        mf[i]->FillBoundaryAndSync_nowait(scomp[i], ncomp[i], nghost[i], period[i]);
+    }
+}
+
+/** \brief Convenience overload that launches FillBoundaryAndSync_nowait for
+ *         every component/ghost cell on each FabArray in the vector.
+ *
+ *  \param mf       FabArray pointers that should be updated.
+ *  \param a_period Periodicity applied to every FabArray.
+ */
+template <FabArrayType MF>
+void
+FillBoundaryAndSync_nowait (Vector<MF*> const& mf,
+                            const Periodicity& a_period = Periodicity::NonPeriodic())
+{
+    Vector<int> scomp(mf.size(), 0);
+    Vector<int> ncomp;
+    Vector<IntVect> nghost;
+    Vector<Periodicity> period(mf.size(), a_period);
+    ncomp.reserve(mf.size());
+    nghost.reserve(mf.size());
+    for (auto const& x : mf) {
+        ncomp.push_back(x->nComp());
+        nghost.push_back(x->nGrowVect());
+    }
+    FillBoundaryAndSync_nowait(mf, scomp, ncomp, nghost, period);
+}
+
+/** \brief Wait for outstanding FillBoundaryAndSync_nowait operations launched
+ *         with the vector helper to complete.
+ *
+ *  \param mf FabArray pointers whose FillBoundaryAndSync_nowait calls should finish.
+ */
+template <FabArrayType MF>
+void
+FillBoundaryAndSync_finish (Vector<MF*> const& mf)
+{
+    BL_PROFILE("FillBoundaryAndSync_finish(Vector)");
+    const int N = mf.size();
+    for (int i = 0; i < N; ++i) {
+        mf[i]->FillBoundaryAndSync_finish();
+    }
+}
+
+/** \brief Perform FillBoundary on a batch of FabArrays (e.g., MultiFabs).
+ *
+ *  Prefer this helper over invoking FillBoundary on each FabArray
+ *  individually; batching the work lets AMReX apply latency-reducing
+ *  optimizations by coordinating the ghost exchanges across the entire
+ *  vector.
+ *
+ *  \param mf     FabArray pointers that should be updated.
+ *  \param scomp  Component indices to start filling on each FabArray.
+ *  \param ncomp  Number of components to update on each FabArray.
+ *  \param nghost Number of ghost cells to fill for each FabArray.
+ *  \param period Periodicity to use for each FabArray.
+ *  \param cross  Optional flags; non-zero entries skip corner ghost cells
+ *                (cross stencil) for the corresponding FabArray.
+ */
+template <FabArrayType MF>
+void
 FillBoundary (Vector<MF*> const& mf, Vector<int> const& scomp,
               Vector<int> const& ncomp, Vector<IntVect> const& nghost,
               Vector<Periodicity> const& period, Vector<int> const& cross = {})
@@ -1036,10 +1249,11 @@ FillBoundary (Vector<MF*> const& mf, Vector<int> const& scomp,
         if (cmds[imf]) {
             auto const& tags = *(cmds[imf]->m_LocTags);
             for (auto const& tag : tags) {
-                local_tags.push_back({(*mf[imf])[tag.dstIndex].array      (scomp[imf],ncomp[imf]),
-                                      (*mf[imf])[tag.srcIndex].const_array(scomp[imf],ncomp[imf]),
-                                      tag.dbox,
-                                      (tag.sbox.smallEnd()-tag.dbox.smallEnd()).dim3()});
+                local_tags.push_back(TagT{.dfab = (*mf[imf])[tag.dstIndex].array(scomp[imf],ncomp[imf]),
+                                          .dindex = tag.dstIndex,
+                                          .sfab = (*mf[imf])[tag.srcIndex].const_array(scomp[imf],ncomp[imf]),
+                                          .dbox = tag.dbox,
+                                          .offset = (tag.sbox.smallEnd()-tag.dbox.smallEnd()).dim3()});
             }
         }
     }
@@ -1099,9 +1313,13 @@ FillBoundary (Vector<MF*> const& mf, Vector<int> const& scomp,
                         for (auto const& cct : it->second) {
                             auto& dfab = (*mf[imf])[cct.dstIndex];
                             recv_offset[i].push_back(nbytes);
-                            recv_tags.push_back({dfab.array(scomp[imf],ncomp[imf]),
-                                                 makeArray4<T const>(nullptr,cct.dbox,ncomp[imf]),
-                                                 cct.dbox, Dim3{0,0,0}});
+                            recv_tags.push_back(TagT{
+                                .dfab = dfab.array(scomp[imf],ncomp[imf]),
+                                .dindex = cct.dstIndex,
+                                .sfab = makeArray4<T const>(nullptr,cct.dbox,ncomp[imf]),
+                                .dbox = cct.dbox,
+                                .offset = Dim3{.x = 0, .y = 0, .z = 0}
+                            });
                             nbytes += dfab.nBytes(cct.dbox,ncomp[imf]);
                         }
                     }
@@ -1172,9 +1390,13 @@ FillBoundary (Vector<MF*> const& mf, Vector<int> const& scomp,
                         for (auto const& cct : it->second) {
                             auto const& sfab = (*mf[imf])[cct.srcIndex];
                             send_offset[i].push_back(nbytes);
-                            send_tags.push_back({amrex::makeArray4<T>(nullptr,cct.sbox,ncomp[imf]),
-                                                 sfab.const_array(scomp[imf],ncomp[imf]),
-                                                 cct.sbox, Dim3{0,0,0}});
+                            send_tags.push_back(TagT{
+                                .dfab = amrex::makeArray4<T>(nullptr,cct.sbox,ncomp[imf]),
+                                .dindex = cct.dstIndex,
+                                .sfab = sfab.const_array(scomp[imf],ncomp[imf]),
+                                .dbox = cct.sbox,
+                                .offset = Dim3{.x = 0, .y = 0, .z = 0}
+                            });
                             nbytes += sfab.nBytes(cct.sbox,ncomp[imf]);
                         }
                     }
@@ -1242,19 +1464,50 @@ FillBoundary (Vector<MF*> const& mf, Vector<int> const& scomp,
 #endif  // #if 1 #else
 }
 
-template <class MF>
-std::enable_if_t<IsFabArray<MF>::value>
+/** \brief Perform FillBoundaryAndSync on a batch of FabArrays (e.g., MultiFabs).
+ *
+ *  Prefer this helper over invoking FillBoundaryAndSync on each FabArray
+ *  individually; batching the work enables latency-hiding optimizations that
+ *  overlap the combined ghost exchanges and syncs across the whole vector.
+ *
+ *  \param mf     FabArray pointers that should be synchronized.
+ *  \param scomp  Component indices to start syncing on each FabArray.
+ *  \param ncomp  Number of components to synchronize on each FabArray.
+ *  \param nghost Number of ghost cells to fill for each FabArray.
+ *  \param period Periodicity to use for each FabArray.
+ */
+template <FabArrayType MF>
+void
+FillBoundaryAndSync (Vector<MF*> const& mf, Vector<int> const& scomp,
+                     Vector<int> const& ncomp, Vector<IntVect> const& nghost,
+                     Vector<Periodicity> const& period)
+{
+    BL_PROFILE("FillBoundaryAndSync(Vector)");
+    const int N = mf.size();
+    for (int i = 0; i < N; ++i) {
+        mf[i]->FillBoundaryAndSync_nowait(scomp[i], ncomp[i], nghost[i], period[i]);
+    }
+    for (int i = 0; i < N; ++i) {
+        mf[i]->FillBoundaryAndSync_finish();
+    }
+}
+
+/** \brief Convenience overload that fills every component/ghost cell on each FabArray. */
+template <FabArrayType MF>
+void
 FillBoundary (Vector<MF*> const& mf, const Periodicity& a_period = Periodicity::NonPeriodic())
 {
-    Vector<int> scomp(mf.size(), 0);
-    Vector<int> ncomp;
-    Vector<IntVect> nghost;
-    Vector<Periodicity> period(mf.size(), a_period);
-    ncomp.reserve(mf.size());
-    nghost.reserve(mf.size());
-    for (auto const& x : mf) {
-        ncomp.push_back(x->nComp());
-        nghost.push_back(x->nGrowVect());
-    }
-    FillBoundary(mf, scomp, ncomp, nghost, period);
+    FillBoundary_nowait(mf, a_period);
+    FillBoundary_finish(mf);
+}
+
+/** \brief Convenience overload that fills/syncs every component/ghost cell on each FabArray. */
+template <FabArrayType MF>
+void
+FillBoundaryAndSync (Vector<MF*> const& mf, const Periodicity& a_period = Periodicity::NonPeriodic())
+{
+    FillBoundaryAndSync_nowait(mf, a_period);
+    FillBoundaryAndSync_finish(mf);
+}
+
 }

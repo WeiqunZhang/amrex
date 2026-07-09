@@ -2,6 +2,7 @@
 #define AMREX_MF_PARALLEL_FOR_H_
 #include <AMReX_Config.H>
 
+#include <AMReX_Concepts.H>
 #include <AMReX_FabArrayBase.H>
 #include <AMReX_TypeTraits.H>
 
@@ -23,8 +24,6 @@ struct DynamicTiling {
     explicit DynamicTiling (bool f) noexcept : dynamic(f) {}
 };
 
-namespace experimental {
-
 /**
  * \brief ParallelFor for MultiFab/FabArray.
  *
@@ -40,11 +39,11 @@ namespace experimental {
  *           is the local box index, and the following three are spatial indices
  *           for x, y, and z-directions.
  */
-template <typename MF, typename F>
-std::enable_if_t<IsFabArray<MF>::value>
+template <FabArrayType MF, typename F>
+void
 ParallelFor (MF const& mf, F&& f)
 {
-    detail::ParallelFor(mf, IntVect(0), FabArrayBase::mfiter_tile_size, false, std::forward<F>(f));
+    detail::ParallelFor_doit(mf, IntVect(0), FabArrayBase::mfiter_tile_size, false, std::forward<F>(f));
 }
 
 /**
@@ -63,14 +62,14 @@ ParallelFor (MF const& mf, F&& f)
  *           is the local box index, and the following three are spatial indices
  *           for x, y, and z-directions.
  */
-template <int MT, typename MF, typename F>
-std::enable_if_t<IsFabArray<MF>::value>
+template <int MT, FabArrayType MF, typename F>
+void
 ParallelFor (MF const& mf, F&& f)
 {
 #ifdef AMREX_USE_GPU
-    detail::ParallelFor<MT>(mf, IntVect(0), 1, FabArrayBase::mfiter_tile_size, false, std::forward<F>(f));
+    detail::ParallelFor_doit<MT>(mf, IntVect(0), 1, FabArrayBase::mfiter_tile_size, false, std::forward<F>(f));
 #else
-    detail::ParallelFor(mf, IntVect(0), FabArrayBase::mfiter_tile_size, false, std::forward<F>(f));
+    detail::ParallelFor_doit(mf, IntVect(0), FabArrayBase::mfiter_tile_size, false, std::forward<F>(f));
 #endif
 }
 
@@ -90,11 +89,11 @@ ParallelFor (MF const& mf, F&& f)
  *           is the local box index, and the following three are spatial indices
  *           for x, y, and z-directions.
  */
-template <typename MF, typename F>
-std::enable_if_t<IsFabArray<MF>::value>
+template <FabArrayType MF, typename F>
+void
 ParallelFor (MF const& mf, IntVect const& ng, F&& f)
 {
-    detail::ParallelFor(mf, ng, FabArrayBase::mfiter_tile_size, false, std::forward<F>(f));
+    detail::ParallelFor_doit(mf, ng, FabArrayBase::mfiter_tile_size, false, std::forward<F>(f));
 }
 
 /**
@@ -114,14 +113,14 @@ ParallelFor (MF const& mf, IntVect const& ng, F&& f)
  *           is the local box index, and the following three are spatial indices
  *           for x, y, and z-directions.
  */
-template <int MT, typename MF, typename F>
-std::enable_if_t<IsFabArray<MF>::value>
+template <int MT, FabArrayType MF, typename F>
+void
 ParallelFor (MF const& mf, IntVect const& ng, F&& f)
 {
 #ifdef AMREX_USE_GPU
-    detail::ParallelFor<MT>(mf, ng, 1, FabArrayBase::mfiter_tile_size, false, std::forward<F>(f));
+    detail::ParallelFor_doit<MT>(mf, ng, 1, FabArrayBase::mfiter_tile_size, false, std::forward<F>(f));
 #else
-    detail::ParallelFor(mf, ng, FabArrayBase::mfiter_tile_size, false, std::forward<F>(f));
+    detail::ParallelFor_doit(mf, ng, FabArrayBase::mfiter_tile_size, false, std::forward<F>(f));
 #endif
 }
 
@@ -142,11 +141,11 @@ ParallelFor (MF const& mf, IntVect const& ng, F&& f)
  *           is the local box index, the following three are spatial indices
  *           for x, y, and z-directions, and the last is for component.
  */
-template <typename MF, typename F>
-std::enable_if_t<IsFabArray<MF>::value>
+template <FabArrayType MF, typename F>
+void
 ParallelFor (MF const& mf, IntVect const& ng, int ncomp, F&& f)
 {
-    detail::ParallelFor(mf, ng, ncomp, FabArrayBase::mfiter_tile_size, false, std::forward<F>(f));
+    detail::ParallelFor_doit(mf, ng, ncomp, FabArrayBase::mfiter_tile_size, false, std::forward<F>(f));
 }
 
 /**
@@ -167,14 +166,14 @@ ParallelFor (MF const& mf, IntVect const& ng, int ncomp, F&& f)
  *           is the local box index, the following three are spatial indices
  *           for x, y, and z-directions, and the last is for component.
  */
-template <int MT, typename MF, typename F>
-std::enable_if_t<IsFabArray<MF>::value>
+template <int MT, FabArrayType MF, typename F>
+void
 ParallelFor (MF const& mf, IntVect const& ng, int ncomp, F&& f)
 {
 #ifdef AMREX_USE_GPU
-    detail::ParallelFor<MT>(mf, ng, ncomp, FabArrayBase::mfiter_tile_size, false, std::forward<F>(f));
+    detail::ParallelFor_doit<MT>(mf, ng, ncomp, FabArrayBase::mfiter_tile_size, false, std::forward<F>(f));
 #else
-    detail::ParallelFor(mf, ng, ncomp, FabArrayBase::mfiter_tile_size, false, std::forward<F>(f));
+    detail::ParallelFor_doit(mf, ng, ncomp, FabArrayBase::mfiter_tile_size, false, std::forward<F>(f));
 #endif
 }
 
@@ -195,11 +194,11 @@ ParallelFor (MF const& mf, IntVect const& ng, int ncomp, F&& f)
  *           is the local box index, and the following three are spatial indices
  *           for x, y, and z-directions.
  */
-template <typename MF, typename F>
-std::enable_if_t<IsFabArray<MF>::value>
+template <FabArrayType MF, typename F>
+void
 ParallelFor (MF const& mf, TileSize const& ts, F&& f)
 {
-    detail::ParallelFor(mf, IntVect(0), ts.tile_size, false, std::forward<F>(f));
+    detail::ParallelFor_doit(mf, IntVect(0), ts.tile_size, false, std::forward<F>(f));
 }
 
 /**
@@ -220,14 +219,14 @@ ParallelFor (MF const& mf, TileSize const& ts, F&& f)
  *           is the local box index, and the following three are spatial indices
  *           for x, y, and z-directions.
  */
-template <int MT, typename MF, typename F>
-std::enable_if_t<IsFabArray<MF>::value>
+template <int MT, FabArrayType MF, typename F>
+void
 ParallelFor (MF const& mf, TileSize const& ts, F&& f)
 {
 #ifdef AMREX_USE_GPU
-    detail::ParallelFor<MT>(mf, IntVect(0), 1, ts.tile_size, false, std::forward<F>(f));
+    detail::ParallelFor_doit<MT>(mf, IntVect(0), 1, ts.tile_size, false, std::forward<F>(f));
 #else
-    detail::ParallelFor(mf, IntVect(0), ts.tile_size, false, std::forward<F>(f));
+    detail::ParallelFor_doit(mf, IntVect(0), ts.tile_size, false, std::forward<F>(f));
 #endif
 }
 
@@ -249,11 +248,11 @@ ParallelFor (MF const& mf, TileSize const& ts, F&& f)
  *           is the local box index, and the following three are spatial indices
  *           for x, y, and z-directions.
  */
-template <typename MF, typename F>
-std::enable_if_t<IsFabArray<MF>::value>
+template <FabArrayType MF, typename F>
+void
 ParallelFor (MF const& mf, IntVect const& ng, TileSize const& ts, F&& f)
 {
-    detail::ParallelFor(mf, ng, ts.tile_size, false, std::forward<F>(f));
+    detail::ParallelFor_doit(mf, ng, ts.tile_size, false, std::forward<F>(f));
 }
 
 /**
@@ -275,14 +274,14 @@ ParallelFor (MF const& mf, IntVect const& ng, TileSize const& ts, F&& f)
  *           is the local box index, and the following three are spatial indices
  *           for x, y, and z-directions.
  */
-template <int MT, typename MF, typename F>
-std::enable_if_t<IsFabArray<MF>::value>
+template <int MT, FabArrayType MF, typename F>
+void
 ParallelFor (MF const& mf, IntVect const& ng, TileSize const& ts, F&& f)
 {
 #ifdef AMREX_USE_GPU
-    detail::ParallelFor<MT>(mf, ng, 1, ts.tile_size, false, std::forward<F>(f));
+    detail::ParallelFor_doit<MT>(mf, ng, 1, ts.tile_size, false, std::forward<F>(f));
 #else
-    detail::ParallelFor(mf, ng, ts.tile_size, false, std::forward<F>(f));
+    detail::ParallelFor_doit(mf, ng, ts.tile_size, false, std::forward<F>(f));
 #endif
 }
 
@@ -305,11 +304,11 @@ ParallelFor (MF const& mf, IntVect const& ng, TileSize const& ts, F&& f)
  *           is the local box index, the following three are spatial indices
  *           for x, y, and z-directions, and the last is for component.
  */
-template <typename MF, typename F>
-std::enable_if_t<IsFabArray<MF>::value>
+template <FabArrayType MF, typename F>
+void
 ParallelFor (MF const& mf, IntVect const& ng, int ncomp, TileSize const& ts, F&& f)
 {
-    detail::ParallelFor(mf, ng, ncomp, ts.tile_size, false, std::forward<F>(f));
+    detail::ParallelFor_doit(mf, ng, ncomp, ts.tile_size, false, std::forward<F>(f));
 }
 
 /**
@@ -332,14 +331,14 @@ ParallelFor (MF const& mf, IntVect const& ng, int ncomp, TileSize const& ts, F&&
  *           is the local box index, the following three are spatial indices
  *           for x, y, and z-directions, and the last is for component.
  */
-template <int MT, typename MF, typename F>
-std::enable_if_t<IsFabArray<MF>::value>
+template <int MT, FabArrayType MF, typename F>
+void
 ParallelFor (MF const& mf, IntVect const& ng, int ncomp, TileSize const& ts, F&& f)
 {
 #ifdef AMREX_USE_GPU
-    detail::ParallelFor<MT>(mf, ng, ncomp, ts.tile_size, false, std::forward<F>(f));
+    detail::ParallelFor_doit<MT>(mf, ng, ncomp, ts.tile_size, false, std::forward<F>(f));
 #else
-    detail::ParallelFor(mf, ng, ncomp, ts.tile_size, false, std::forward<F>(f));
+    detail::ParallelFor_doit(mf, ng, ncomp, ts.tile_size, false, std::forward<F>(f));
 #endif
 }
 
@@ -362,11 +361,11 @@ ParallelFor (MF const& mf, IntVect const& ng, int ncomp, TileSize const& ts, F&&
  *           is the local box index, and the following three are spatial indices
  *           for x, y, and z-directions.
  */
-template <typename MF, typename F>
-std::enable_if_t<IsFabArray<MF>::value>
+template <FabArrayType MF, typename F>
+void
 ParallelFor (MF const& mf, IntVect const& ng, TileSize const& ts, DynamicTiling dt, F&& f)
 {
-    detail::ParallelFor(mf, ng, ts.tile_size, dt.dynamic, std::forward<F>(f));
+    detail::ParallelFor_doit(mf, ng, ts.tile_size, dt.dynamic, std::forward<F>(f));
 }
 
 /**
@@ -389,12 +388,12 @@ ParallelFor (MF const& mf, IntVect const& ng, TileSize const& ts, DynamicTiling 
  *           is the local box index, the following three are spatial indices
  *           for x, y, and z-directions, and the last is for component.
  */
-template <typename MF, typename F>
-std::enable_if_t<IsFabArray<MF>::value>
+template <FabArrayType MF, typename F>
+void
 ParallelFor (MF const& mf, IntVect const& ng, int ncomp, TileSize const& ts,
              DynamicTiling dt, F&& f)
 {
-    detail::ParallelFor(mf, ng, ncomp, ts.tile_size, dt.dynamic, std::forward<F>(f));
+    detail::ParallelFor_doit(mf, ng, ncomp, ts.tile_size, dt.dynamic, std::forward<F>(f));
 }
 
 /**
@@ -417,15 +416,15 @@ ParallelFor (MF const& mf, IntVect const& ng, int ncomp, TileSize const& ts,
  *           is the local box index, and the following three are spatial indices
  *           for x, y, and z-directions.
  */
-template <int MT, typename MF, typename F>
-std::enable_if_t<IsFabArray<MF>::value>
+template <int MT, FabArrayType MF, typename F>
+void
 ParallelFor (MF const& mf, IntVect const& ng, TileSize const& ts,
              DynamicTiling dt, F&& f)
 {
 #ifdef AMREX_USE_GPU
-    detail::ParallelFor<MT>(mf, ng, 1, ts.tile_size, dt.dynamic, std::forward<F>(f));
+    detail::ParallelFor_doit<MT>(mf, ng, 1, ts.tile_size, dt.dynamic, std::forward<F>(f));
 #else
-    detail::ParallelFor(mf, ng, ts.tile_size, dt.dynamic, std::forward<F>(f));
+    detail::ParallelFor_doit(mf, ng, ts.tile_size, dt.dynamic, std::forward<F>(f));
 #endif
 }
 
@@ -450,21 +449,17 @@ ParallelFor (MF const& mf, IntVect const& ng, TileSize const& ts,
  *           is the local box index, the following three are spatial indices
  *           for x, y, and z-directions, and the last is for component.
  */
-template <int MT, typename MF, typename F>
-std::enable_if_t<IsFabArray<MF>::value>
+template <int MT, FabArrayType MF, typename F>
+void
 ParallelFor (MF const& mf, IntVect const& ng, int ncomp, TileSize const& ts,
              DynamicTiling dt, F&& f)
 {
 #ifdef AMREX_USE_GPU
-    detail::ParallelFor<MT>(mf, ng, ncomp, ts.tile_size, dt.dynamic, std::forward<F>(f));
+    detail::ParallelFor_doit<MT>(mf, ng, ncomp, ts.tile_size, dt.dynamic, std::forward<F>(f));
 #else
-    detail::ParallelFor(mf, ng, ncomp, ts.tile_size, dt.dynamic, std::forward<F>(f));
+    detail::ParallelFor_doit(mf, ng, ncomp, ts.tile_size, dt.dynamic, std::forward<F>(f));
 #endif
 }
-
-}
-
-using experimental::ParallelFor;
 
 }
 

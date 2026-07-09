@@ -56,7 +56,7 @@ namespace {
         }
         else {
             std::free(mem);
-            memptr = nullptr;
+            *memptr = nullptr;
             return -1;
         }
 
@@ -100,6 +100,7 @@ namespace {
 
     void ActuallyDestroySUNMemoryHelper(SUNMemoryHelper helper)
     {
+        if (helper == nullptr) { return; }
         if (helper->ops) { std::free(helper->ops); }
         std::free(helper);
     }
@@ -157,27 +158,13 @@ MemoryHelper::MemoryHelper(MemoryHelper&& rhs) noexcept
     rhs.sunctx = nullptr;
 }
 
-MemoryHelper& MemoryHelper::operator=(MemoryHelper&& rhs) noexcept
-{
-    if (this != &rhs)
-    {
-        ActuallyDestroySUNMemoryHelper(helper);
-        helper = rhs.helper;
-        rhs.helper = nullptr;
-        delete sunctx;
-        sunctx = rhs.sunctx;
-        rhs.sunctx = nullptr;
-    }
-    return *this;
-}
-
 void MemoryHelper::Initialize(int nthreads)
 {
     if (initialized.empty()) {
         initialized.resize(nthreads);
-        std::fill(initialized.begin(), initialized.end(), 0);
+        std::ranges::fill(initialized, 0);
         the_sunmemory_helper.resize(nthreads);
-        std::fill(the_sunmemory_helper.begin(), the_sunmemory_helper.end(), nullptr);
+        std::ranges::fill(the_sunmemory_helper, nullptr);
     }
     for (int i = 0; i < nthreads; i++) {
         if (initialized[i]) { continue; }

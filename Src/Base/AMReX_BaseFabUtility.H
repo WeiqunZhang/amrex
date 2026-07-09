@@ -5,8 +5,25 @@
 #include <AMReX_BaseFab.H>
 #include <AMReX_TypeTraits.H>
 
+/**
+ * \file AMReX_BaseFabUtility.H
+ * \brief Helper routines for manipulating BaseFab data and related arrays.
+ */
+
 namespace amrex {
 
+/**
+ * \brief Cast components from one BaseFab to another over a region.
+ *
+ * \tparam Tto   Destination value type.
+ * \tparam Tfrom Source value type.
+ * \param tofab Destination fab receiving the cast values.
+ * \param fromfab Source fab providing values to cast.
+ * \param bx Region over which to apply the cast.
+ * \param scomp Starting component in the source fab.
+ * \param dcomp Starting component in the destination fab.
+ * \param ncomp Number of components to copy.
+ */
 template <class Tto, class Tfrom>
 AMREX_GPU_HOST_DEVICE
 void
@@ -21,11 +38,23 @@ cast (BaseFab<Tto>& tofab, BaseFab<Tfrom> const& fromfab,
     });
 }
 
-template <typename STRUCT, typename F,
-          std::enable_if_t<(sizeof(STRUCT)<=36*8) &&
-                                  AMREX_IS_TRIVIALLY_COPYABLE(STRUCT) &&
-                                  std::is_trivially_destructible_v<STRUCT>,
-                                  int>FOO = 0>
+/**
+ * \brief Fill an array-of-structs BaseFab by invoking a functor per cell.
+ *
+ * The functor must provide an `operator()(STRUCT&, int i, int j, int k)` that
+ * populates the aggregate. \p STRUCT must define a nested `value_type` member
+ * and satisfy `sizeof(STRUCT) <= 36*8`. The struct is required to be trivially
+ * copyable and destructible so it can be staged in shared memory on GPUs.
+ *
+ * \tparam STRUCT Aggregate type stored in the fab.
+ * \tparam F Callable functor type.
+ * \param aos_fab Target fab storing STRUCT values.
+ * \param f Functor used to populate each element.
+ */
+template <typename STRUCT, typename F>
+requires ((sizeof(STRUCT)<=36*8) &&
+          AMREX_IS_TRIVIALLY_COPYABLE(STRUCT) &&
+          std::is_trivially_destructible_v<STRUCT>)
 void fill (BaseFab<STRUCT>& aos_fab, F const& f)
 {
     Box const& box = aos_fab.box();
@@ -93,6 +122,183 @@ void fill (BaseFab<STRUCT>& aos_fab, F const& f)
             f(aos(i,j,k), i, j, k);
         });
     }
+}
+
+/**
+ * \brief Transpose a 3D array of shape (nx, ny, nz) from C-order to Fortran-order storage.
+ *
+ * The input is interpreted in row-major order with unit stride along the \p z
+ * axis. The output is written in column-major order with unit stride along
+ * the \p x axis. For GPU builds the kernel launches on the current
+ * stream; callers should synchronize explicitly if needed.
+ *
+ * \param pi Pointer to the source data laid out in C order.
+ * \param po Pointer to the destination buffer that receives Fortran-ordered data.
+ * \param nx Number of cells in the x-direction.
+ * \param ny Number of cells in the y-direction.
+ * \param nz Number of cells in the z-direction.
+ */
+template <typename T>
+void transposeCtoF (T const* pi, T* po, int nx, int ny, int nz)
+{
+    AMREX_ALWAYS_ASSERT(pi != po);
+
+#if defined(AMREX_USE_CUDA) || defined(AMREX_USE_HIP)
+
+    constexpr int tile_dim = 32;
+    constexpr int block_rows = 16;
+    constexpr int nthreads = tile_dim*block_rows;
+
+    // Each block has tile_dim x block_rows threads. They work on a tile_dim
+    // x tile_dim tile.
+
+    dim3 block{unsigned(tile_dim), unsigned(block_rows), 1};
+    dim3 grid{unsigned((nx+tile_dim-1)/tile_dim),
+              unsigned((nz+tile_dim-1)/tile_dim), unsigned(ny)};
+
+    AMREX_LAUNCH_KERNEL(nthreads, grid, block, 0, Gpu::gpuStream(),
+    [=] AMREX_GPU_DEVICE ()
+    {
+        __shared__ T tile[tile_dim][tile_dim+1]; // +1 to avoid bank conflicts
+
+        int k = blockIdx.y * tile_dim + threadIdx.x; // for loading z-direction
+        int i = blockIdx.x * tile_dim + threadIdx.y; // for loading x-direction
+
+        int j = blockIdx.z; // for y-direction
+
+        if (k < nz) {
+            for (int it = 0; it < tile_dim; it += block_rows, i += block_rows) {
+                if (i < nx) {
+                    //      x               z
+                    tile[threadIdx.y+it][threadIdx.x] = pi[k + (j+i*std::size_t(ny))*nz];
+                }
+            }
+        }
+
+        __syncthreads();
+
+        i = blockIdx.x * tile_dim + threadIdx.x; // for storing x-direction
+        k = blockIdx.y * tile_dim + threadIdx.y; // for storing z-direction
+
+        if (i < nx) {
+            for (int it = 0; it < tile_dim; it += block_rows, k += block_rows) {
+                if (k < nz) {
+                    po[i + (j+k*std::size_t(ny))*nx] = tile[threadIdx.x][threadIdx.y+it];
+                }
+            }
+        }
+    });
+
+#elif defined(AMREX_USE_SYCL)
+
+    constexpr int tile_dim = 32;
+    constexpr int block_rows = 8;
+
+    // Each block has tile_dim x block_rows threads. They work on a tile_dim
+    // x tile_dim tile.
+
+    sycl::range<3> block{std::size_t(1), std::size_t(block_rows), std::size_t(tile_dim)};
+    sycl::range<3> grid{std::size_t(ny), std::size_t((nz+tile_dim-1)/tile_dim),
+                                         std::size_t((nx+tile_dim-1)/tile_dim)};
+    sycl::range<3> global_size{grid[0]*block[0],
+                               grid[1]*block[1],
+                               grid[2]*block[2]};
+
+    auto& q = *(Gpu::gpuStream().queue);
+    try {
+      q.submit([&] (sycl::handler& h)
+      {
+        auto tile = sycl::local_accessor<T,2>(sycl::range<2>(tile_dim,tile_dim+1),h);
+
+        h.parallel_for(sycl::nd_range<3>(global_size, block),
+        [=] (sycl::nd_item<3> item)
+        {
+            auto group = item.get_group();
+            dim3 blockIdx{unsigned(group.get_group_id(2)),
+                          unsigned(group.get_group_id(1)),
+                          unsigned(group.get_group_id(0))};
+            dim3 threadIdx{unsigned(item.get_local_id(2)),
+                           unsigned(item.get_local_id(1)),
+                           unsigned(item.get_local_id(0))};
+
+            int k = blockIdx.y * tile_dim + threadIdx.x; // for loading z-direction
+            int i = blockIdx.x * tile_dim + threadIdx.y; // for loading x-direction
+
+            int j = blockIdx.z; // for y-direction
+
+            if (k < nz) {
+                for (int it = 0; it < tile_dim; it += block_rows, i += block_rows) {
+                    if (i < nx) {
+                        //      x               z
+                        tile[threadIdx.y+it][threadIdx.x] = pi[k + (j+i*std::size_t(ny))*nz];
+                    }
+                }
+            }
+
+            item.barrier(sycl::access::fence_space::local_space);
+
+            i = blockIdx.x * tile_dim + threadIdx.x; // for storing x-direction
+            k = blockIdx.y * tile_dim + threadIdx.y; // for storing z-direction
+
+            if (i < nx) {
+                for (int it = 0; it < tile_dim; it += block_rows, k += block_rows) {
+                    if (k < nz) {
+                        po[i + (j+k*std::size_t(ny))*nx] = tile[threadIdx.x][threadIdx.y+it];
+                    }
+                }
+            }
+        });
+      });
+    } catch (sycl::exception const& ex) {
+        amrex::Abort(std::string("transposeCtoF: ")+ex.what()+"!!!!!");
+    }
+
+#else
+
+    constexpr int bx = 32;
+    constexpr int bz = 32;
+
+    std::size_t nxy = std::size_t(nx) * ny;
+    std::size_t nyz = std::size_t(ny) * nz;
+
+#ifdef AMREX_USE_OMP
+#pragma omp parallel for collapse(3)
+#endif
+    for (int j = 0; j < ny; ++j) {
+        for (int k0 = 0; k0 < nz; k0 += bz) {
+            for (int i0 = 0; i0 < nx; i0 += bx) {
+                int imax = std::min(i0+bx, nx);
+                int kmax = std::min(k0+bz, nz);
+                auto      * AMREX_RESTRICT pdst = po + j*std::size_t(nx);
+                auto const* AMREX_RESTRICT psrc = pi + j*std::size_t(nz);
+                for (int i = i0; i < imax; ++i) {
+                    AMREX_PRAGMA_SIMD
+                    for (int k = k0; k < kmax; ++k) {
+                        pdst[i + k*nxy] = psrc[k + i*nyz];
+                    }
+                }
+            }
+        }
+    }
+
+#endif
+}
+
+/**
+ * \brief Transpose a 2D array of shape (nx, ny) from C-order to Fortran-order storage.
+ *
+ * Equivalent to the 3D variant with \p nz = 1. The input's unit stride lies
+ * along the \p y direction and the output's unit stride lies along \p x.
+ *
+ * \param pi Pointer to the source data laid out in C order.
+ * \param po Pointer to the destination buffer that receives Fortran-ordered data.
+ * \param nx Number of cells along the first (x) dimension.
+ * \param ny Number of cells along the second (y) dimension.
+ */
+template <typename T>
+void transposeCtoF (T const* pi, T* po, int nx, int ny)
+{
+    transposeCtoF(pi, po, nx, 1, ny);
 }
 
 }

@@ -117,8 +117,7 @@ public:
 
     //! Return local index in the vector of FABs.
     [[nodiscard]] int localindex (int K) const noexcept {
-        auto low
-            = std::lower_bound(indexArray.begin(), indexArray.end(), K);
+        auto low = std::ranges::lower_bound(indexArray, K);
         if (low != indexArray.end() && *low == K) {
             return static_cast<int>(low - indexArray.begin());
         }
@@ -154,7 +153,7 @@ public:
     //! Is this a good candidate for kernel fusing?
     [[nodiscard]] bool isFusingCandidate () const noexcept;
 
-    //
+    /// \cond DOXYGEN_IGNORE
     struct CacheStats
     {
         int         size{0};     //!< current size: nbuild - nerase
@@ -167,7 +166,7 @@ public:
         Long        bytes_hwm{0};
         std::string name;     //!< name of the cache
         explicit CacheStats (std::string  name_)
-            : name(std::move(name_)) {;}
+            : name(std::move(name_)) {}
         void recordBuild () noexcept {
             ++size;
             ++nbuild;
@@ -189,7 +188,7 @@ public:
                                           << "    max # of uses    : " << maxuse  << "\n";
         }
     };
-    //
+    /// \endcond
     //! Used by a bunch of routines when communicating via MPI.
     struct CopyComTag
     {
@@ -489,12 +488,13 @@ public:
         FB (const FabArrayBase& fa, const IntVect& nghost,
             bool cross, const Periodicity& period,
             bool enforce_periodicity_only, bool override_sync,
-            bool multi_ghost);
+            bool multi_ghost, IntVect const& sumboundary_src_nghost);
 
         std::uint64_t m_id = std::numeric_limits<std::uint64_t>::max();
         IndexType    m_typ;
         IntVect      m_crse_ratio; //!< BoxArray in FabArrayBase may have crse_ratio.
         IntVect      m_ngrow;
+        IntVect      m_sb_snghost;
         bool         m_cross;
         bool         m_epo;
         bool         m_override_sync;
@@ -514,6 +514,7 @@ public:
         void define_fb (const FabArrayBase& fa);
         void define_epo (const FabArrayBase& fa);
         void define_os (const FabArrayBase& fa);
+        void define_sb (const FabArrayBase& fa);
         void tag_one_box (int krcv, BoxArray const& ba, DistributionMapping const& dm,
                           bool build_recv_tag);
     };
@@ -526,7 +527,8 @@ public:
     //
     const FB& getFB (const IntVect& nghost, const Periodicity& period,
                      bool cross=false, bool enforce_periodicity_only = false,
-                     bool override_sync = false) const;
+                     bool override_sync = false,
+                     IntVect const& sumboundary_src_nghost = IntVect(-1)) const;
 
     //
     //! parallel copy or add
@@ -737,6 +739,7 @@ private:
     static void flushCPCache (); //!< This flusheds the entire cache.
 };
 
+/// \cond DOXYGEN_IGNORE
 namespace detail {
     class SingleChunkArena final
         : public Arena
@@ -771,6 +774,7 @@ namespace detail {
         std::size_t m_size = 0;
     };
 }
+/// \endcond
 
 [[nodiscard]] int nComp (FabArrayBase const& fa);
 [[nodiscard]] IntVect nGrowVect (FabArrayBase const& fa);

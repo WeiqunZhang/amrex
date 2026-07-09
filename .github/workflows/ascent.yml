@@ -1,6 +1,10 @@
 name: 🐧 Ascent
 
-on: [push, pull_request]
+on:
+  push:
+    branches-ignore:
+      - 'dependabot/**'
+  pull_request:
 
 concurrency:
   group: ${{ github.ref }}-${{ github.head_ref }}-insituvis
@@ -16,13 +20,14 @@ jobs:
       CC: gcc
       CMAKE_PREFIX_PATH: /ascent/install/lib/cmake/
     container:
-      image: alpinedav/ascent:0.9.2
+      image: alpinedav/ascent:0.9.3
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v7
     - name: Configure
       run: |
         . /ascent_docker_setup_env.sh
         cmake -S . -B build          \
+            -DCMAKE_CXX_STANDARD=20  \
             -DCMAKE_BUILD_TYPE=Debug \
             -DAMReX_ENABLE_TESTS=ON  \
             -DAMReX_FORTRAN=OFF      \

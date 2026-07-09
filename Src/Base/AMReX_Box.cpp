@@ -10,6 +10,7 @@
 
 namespace amrex {
 
+/// \cond DOXYGEN_IGNORE
 namespace detail {
 
 //
@@ -24,9 +25,9 @@ box_write (std::ostream& os,
            int dim)
 {
     os << '(';
-    int_vector_write(os, smallend, dim) << ' ';
-    int_vector_write(os, bigend, dim) << ' ';
-    int_vector_write(os, type, dim) << ')';
+    T_vector_write(os, smallend, dim) << ' ';
+    T_vector_write(os, bigend, dim) << ' ';
+    T_vector_write(os, type, dim) << ')';
 
     if (os.fail()) {
         amrex::Error("operator<<(ostream&,Box&) failed");
@@ -57,28 +58,28 @@ box_read (std::istream& is,
 
     if (c == '(')
     {
-        int_vector_read(is, smallend, dim);
-        int_vector_read(is, bigend, dim);
+        T_vector_read(is, smallend, dim);
+        T_vector_read(is, bigend, dim);
         is >> c;
         // Read an optional IndexType
         is.putback(c);
         if ( c == '(' )
         {
-            int_vector_read(is, type, dim);
+            T_vector_read(is, type, dim);
         }
         is.ignore(BL_IGNORE_MAX,')');
     }
     else if (c == '<')
     {
         is.putback(c);
-        int_vector_read(is, smallend, dim);
-        int_vector_read(is, bigend, dim);
+        T_vector_read(is, smallend, dim);
+        T_vector_read(is, bigend, dim);
         is >> c;
         // Read an optional IndexType
         is.putback(c);
         if ( c == '<' )
         {
-            int_vector_read(is, type, dim);
+            T_vector_read(is, type, dim);
         }
         //is.ignore(BL_IGNORE_MAX,'>');
     }
@@ -95,7 +96,9 @@ box_read (std::istream& is,
 }
 
 } // namespace detail
+/// \endcond
 
+/// \cond DOXYGEN_IGNORE
 BoxCommHelper::BoxCommHelper (const Box& bx, int* p_)
     : p(p_)
 {
@@ -115,6 +118,7 @@ BoxCommHelper::BoxCommHelper (const Box& bx, int* p_)
                  p[1+AMREX_SPACEDIM*2] = typ[1],
                  p[2+AMREX_SPACEDIM*2] = typ[2]);
 }
+/// \endcond
 
 void
 AllGatherBoxes (Vector<Box>& bxs, int n_extra_reserve)
@@ -160,7 +164,7 @@ AllGatherBoxes (Vector<Box>& bxs, int n_extra_reserve)
     MPI_Gather(&count, 1, MPI_INT, countvec.data(), 1, MPI_INT, root, comm);
 
     Long count_tot = 0L;
-    Vector<int> offset(countvec.size(),0);
+    Vector<int> offset(nprocs, 0);
     if (myproc == root) {
         count_tot = countvec[0];
         for (int i = 1, N = static_cast<int>(offset.size()); i < N; ++i) {
@@ -169,7 +173,8 @@ AllGatherBoxes (Vector<Box>& bxs, int n_extra_reserve)
         }
     }
 
-    MPI_Bcast(&count_tot, 1, MPI_INT, root, comm);
+    MPI_Bcast(&count_tot, 1, ParallelDescriptor::Mpi_typemap<Long>::type(),
+              root, comm);
 
     if (count_tot == 0) { return; }
 

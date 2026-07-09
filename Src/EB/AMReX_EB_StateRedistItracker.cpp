@@ -1,5 +1,5 @@
 /**
- * \file StateRedistItracer.cpp
+ * \file AMReX_EB_StateRedistItracker.cpp
  * @{
  *
  */
@@ -23,7 +23,7 @@ MakeITracker ( Box const& bx,
     int debug_verbose = 0;
 #endif
 
-    const Real small_norm_diff = 1.e-8;
+    const Real small_norm_diff = Real(1e-8);
 
     const Box domain = lev_geom.Domain();
 
@@ -69,7 +69,7 @@ MakeITracker ( Box const& bx,
            const Real dapx = apx(i+1,j  ,k  ) - apx(i,j,k);
            const Real dapy = apy(i  ,j+1,k  ) - apy(i,j,k);
            apnorm = std::sqrt(dapx*dapx+dapy*dapy);
-           apnorm_inv = 1.0/apnorm;
+           apnorm_inv = Real(1)/apnorm;
            Real nx = dapx * apnorm_inv;
            Real ny = dapy * apnorm_inv;
 
@@ -213,10 +213,10 @@ MakeITracker ( Box const& bx,
            if (sum_vol < target_volfrac)
            {
 #if 0
-             amrex::Print() << "Couldnt merge with enough cells to raise volume at " <<
+             amrex::Print() << "Couldn't merge with enough cells to raise volume at " <<
                                IntVect(i,j) << " so stuck with sum_vol " << sum_vol << '\n';
 #endif
-             amrex::Abort("Couldnt merge with enough cells to raise volume greater than target_volfrac");
+             amrex::Abort("Couldn't merge with enough cells to raise volume greater than target_volfrac");
            }
        }
     });
@@ -724,10 +724,10 @@ MakeITracker ( Box const& bx,
            if (sum_vol < target_volfrac)
            {
 #if 0
-             amrex::Print() << "Couldnt merge with enough cells to raise volume at " <<
+             amrex::Print() << "Couldn't merge with enough cells to raise volume at " <<
                                IntVect(i,j,k) << " so stuck with sum_vol " << sum_vol << '\n';
 #endif
-             amrex::Abort("Couldnt merge with enough cells to raise volume greater than target_volfrac");
+             amrex::Abort("Couldn't merge with enough cells to raise volume greater than target_volfrac");
            }
        }
     });
@@ -736,3 +736,5 @@ MakeITracker ( Box const& bx,
 #endif
 
 }
+
+/** @} */

@@ -25,7 +25,11 @@ namespace amrex {
     {
         if (id == FPC::NativeIntDescriptor())
         {
-            os.write((char*) data, static_cast<std::streamsize>(size*sizeof(int)));
+            if (!os.write(reinterpret_cast<char const*>(data),
+                          static_cast<std::streamsize>(size*sizeof(int))))
+            {
+                amrex::Error("Failed to write integer data.");
+            }
         }
         else if (id.numBytes() == 2)
         {
@@ -54,7 +58,11 @@ namespace amrex {
     {
         if (id == FPC::NativeIntDescriptor())
         {
-            is.read((char*) data, static_cast<std::streamsize>(size * id.numBytes()));
+            if (!is.read(reinterpret_cast<char*>(data),
+                         static_cast<std::streamsize>(size * id.numBytes())))
+            {
+                amrex::Error("Failed to read integer data.");
+            }
         }
         else if (id.numBytes() == 2)
         {
@@ -84,7 +92,11 @@ namespace amrex {
     {
         if (id == FPC::NativeLongDescriptor())
         {
-            os.write((char*) data, static_cast<std::streamsize>(size*sizeof(Long)));
+            if (!os.write(reinterpret_cast<char const*>(data),
+                          static_cast<std::streamsize>(size*sizeof(Long))))
+            {
+                amrex::Error("Failed to write long integer data.");
+            }
         }
         else if (id.numBytes() == 2)
         {
@@ -113,7 +125,11 @@ namespace amrex {
     {
         if (id == FPC::NativeLongDescriptor())
         {
-            is.read((char*) data, static_cast<std::streamsize>(size * id.numBytes()));
+            if (!is.read(reinterpret_cast<char*>(data),
+                         static_cast<std::streamsize>(size * id.numBytes())))
+            {
+                amrex::Error("Failed to read long integer data.");
+            }
         }
         else if (id.numBytes() == 2)
         {

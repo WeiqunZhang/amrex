@@ -15,6 +15,7 @@ namespace amrex::Gpu {
 #ifdef AMREX_USE_GPU
 
     /**
+     * \ingroup amrex_linear_containers
      * \brief A PODVector that uses the standard memory Arena.
      * Note that the memory might or might not be managed depending
      * on the amrex.the_arena_is_managed ParmParse parameter.
@@ -23,6 +24,7 @@ namespace amrex::Gpu {
     using DeviceVector = PODVector<T, ArenaAllocator<T> >;
 
     /**
+     * \ingroup amrex_linear_containers
      * \brief A PODVector that uses the non-managed device memory arena.
      *
      */
@@ -30,6 +32,7 @@ namespace amrex::Gpu {
     using NonManagedDeviceVector = PODVector<T, DeviceArenaAllocator<T> >;
 
     /**
+     * \ingroup amrex_linear_containers
      * \brief A PODVector that uses the managed memory arena.
      *
      */
@@ -37,6 +40,7 @@ namespace amrex::Gpu {
     using ManagedVector = PODVector<T, ManagedArenaAllocator<T> >;
 
     /**
+     * \ingroup amrex_linear_containers
      * \brief A PODVector that uses the pinned memory arena.
      *
      */
@@ -44,6 +48,7 @@ namespace amrex::Gpu {
     using PinnedVector = PODVector<T, PinnedArenaAllocator<T> >;
 
     /**
+     * \ingroup amrex_linear_containers
      * \brief A PODVector that uses the async memory arena.
      *        Maybe useful for temporary vectors inside MFIters
      *        that are accessed on the device.
@@ -53,6 +58,7 @@ namespace amrex::Gpu {
     using AsyncVector = PODVector<T, AsyncArenaAllocator<T> >;
 
     /**
+     * \ingroup amrex_linear_containers
      * \brief A PODVector that uses pinned host memory. Same as PinnedVector.
      * For a vector class that uses std::allocator by default, see amrex::Vector.
      *
@@ -61,6 +67,7 @@ namespace amrex::Gpu {
     using HostVector = PinnedVector<T>;
 
     /**
+     * \ingroup amrex_linear_containers
      * \brief This is identical to ManagedVector<T>. The ManagedDeviceVector
      * form is deprecated and will be removed in a future release.
      *
@@ -77,7 +84,7 @@ namespace amrex::Gpu {
     using HostVector = PODVector<T>;
 
     template <class T>
-    using NonManagedVector = PODVector<T>;
+    using NonManagedDeviceVector = PODVector<T>;
 
     template <class T>
     using ManagedVector = PODVector<T>;
@@ -108,14 +115,14 @@ namespace amrex::Gpu {
      *
      * \tparam InIter  The input iterator type
      * \tparam OutIter The output iterator type
-     * \param HostToDevice A tag indicating that the copy is from the host to the device
      * \param begin Where in the input to start reading
      * \param end Where in the input to stop reading
      * \param result Where in the output to start writing
      *
      * Example usage:
-     *
+     * \code{.cpp}
      *    Gpu::copy(Gpu::hostToDevice, a.begin(), a.end(), b.begin());
+     * \endcode
      */
     template<class InIter, class OutIter>
     void copy (HostToDevice, InIter begin, InIter end, OutIter result) noexcept
@@ -129,11 +136,7 @@ namespace amrex::Gpu {
 
         auto size = std::distance(begin, end);
         if (size == 0) { return; }
-#ifdef AMREX_USE_GPU
         htod_memcpy(&(*result), &(*begin), size*sizeof(value_type));
-#else
-        std::memcpy(&(*result), &(*begin), size*sizeof(value_type));
-#endif
     }
 
     /**
@@ -145,14 +148,14 @@ namespace amrex::Gpu {
      *
      * \tparam InIter  The input iterator type
      * \tparam OutIter The output iterator type
-     * \param DeviceToHost A tag indicating that the copy is from the device to the host
      * \param begin Where in the input to start reading
      * \param end Where in the input to stop reading
      * \param result Where in the output to start writing
      *
      * Example usage:
-     *
+     * \code{.cpp}
      *    Gpu::copy(Gpu::deviceToHost, a.begin(), a.end(), b.begin());
+     * \endcode
      */
     template<class InIter, class OutIter>
     void copy (DeviceToHost, InIter begin, InIter end, OutIter result) noexcept
@@ -166,11 +169,7 @@ namespace amrex::Gpu {
 
         auto size = std::distance(begin, end);
         if (size == 0) { return; }
-#ifdef AMREX_USE_GPU
         dtoh_memcpy(&(*result), &(*begin), size*sizeof(value_type));
-#else
-        std::memcpy(&(*result), &(*begin), size*sizeof(value_type));
-#endif
     }
 
     /**
@@ -182,14 +181,14 @@ namespace amrex::Gpu {
      *
      * \tparam InIter  The input iterator type
      * \tparam OutIter The output iterator type
-     * \param DeviceToDevice A tag indicating that the copy is from the device to the device
      * \param begin Where in the input to start reading
      * \param end Where in the input to stop reading
      * \param result Where in the output to start writing
      *
      * Example usage:
-     *
+     * \code{.cpp}
      *    Gpu::copy(Gpu::deviceToDevice, a.begin(), a.end(), b.begin());
+     * \endcode
      */
     template<class InIter, class OutIter>
     void copy (DeviceToDevice, InIter begin, InIter end, OutIter result) noexcept
@@ -203,11 +202,7 @@ namespace amrex::Gpu {
 
         auto size = std::distance(begin, end);
         if (size == 0) { return; }
-#ifdef AMREX_USE_GPU
         dtod_memcpy(&(*result), &(*begin), size*sizeof(value_type));
-#else
-        std::memcpy(&(*result), &(*begin), size*sizeof(value_type));
-#endif
     }
 
     /**
@@ -220,14 +215,14 @@ namespace amrex::Gpu {
      *
      * \tparam InIter  The input iterator type
      * \tparam OutIter The output iterator type
-     * \param HostToDevice A tag indicating that the copy is from the host to the device
      * \param begin Where in the input to start reading
      * \param end Where in the input to stop reading
      * \param result Where in the output to start writing
      *
      * Example usage:
-     *
+     * \code{.cpp}
      *    Gpu::copyAsync(Gpu::hostToDevice, a.begin(), a.end(), b.begin());
+     * \endcode
      */
     template<class InIter, class OutIter>
     void copyAsync (HostToDevice, InIter begin, InIter end, OutIter result) noexcept
@@ -241,11 +236,7 @@ namespace amrex::Gpu {
 
         auto size = std::distance(begin, end);
         if (size == 0) { return; }
-#ifdef AMREX_USE_GPU
         htod_memcpy_async(&(*result), &(*begin), size*sizeof(value_type));
-#else
-        std::memcpy(&(*result), &(*begin), size*sizeof(value_type));
-#endif
     }
 
     /**
@@ -258,14 +249,14 @@ namespace amrex::Gpu {
      *
      * \tparam InIter  The input iterator type
      * \tparam OutIter The output iterator type
-     * \param DeviceToHost A tag indicating that the copy is from the device to the host
      * \param begin Where in the input to start reading
      * \param end Where in the input to stop reading
      * \param result Where in the output to start writing
      *
      * Example usage:
-     *
+     * \code{.cpp}
      *    Gpu::copyAsync(Gpu::deviceToHost, a.begin(), a.end(), b.begin());
+     * \endcode
      */
     template<class InIter, class OutIter>
     void copyAsync (DeviceToHost, InIter begin, InIter end, OutIter result) noexcept
@@ -279,11 +270,7 @@ namespace amrex::Gpu {
 
         auto size = std::distance(begin, end);
         if (size == 0) { return; }
-#ifdef AMREX_USE_GPU
         dtoh_memcpy_async(&(*result), &(*begin), size*sizeof(value_type));
-#else
-        std::memcpy(&(*result), &(*begin), size*sizeof(value_type));
-#endif
     }
 
     /**
@@ -296,14 +283,14 @@ namespace amrex::Gpu {
      *
      * \tparam InIter  The input iterator type
      * \tparam OutIter The output iterator type
-     * \param DeviceToDevice A tag indicating that the copy is from the device to the device
      * \param begin Where in the input to start reading
      * \param end Where in the input to stop reading
      * \param result Where in the output to start writing
      *
      * Example usage:
-     *
+     * \code{.cpp}
      *    Gpu::copyAsync(Gpu::deviceToDevice, a.begin(), a.end(), b.begin());
+     * \endcode
      */
     template<class InIter, class OutIter>
     void copyAsync (DeviceToDevice, InIter begin, InIter end, OutIter result) noexcept
@@ -317,11 +304,7 @@ namespace amrex::Gpu {
 
         auto size = std::distance(begin, end);
         if (size == 0) { return; }
-#ifdef AMREX_USE_GPU
         dtod_memcpy_async(&(*result), &(*begin), size*sizeof(value_type));
-#else
-        std::memcpy(&(*result), &(*begin), size*sizeof(value_type));
-#endif
     }
 
     /**
@@ -329,6 +312,11 @@ namespace amrex::Gpu {
      * This is a no-op for host-only code.
      *
      * This version is blocking - CPU execution will halt until the migration is finished.
+     *
+     * \warning For GPU builds this helper only supports unified allocations
+     * (for example Gpu::ManagedVector). Passing iterators to non-managed
+     * memory, like the default DeviceVector or PinnedVector, will trigger a
+     * runtime error (cudaErrorInvalidValue) from cudaMemPrefetchAsync.
      */
     template<class Iter>
     void prefetchToHost (Iter begin, Iter end) noexcept
@@ -344,10 +332,19 @@ namespace amrex::Gpu {
         // Currently only implemented for CUDA.
 #if defined(AMREX_USE_CUDA) && !defined(_WIN32)
         if (Gpu::Device::devicePropMajor() >= 6) {
+#if defined(CUDART_VERSION) && (CUDART_VERSION >= 13000)
+            cudaMemLocation location = {};
+            location.type = cudaMemLocationTypeHost;
+            AMREX_CUDA_SAFE_CALL(cudaMemPrefetchAsync(&(*begin),
+                                                      size*sizeof(value_type),
+                                                      location, 0,
+                                                      Gpu::gpuStream()));
+#else
             AMREX_CUDA_SAFE_CALL(cudaMemPrefetchAsync(&(*begin),
                                                       size*sizeof(value_type),
                                                       cudaCpuDeviceId,
                                                       Gpu::gpuStream()));
+#endif
         }
 #endif
 #endif
@@ -360,6 +357,11 @@ namespace amrex::Gpu {
      * This is a no-op for host-only code.
      *
      * This version is blocking - CPU execution will halt until the migration is finished.
+     *
+     * \warning For GPU builds this helper only supports unified allocations
+     * (for example Gpu::ManagedVector). Passing iterators to non-managed
+     * memory, like the default DeviceVector or PinnedVector, will trigger a
+     * runtime error (cudaErrorInvalidValue) from cudaMemPrefetchAsync.
      */
     template<class Iter>
     void prefetchToDevice (Iter begin, Iter end) noexcept
@@ -375,10 +377,20 @@ namespace amrex::Gpu {
         // Currently only implemented for CUDA.
 #if defined(AMREX_USE_CUDA) && !defined(_WIN32)
         if (Gpu::Device::devicePropMajor() >= 6) {
+#if defined(CUDART_VERSION) && (CUDART_VERSION >= 13000)
+            cudaMemLocation location = {};
+            location.type = cudaMemLocationTypeDevice;
+            location.id = Gpu::Device::deviceId();
+            AMREX_CUDA_SAFE_CALL(cudaMemPrefetchAsync(&(*begin),
+                                                      size*sizeof(value_type),
+                                                      location, 0,
+                                                      Gpu::gpuStream()));
+#else
             AMREX_CUDA_SAFE_CALL(cudaMemPrefetchAsync(&(*begin),
                                                       size*sizeof(value_type),
                                                       Gpu::Device::deviceId(),
                                                       Gpu::gpuStream()));
+#endif
         }
 #endif
 #endif
@@ -402,11 +414,10 @@ namespace amrex::Gpu {
      *              index for the element to be filled.
      */
     template <typename IT, typename F,
-              typename T = typename std::iterator_traits<IT>::value_type,
-              std::enable_if_t<(sizeof(T) <= 36*8) &&  // so there is enough shared memory
-                               std::is_trivially_copyable_v<T> &&
-                               amrex::IsCallable<F, T&, Long>::value,
-                               int> FOO = 0>
+              typename T = typename std::iterator_traits<IT>::value_type>
+    requires ((sizeof(T) <= 36*8) &&  // so there is enough shared memory
+             std::is_trivially_copyable_v<T> &&
+             amrex::IsCallable<F, T&, Long>::value)
     void fillAsync (IT first, IT last, F const& f) noexcept
     {
         auto N = static_cast<Long>(std::distance(first, last));

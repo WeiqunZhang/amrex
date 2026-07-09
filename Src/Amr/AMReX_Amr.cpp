@@ -42,6 +42,7 @@
 #include <cstdio>
 #include <iostream>
 #include <iomanip>
+#include <iterator>
 #include <limits>
 #include <list>
 #include <sstream>
@@ -141,6 +142,7 @@ void
 Amr::Finalize ()
 {
     Amr::state_plot_vars.clear();
+    Amr::state_small_plot_vars.clear();
     Amr::derive_plot_vars.clear();
     Amr::derive_small_plot_vars.clear();
     Amr::regrid_ba.clear();
@@ -203,6 +205,54 @@ Amr::derive (const std::string& name,
              int                ngrow)
 {
     return amr_level[lev]->derive(name,time,ngrow);
+}
+
+Vector<std::unique_ptr<MultiFab>>
+Amr::derive(const std::string& name,
+            amrex::Real        time,
+            int                ngrow)
+{
+    BL_PROFILE("Amr::derive()");
+    Vector<std::unique_ptr<MultiFab>> out;
+    out.reserve(finest_level + 1);
+
+    for (int i = 0; i <= finest_level; ++i)
+    {
+        auto mf = amr_level[i]->derive(name,time,ngrow);
+        out.push_back(std::move(mf));
+    }
+
+    return out;
+}
+
+void
+Amr::derive (const std::string&       name,
+             Real                     time,
+             const Vector<MultiFab*>& mf,
+             int                      dcomp)
+{
+    BL_PROFILE("Amr::derive()");
+    AMREX_ASSERT(std::ssize(mf) == (finest_level + 1));
+
+    int state_index, state_comp;
+    int ncomp = 1;
+    if (!AmrLevel::isStateVariable(name, state_index, state_comp)) {
+        if (const DeriveRec* rec = AmrLevel::get_derive_lst().get(name)) {
+            ncomp = rec->numDerive();
+        }
+    }
+    amrex::ignore_unused(ncomp);
+
+    for (int i = 0; i <= finest_level; ++i)
+    {
+        AMREX_ASSERT((mf[i] != nullptr) && mf[i]->ok() &&
+                     (dcomp >= 0) && (dcomp + ncomp <= mf[i]->nComp()));
+    }
+
+    for (int i = 0; i <= finestLevel(); ++i)
+    {
+        amr_level[i]->derive(name,time,*(mf[i]),dcomp);
+    }
 }
 
 Amr::Amr (LevelBld* a_levelbld)
@@ -557,14 +607,14 @@ Amr::finalizeInSitu()
 bool
 Amr::isStatePlotVar (const std::string& name)
 {
-    auto it = std::find(state_plot_vars.begin(), state_plot_vars.end(), name);
+    auto it = std::ranges::find(state_plot_vars, name);
     return (it != state_plot_vars.end());
 }
 
 bool
 Amr::isStateSmallPlotVar (const std::string& name)
 {
-    auto it = std::find(state_small_plot_vars.begin(), state_small_plot_vars.end(), name);
+    auto it = std::ranges::find(state_small_plot_vars, name);
     return (it != state_small_plot_vars.end());
 }
 
@@ -635,14 +685,14 @@ Amr::deleteStatePlotVar (const std::string& name)
 bool
 Amr::isDerivePlotVar (const std::string& name) noexcept
 {
-    auto it = std::find(derive_plot_vars.begin(), derive_plot_vars.end(), name);
+    auto it = std::ranges::find(derive_plot_vars, name);
     return (it != derive_plot_vars.end());
 }
 
 bool
 Amr::isDeriveSmallPlotVar (const std::string& name) noexcept
 {
-    auto it = std::find(derive_small_plot_vars.begin(), derive_small_plot_vars.end(), name);
+    auto it = std::ranges::find(derive_small_plot_vars, name);
     return (it != derive_small_plot_vars.end());
 }
 
@@ -2212,47 +2262,6 @@ Amr::coarseTimeStep (Real stop_time)
         runlog_terse.flush();
     }
 
-    int check_test = 0;
-
-    if (check_per > 0.0)
-    {
-
-        // Check to see if we've crossed a check_per interval by comparing
-        // the number of intervals that have elapsed for both the current
-        // time and the time at the beginning of this timestep.
-
-        int num_per_old = static_cast<int>((cumtime-dt_level[0]) / check_per);
-        int num_per_new = static_cast<int>((cumtime            ) / check_per);
-
-        // Before using these, however, we must test for the case where we're
-        // within machine epsilon of the next interval. In that case, increment
-        // the counter, because we have indeed reached the next check_per interval
-        // at this point.
-
-        const Real eps = std::numeric_limits<Real>::epsilon() * 10.0_rt * std::abs(cumtime);
-        const Real next_chk_time = static_cast<Real>(num_per_old + 1) * check_per;
-
-        if ((num_per_new == num_per_old) && std::abs(cumtime - next_chk_time) <= eps)
-        {
-            num_per_new += 1;
-        }
-
-        // Similarly, we have to account for the case where the old time is within
-        // machine epsilon of the beginning of this interval, so that we don't double
-        // count that time threshold -- we already plotted at that time on the last timestep.
-
-        if ((num_per_new != num_per_old) && std::abs((cumtime - dt_level[0]) - next_chk_time) <= eps)
-        {
-            num_per_old += 1;
-        }
-
-        if (num_per_old != num_per_new)
-        {
-            check_test = 1;
-        }
-
-    }
-
     int to_stop       = 0;
     int to_checkpoint = 0;
     int to_plot       = 0;
@@ -2323,8 +2332,7 @@ Amr::coarseTimeStep (Real stop_time)
         to_small_plot = 1;
     }
 
-    if ((check_int > 0 && level_steps[0] % check_int == 0) || check_test == 1
-        || to_checkpoint)
+    if (checkPointNow() || to_checkpoint)
     {
         checkPoint();
     }
@@ -2359,6 +2367,54 @@ Amr::coarseTimeStep (Real stop_time)
     }
 }
 
+bool
+Amr::checkPointNow () noexcept
+{
+    int check_test = 0;
+
+    if (check_per > 0.0)
+    {
+
+        // Check to see if we've crossed a check_per interval by comparing
+        // the number of intervals that have elapsed for both the current
+        // time and the time at the beginning of this timestep.
+
+        int num_per_old = static_cast<int>((cumtime-dt_level[0]) / check_per);
+        int num_per_new = static_cast<int>((cumtime            ) / check_per);
+
+        // Before using these, however, we must test for the case where we're
+        // within machine epsilon of the next interval. In that case, increment
+        // the counter, because we have indeed reached the next check_per interval
+        // at this point.
+
+        const Real eps = std::numeric_limits<Real>::epsilon() * 10.0_rt * std::abs(cumtime);
+        const Real next_chk_time = static_cast<Real>(num_per_old + 1) * check_per;
+
+        if ((num_per_new == num_per_old) && std::abs(cumtime - next_chk_time) <= eps)
+        {
+            num_per_new += 1;
+        }
+
+        // Similarly, we have to account for the case where the old time is within
+        // machine epsilon of the beginning of this interval, so that we don't double
+        // count that time threshold -- we already plotted at that time on the last timestep.
+
+        if ((num_per_new != num_per_old) && std::abs((cumtime - dt_level[0]) - next_chk_time) <= eps)
+        {
+            num_per_old += 1;
+        }
+
+        if (num_per_old != num_per_new)
+        {
+            check_test = 1;
+        }
+
+    }
+
+    return ((check_int > 0 && level_steps[0] % check_int == 0) ||
+            check_test == 1 ||
+            amr_level[0]->checkPointNow());
+}
 bool
 Amr::writePlotNow() noexcept
 {
@@ -2632,7 +2688,7 @@ Amr::regrid (int  lbase,
     // Reclaim all remaining storage for levels > new_finest.
     //
     for(int lev = new_finest + 1; lev <= finest_level; ++lev) {
-        amr_level[lev].reset();
+        amr_level[lev] = nullptr;
         this->ClearBoxArray(lev);
         this->ClearDistributionMap(lev);
     }
@@ -2686,7 +2742,7 @@ Amr::regrid (int  lbase,
             a->init();
             amr_level[lev].reset(a);
             if (lev > 0) {
-                level_steps[lev] = level_steps[lev-1] * n_cycle[lev-1];
+                level_steps[lev] = level_steps[lev-1] * n_cycle[lev];
             }
             this->SetBoxArray(lev, amr_level[lev]->boxArray());
             this->SetDistributionMap(lev, amr_level[lev]->DistributionMap());

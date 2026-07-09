@@ -46,9 +46,7 @@ module amrex_multigrid_module
      procedure, private :: amrex_multigrid_set_always_use_bnorm
      procedure, private :: amrex_multigrid_set_final_fill_bc
 
-#if !defined(__GFORTRAN__) || (__GNUC__ > 4)
      final :: amrex_multigrid_destroy
-#endif
   end type amrex_multigrid
 
   ! interfaces to C++ functions
@@ -154,9 +152,11 @@ module amrex_multigrid_module
      end subroutine amrex_fi_multigrid_set_final_fill_bc
   end interface
 
+#ifdef __NVCOMPILER
   interface amrex_multigrid_destroy
      module procedure amrex_multigrid_destroy
   end interface amrex_multigrid_destroy
+#endif
 
 contains
 
@@ -172,6 +172,7 @@ contains
   subroutine amrex_multigrid_build (mg, linop)
     type(amrex_multigrid), intent(inout) :: mg
     class(amrex_linop), intent(in) :: linop
+    call amrex_multigrid_destroy(mg)
     mg%owner = .true.
     call amrex_fi_new_multigrid(mg%p, linop%p)
   end subroutine amrex_multigrid_build

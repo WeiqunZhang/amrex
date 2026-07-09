@@ -118,10 +118,12 @@ void btUnit::btCalculateLevel (BittreeAmr* const mesh, int lev,
       //Get coordinates and morton index.
       auto b = tree1->locate(i);
 
+#if 0
       if(b.level != lev) {
           std::string msg = "Error identifying block in btCalculateGrids";
           //throw error?
       }
+#endif
 
       IntVect coordVec{AMREX_D_DECL(static_cast<int>(b.coord[0]),
                                     static_cast<int>(b.coord[1]),
@@ -174,7 +176,7 @@ void btUnit::btCheckRefine (BittreeAmr* const mesh, std::vector<int>& btTags,
 
     do {
         // Clear out ref_test
-        std::fill(ref_test.begin(),ref_test.end(),0);
+        std::ranges::fill(ref_test, 0);
 
         // Check neighbors - if any adjacent child of a neighbor is either a parent
         // or marked for refinement, this block needs to be refined.

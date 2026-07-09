@@ -2,6 +2,7 @@
 #define AMREX_MultiFabUtil_H_
 #include <AMReX_Config.H>
 
+#include <AMReX_Concepts.H>
 #include <AMReX_MultiFab.H>
 #include <AMReX_iMultiFab.H>
 #include <AMReX_LayoutData.H>
@@ -18,26 +19,47 @@ namespace amrex
     void average_node_to_cellcenter (MultiFab& cc, int dcomp,
                                      const MultiFab& nd, int scomp,
                                      int ncomp, int ngrow = 0);
+    void average_node_to_cellcenter (MultiFab& cc, int dcomp,
+                                     const MultiFab& nd, int scomp,
+                                     int ncomp, IntVect const& ng_vect);
 
     /**
      * \brief Average edge-based MultiFab onto cell-centered MultiFab.
      *
-     * This fills in \p ngrow ghost cells in the cell-centered MultiFab. Both cell centered and
-     * edge centered MultiFabs need to have \p ngrow ghost values.
+     * This fills in \p ngrow ghost cells in the cell-centered MultiFab. Both cell-centered and
+     * edge-centered MultiFabs need to have \p ngrow ghost values.
      */
     void average_edge_to_cellcenter (MultiFab& cc, int dcomp,
                                      const Vector<const MultiFab*>& edge,
                                      int ngrow = 0);
-    //! Average face-based MultiFab onto cell-centered MultiFab.
+    void average_edge_to_cellcenter (MultiFab& cc, int dcomp,
+                                     const Vector<const MultiFab*>& edge,
+                                     IntVect const& ng_vect);
+
+    /**
+     * \brief Average face-based MultiFab onto cell-centered MultiFab.
+     *
+     * This fills in \p ngrow ghost cells in the cell-centered MultiFab. Both cell-centered and
+     * face-centered MultiFabs need to have \p ngrow ghost values.
+     */
     void average_face_to_cellcenter (MultiFab& cc, int dcomp,
                                      const Vector<const MultiFab*>& fc,
                                      int ngrow = 0);
+    void average_face_to_cellcenter (MultiFab& cc, int dcomp,
+                                     const Vector<const MultiFab*>& fc,
+                                     IntVect const& ng_vect);
+
     //! Average face-based FabArray onto cell-centered FabArray.
-    template <typename CMF, typename FMF,
-              std::enable_if_t<IsFabArray_v<CMF> && IsFabArray_v<FMF>, int> = 0>
+    template <FabArrayType CMF, FabArrayType FMF>
     void average_face_to_cellcenter (CMF& cc, int dcomp,
                                      const Array<const FMF*,AMREX_SPACEDIM>& fc,
                                      int ngrow = 0);
+
+    template <FabArrayType CMF, FabArrayType FMF>
+    void average_face_to_cellcenter (CMF& cc, int dcomp,
+                                     const Array<const FMF*,AMREX_SPACEDIM>& fc,
+                                     IntVect const& ng_vect);
+
     //! Average face-based MultiFab onto cell-centered MultiFab with geometric weighting.
     void average_face_to_cellcenter (MultiFab& cc,
                                      const Vector<const MultiFab*>& fc,
@@ -46,39 +68,55 @@ namespace amrex
     void average_face_to_cellcenter (MultiFab& cc,
                                      const Array<const MultiFab*,AMREX_SPACEDIM>& fc,
                                      const Geometry& geom);
-    //! Average cell-centered MultiFab onto face-based MultiFab with geometric weighting.
+    /**
+     * \brief Average cell-centered MultiFab onto face-based MultiFab with
+     * geometric weighting.
+     *
+     * Fills in \p ngrow ghost cells in each face-centered MultiFab.
+     * The cell-centred MultiFab must have at least one more than \p ngrow
+     * ghost cells.
+     */
     void average_cellcenter_to_face (const Vector<MultiFab*>& fc,
                                      const MultiFab& cc,
                                      const Geometry& geom,
                                      int ncomp = 1,
-                                     bool use_harmonic_averaging = false);
+                                     bool use_harmonic_averaging = false,
+                                     int ngrow = 0);
     //! Average cell-centered MultiFab onto face-based MultiFab with geometric weighting.
     void average_cellcenter_to_face (const Array<MultiFab*,AMREX_SPACEDIM>& fc,
                                      const MultiFab& cc,
                                      const Geometry& geom,
                                      int ncomp = 1,
-                                     bool use_harmonic_averaging = false);
+                                     bool use_harmonic_averaging = false,
+                                     int ngrow = 0);
+
+    void average_cellcenter_to_face (const Array<MultiFab*,AMREX_SPACEDIM>& fc,
+                                     const MultiFab& cc,
+                                     const Geometry& geom,
+                                     int ncomp,
+                                     bool use_harmonic_averaging,
+                                     const Array<IntVect, AMREX_SPACEDIM>& ng_vects);
 
     //! Average fine face-based FabArray onto crse face-based FabArray.
-    template <typename MF, std::enable_if_t<IsFabArray<MF>::value,int> = 0>
+    template <FabArrayType MF>
     void average_down_faces (const Vector<const MF*>& fine,
                              const Vector<MF*>& crse,
                              const IntVect& ratio,
                              int ngcrse = 0);
     //! Average fine face-based FabArray onto crse face-based FabArray.
-    template <typename MF, std::enable_if_t<IsFabArray<MF>::value,int> = 0>
+    template <FabArrayType MF>
     void average_down_faces (const Vector<const MF*>& fine,
                              const Vector<MF*>& crse,
                              int ratio,
                              int ngcrse = 0);
     //! Average fine face-based FabArray onto crse face-based FabArray.
-    template <typename MF, std::enable_if_t<IsFabArray<MF>::value,int> = 0>
+    template <FabArrayType MF>
     void average_down_faces (const Array<const MF*,AMREX_SPACEDIM>& fine,
                              const Array<MF*,AMREX_SPACEDIM>& crse,
                              const IntVect& ratio,
                              int ngcrse = 0);
     //! Average fine face-based FabArray onto crse face-based FabArray.
-    template <typename MF, std::enable_if_t<IsFabArray<MF>::value,int> = 0>
+    template <FabArrayType MF>
     void average_down_faces (const Array<const MF*,AMREX_SPACEDIM>& fine,
                              const Array<MF*,AMREX_SPACEDIM>& crse,
                              int ratio,
@@ -89,17 +127,17 @@ namespace amrex
      * It uses the IndexType of MultiFabs to determine the direction.
      * It is expected that one direction is nodal and the rest are cell-centered.
      */
-    template <typename FAB>
+    template <BaseFabType FAB>
     void average_down_faces (const FabArray<FAB>& fine, FabArray<FAB>& crse,
                              const IntVect& ratio, int ngcrse=0);
 
     //  This version takes periodicity into account.
-    template <typename MF, std::enable_if_t<IsFabArray<MF>::value,int> = 0>
+    template <FabArrayType MF>
     void average_down_faces (const Array<const MF*,AMREX_SPACEDIM>& fine,
                              const Array<MF*,AMREX_SPACEDIM>& crse,
                              const IntVect& ratio, const Geometry& crse_geom);
     //  This version takes periodicity into account.
-    template <typename FAB>
+    template <BaseFabType FAB>
     void average_down_faces (const FabArray<FAB>& fine, FabArray<FAB>& crse,
                              const IntVect& ratio, const Geometry& crse_geom);
 
@@ -119,7 +157,7 @@ namespace amrex
                              const IntVect& ratio, int ngcrse=0);
 
     //! Average fine node-based MultiFab onto crse node-centered MultiFab.
-    template <typename FAB>
+    template <BaseFabType FAB>
     void average_down_nodal (const FabArray<FAB>& S_fine,
                              FabArray<FAB>& S_crse,
                              const IntVect& ratio,
@@ -142,10 +180,10 @@ namespace amrex
     //! Average MultiFab onto crse MultiFab without volume weighting. This
     //! routine DOES NOT assume that the crse BoxArray is a coarsened version of
     //! the fine BoxArray. Work for both cell-centered and nodal MultiFabs.
-    template<typename FAB>
+    template <BaseFabType FAB>
     void average_down (const FabArray<FAB>& S_fine, FabArray<FAB>& S_crse,
                        int scomp, int ncomp, const IntVect& ratio);
-    template<typename FAB>
+    template <BaseFabType FAB>
     void average_down (const FabArray<FAB>& S_fine, FabArray<FAB>& S_crse,
                        int scomp, int ncomp, int rr);
 
@@ -179,7 +217,7 @@ namespace amrex
      * available on a process. The returned Vector is empty if a process
      * does not have the given cell.
      */
-    template <typename MF, std::enable_if_t<IsFabArray<MF>::value,int> FOO = 0>
+    template <FabArrayType MF>
     Vector<typename MF::value_type> get_cell_data (MF const& mf, IntVect const& cell);
 
     /**
@@ -188,37 +226,44 @@ namespace amrex
      * This returns a MultiFab/FabArray containing the data in a line
      * specified by a direction and a cell.
      */
-    template <typename MF, std::enable_if_t<IsFabArray<MF>::value,int> FOO = 0>
+    template <FabArrayType MF>
     MF get_line_data (MF const& mf, int dir, IntVect const& cell, Box const& bnd_bx = Box());
 
     //! Return an iMultiFab that has the same BoxArray and DistributionMapping
     //! as the coarse MultiFab cmf. Cells covered by the coarsened fine grids
     //! are set to fine_value, whereas other cells are set to crse_value.
-    template <typename FAB>
+    template <BaseFabType FAB>
     iMultiFab makeFineMask (const FabArray<FAB>& cmf, const BoxArray& fba, const IntVect& ratio,
-                            int crse_value = 0, int fine_value = 1);
+                            int crse_value = 0, int fine_value = 1,
+                            MFInfo const& info = MFInfo());
     iMultiFab makeFineMask (const BoxArray& cba, const DistributionMapping& cdm,
                             const BoxArray& fba, const IntVect& ratio,
-                            int crse_value = 0, int fine_value = 1);
-    template <typename FAB>
+                            int crse_value = 0, int fine_value = 1,
+                            MFInfo const& info = MFInfo());
+    template <BaseFabType FAB>
     iMultiFab makeFineMask (const FabArray<FAB>& cmf, const BoxArray& fba, const IntVect& ratio,
-                            Periodicity const& period, int crse_value, int fine_value);
+                            Periodicity const& period, int crse_value, int fine_value,
+                            MFInfo const& info = MFInfo());
     iMultiFab makeFineMask (const BoxArray& cba, const DistributionMapping& cdm,
                             const IntVect& cnghost, const BoxArray& fba, const IntVect& ratio,
-                            Periodicity const& period, int crse_value, int fine_value);
-    template <typename FAB>
-    iMultiFab makeFineMask (const FabArray<FAB>& cmf, const FabArray<FAB>& fmf,
-                            const IntVect& cnghost, const IntVect& ratio,
-                            Periodicity const& period, int crse_value, int fine_value);
-    template <typename FAB>
+                            Periodicity const& period, int crse_value, int fine_value,
+                            MFInfo const& info = MFInfo());
+    template <BaseFabType FAB>
     iMultiFab makeFineMask (const FabArray<FAB>& cmf, const FabArray<FAB>& fmf,
                             const IntVect& cnghost, const IntVect& ratio,
                             Periodicity const& period, int crse_value, int fine_value,
-                            LayoutData<int>& has_cf);
+                            MFInfo const& info = MFInfo());
+    template <BaseFabType FAB>
+    iMultiFab makeFineMask (const FabArray<FAB>& cmf, const FabArray<FAB>& fmf,
+                            const IntVect& cnghost, const IntVect& ratio,
+                            Periodicity const& period, int crse_value, int fine_value,
+                            LayoutData<int>& has_cf,
+                            MFInfo const& info = MFInfo());
 
     MultiFab makeFineMask (const BoxArray& cba, const DistributionMapping& cdm,
                            const BoxArray& fba, const IntVect& ratio,
-                           Real crse_value, Real fine_value);
+                           Real crse_value, Real fine_value,
+                           MFInfo const& info = MFInfo());
 
     //! Computes divergence of face-data stored in the umac MultiFab.
     void computeDivergence (MultiFab& divu, const Array<MultiFab const*,AMREX_SPACEDIM>& umac,
@@ -274,36 +319,36 @@ namespace amrex
      * In the example code below, the sum along each line at (i,j) in the
      * z-direction is computed and stored at (i,j,0) of the returned
      * BaseFab.
-     \verbatim
-         int dir = 2; // z-direction
-         auto const& domain_box = geom.Domain();
-         auto const& ma = mf.const_arrays();
-         auto rr = ReduceToPlane<ReduceOpSum,Real>(dir, domain_box, mf,
-             [=] AMREX_GPU_DEVICE (int box_no, int i, int j, int k) -> Real
-             {
-                 return ma[box_no](i,j,k); // data at (i,j,k) of Box box_no
-             });
-     \endverbatim
+     * \code{.cpp}
+     *     int dir = 2; // z-direction
+     *     auto const& domain_box = geom.Domain();
+     *     auto const& ma = mf.const_arrays();
+     *     auto rr = ReduceToPlane<ReduceOpSum,Real>(dir, domain_box, mf,
+     *         [=] AMREX_GPU_DEVICE (int box_no, int i, int j, int k) -> Real
+     *         {
+     *             return ma[box_no](i,j,k); // data at (i,j,k) of Box box_no
+     *         });
+     * \endcode
      *
      * Below is another example.  This finds the maximum value in the
      * x-direction and stores the maximum value and the i-index.  An MPI
      * reduce is then called to further reduce the data to the root process
      * 0.
-     \verbatim
-         int dir = 0; // x-direction
-         auto const& domain_box = geom.Domain().surroundingNodes(); // nodal data
-         auto const& ma = mf.const_arrays();
-         auto rr = ReduceToPlane<ReduceOpMax,KeyValuePair<Real,int>>
-             (dir, domain_box, mf,
-              [=] AMREX_GPU_DEVICE (int box_no, int i, int j, int k)
-                  -> KeyValuePair<Real,int>
-             {
-                 return {ma[box_no](i,j,k), i};
-             });
-         ParallelReduce::Max(rr.dataPtr(), rr.size(), root,
-                             ParallelDescriptor::Communicator());
-         // Process root now has the final results.
-     \endverbatim
+     * \code{.cpp}
+     *     int dir = 0; // x-direction
+     *     auto const& domain_box = geom.Domain().surroundingNodes(); // nodal data
+     *     auto const& ma = mf.const_arrays();
+     *     auto rr = ReduceToPlane<ReduceOpMax,KeyValuePair<Real,int>>
+     *         (dir, domain_box, mf,
+     *          [=] AMREX_GPU_DEVICE (int box_no, int i, int j, int k)
+     *              -> KeyValuePair<Real,int>
+     *         {
+     *             return {ma[box_no](i,j,k), i};
+     *         });
+     *     ParallelReduce::Max(rr.dataPtr(), rr.size(), root,
+     *                         ParallelDescriptor::Communicator());
+     *     // Process root now has the final results.
+     * \endcode
      *
      * \tparam Op  reduce operator (e.g., ReduceOpSum, ReduceOpMin and ReduceOpMax)
      * \tparam T   data type of reduction result
@@ -319,12 +364,10 @@ namespace amrex
      *
      * \return reduction result (BaseFab<T>)
      */
-    template <typename Op, typename T, typename FAB, typename F,
-              std::enable_if_t<IsBaseFab<FAB>::value
+    template <typename Op, typename T, BaseFabType FAB, typename F>
 #ifndef AMREX_USE_CUDA
-                               && IsCallableR<T,F,int,int,int,int>::value
+    requires (IsCallableR<T,F,int,int,int,int>::value)
 #endif
-                               , int> FOO = 0>
     BaseFab<T>
     ReduceToPlane (int direction, Box const& domain, FabArray<FAB> const& mf, F const& f);
 
@@ -342,22 +385,22 @@ namespace amrex
      * behavior is different from that of ReduceToPlane that returns local
      * reduction results.
      *
-     \verbatim
-        auto const& ma = mf.const_arrays();
-        auto mf2 = ReduceToPlaneMF<ReduceOpSum>
-            (2, domain, mf, [=] AMREX_GPU_DEVICE (int b, int i, int j, int k)
-        {
-            return ma[b](i,j,k);
-        });
-        auto nz = domain.length(2); // number of cells in z-direction
-        auto const& ma2 = mf2.const_arrays();
-        ParallelFor(mf, [=] AMREX_GPU_DEVICE (int b, int i, int j, int k)
-        {
-            ma[b](i,j,k) -= ma2[b](i,j,0) / nz; // (i,j,0) is used to access ma2
-        });
-        // If sync is needed, call Gpu::streamSynchronize()
-        // mf now contains data with z-direction line average subtracted
-     \endverbatim
+     * \code{.cpp}
+     *     auto const& ma = mf.const_arrays();
+     *     auto mf2 = ReduceToPlaneMF<ReduceOpSum>
+     *         (2, domain, mf, [=] AMREX_GPU_DEVICE (int b, int i, int j, int k)
+     *     {
+     *         return ma[b](i,j,k);
+     *     });
+     *     auto nz = domain.length(2); // number of cells in z-direction
+     *     auto const& ma2 = mf2.const_arrays();
+     *     ParallelFor(mf, [=] AMREX_GPU_DEVICE (int b, int i, int j, int k)
+     *     {
+     *         ma[b](i,j,k) -= ma2[b](i,j,0) / nz; // (i,j,0) is used to access ma2
+     *     });
+     *     // If sync is needed, call Gpu::streamSynchronize()
+     *     // mf now contains data with z-direction line average subtracted
+     * \endcode
      *
      * \tparam Op  reduce operator (Must be ReduceSum for now.)
      * \tparam FA  Type of FabArray
@@ -372,13 +415,11 @@ namespace amrex
      *
      * \return reduction result (FA)
      */
-    template <typename Op, typename FA, typename F,
-              std::enable_if_t<IsMultiFabLike_v<FA>
+    template <typename Op, MultiFabLike FA, typename F>
 #ifndef AMREX_USE_CUDA
-                               && IsCallableR<typename FA::value_type,
-                                              F,int,int,int,int>::value
+    requires (IsCallableR<typename FA::value_type,
+                           F,int,int,int,int>::value)
 #endif
-                               , int> FOO = 0>
     FA ReduceToPlaneMF (int direction, Box const& domain, FA const& mf, F const& f);
 
     /**
@@ -397,18 +438,18 @@ namespace amrex
      * stored in the first FA, whereas the global results (including MPI
      * communication) are in the second FA.  Below is and an example.
      *
-     \verbatim
-        auto const& ma = mf.const_arrays();
-        auto [mf2, mf2_unique] = ReduceToPlaneMF2<ReduceOpSum>
-            (2, domain, mf, [=] AMREX_GPU_DEVICE (int b, int i, int j, int k)
-        {
-            return ma[b](i,j,k);
-        });
-        // mf2: box local reduction result
-        // mf2_unique: global reduction result
-        auto phi = poisson_solver(mf2_unique); // Perform 2D Poisson solve
-        mf2.ParallelCopy(phi); // Each Fab in mf2 has the 2D Poisson solver result
-     \endverbatim
+     * \code{.cpp}
+     *     auto const& ma = mf.const_arrays();
+     *     auto [mf2, mf2_unique] = ReduceToPlaneMF2<ReduceOpSum>
+     *         (2, domain, mf, [=] AMREX_GPU_DEVICE (int b, int i, int j, int k)
+     *     {
+     *         return ma[b](i,j,k);
+     *     });
+     *     // mf2: box local reduction result
+     *     // mf2_unique: global reduction result
+     *     auto phi = poisson_solver(mf2_unique); // Perform 2D Poisson solve
+     *     mf2.ParallelCopy(phi); // Each Fab in mf2 has the 2D Poisson solver result
+     * \endcode
      *
      * \tparam Op  reduce operator (Must be ReduceSum for now.)
      * \tparam FA  Type of FabArray
@@ -420,18 +461,66 @@ namespace amrex
      * \param f         a callable object returning data fore reduction. It takes
      *                  four ints, where the first int is the local box index and
      *                  the others are spatial indices for x, y, and z-directions.
+     * \param nghost    number of guard cells to include in the reduction. Cells
+     *                  in the reduction \p direction are summed into the plane
+     *                  (e.g. to capture charge deposited outside the valid range
+     *                  when there is a single cell in that direction). Guard
+     *                  cells in the transverse directions are folded into the
+     *                  owning valid nodes of the result (\p period controls the
+     *                  domain-boundary behaviour), so the reduction conserves a
+     *                  summed quantity across box boundaries (MPI-safe). The
+     *                  caller must pass *un-synchronized* data (i.e. no prior
+     *                  SumBoundary), otherwise shared nodes are counted twice.
+     * \param period    periodicity used to fold the transverse guard cells back
+     *                  into the valid region (default: non-periodic).
      *
      * \return reduction result (std::pair<FA,FA>)
      */
-    template <typename Op, typename FA, typename F,
-              std::enable_if_t<IsMultiFabLike_v<FA>
+    template <typename Op, MultiFabLike FA, typename F>
 #ifndef AMREX_USE_CUDA
-                               && IsCallableR<typename FA::value_type,
-                                              F,int,int,int,int>::value
+    requires (IsCallableR<typename FA::value_type,
+                           F,int,int,int,int>::value)
 #endif
-                               , int> FOO = 0>
     std::pair<FA,FA>
-    ReduceToPlaneMF2 (int direction, Box const& domain, FA const& mf, F const& f);
+    ReduceToPlaneMF2 (int direction, Box const& domain, FA const& mf, F const& f,
+                      IntVect const& nghost = IntVect(0),
+                      Periodicity const& period = Periodicity::NonPeriodic());
+
+    /**
+     * \brief Reduce FabArray/MultiFab data to plane FabArray for patchy BoxArrays
+     *
+     * This function is similar to ReduceToPlaneMF2, but it supports
+     * non-rectangular (patchy) input BoxArrays. The return data are a pair
+     * of FabArrays. The first FA stores local per-box reduction results on
+     * a projected BoxArray that can contain overlapping Boxes. The second
+     * FA stores globally accumulated results on a unique projected 2D
+     * BoxArray.
+     *
+     * \tparam Op  reduce operator (Must be ReduceSum for now.)
+     * \tparam FA  Type of FabArray
+     * \tparam F   callable type like a lambda function
+     *
+     * \param direction normal direction of the plane (e.g., 0, 1 and 2)
+     * \param domain    domain Box. For patchy inputs this must cover the full
+     *                  extent of mf.boxArray() (subdomains are not supported).
+     * \param mf        a FabArray/MultiFab object specifying the iteration space
+     * \param plane_max_grid_size
+     *                  the desired max_grid_size of the unique projected 2D
+     *                  BoxArray. The collapsed direction is forced to 1.
+     * \param f         a callable object returning data for reduction. It takes
+     *                  four ints, where the first int is the local box index and
+     *                  the others are spatial indices for x, y, and z-directions.
+     *
+     * \return reduction result (std::pair<FA,FA>)
+     */
+    template <typename Op, MultiFabLike FA, typename F>
+#ifndef AMREX_USE_CUDA
+    requires (IsCallableR<typename FA::value_type,
+                           F,int,int,int,int>::value)
+#endif
+    std::pair<FA,FA>
+    ReduceToPlaneMF2Patchy (int direction, Box const& domain, FA const& mf,
+                            IntVect const& plane_max_grid_size, F const& f);
 
     /**
      * \brief Sum MultiFab data to line
@@ -522,31 +611,34 @@ namespace amrex
 
 namespace amrex {
 
-template <typename FAB>
+template <BaseFabType FAB>
 iMultiFab
 makeFineMask (const FabArray<FAB>& cmf, const BoxArray& fba, const IntVect& ratio,
-              int crse_value, int fine_value)
+              int crse_value, int fine_value, MFInfo const& info)
 {
     return makeFineMask(cmf.boxArray(), cmf.DistributionMap(), cmf.nGrowVect(),
-                        fba, ratio, Periodicity::NonPeriodic(), crse_value, fine_value);
+                        fba, ratio, Periodicity::NonPeriodic(), crse_value, fine_value,
+                        info);
 }
 
-template <typename FAB>
+template <BaseFabType FAB>
 iMultiFab
 makeFineMask (const FabArray<FAB>& cmf, const BoxArray& fba, const IntVect& ratio,
-              Periodicity const& period, int crse_value, int fine_value)
+              Periodicity const& period, int crse_value, int fine_value,
+              MFInfo const& info)
 {
     return makeFineMask(cmf.boxArray(), cmf.DistributionMap(), cmf.nGrowVect(),
-                        fba, ratio, period, crse_value, fine_value);
+                        fba, ratio, period, crse_value, fine_value, info);
 }
 
-template <typename FAB>
+template <BaseFabType FAB>
 iMultiFab
 makeFineMask (const FabArray<FAB>& cmf, const FabArray<FAB>& fmf,
               const IntVect& cnghost, const IntVect& ratio,
-              Periodicity const& period, int crse_value, int fine_value)
+              Periodicity const& period, int crse_value, int fine_value,
+              MFInfo const& info)
 {
-    iMultiFab mask(cmf.boxArray(), cmf.DistributionMap(), 1, cnghost);
+    iMultiFab mask(cmf.boxArray(), cmf.DistributionMap(), 1, cnghost, info);
     mask.setVal(crse_value);
 
     iMultiFab foo(amrex::coarsen(fmf.boxArray(),ratio), fmf.DistributionMap(),
@@ -557,14 +649,14 @@ makeFineMask (const FabArray<FAB>& cmf, const FabArray<FAB>& fmf,
     return mask;
 }
 
-template <typename FAB>
+template <BaseFabType FAB>
 iMultiFab
 makeFineMask (const FabArray<FAB>& cmf, const FabArray<FAB>& fmf,
               const IntVect& cnghost, const IntVect& ratio,
               Periodicity const& period, int crse_value, int fine_value,
-              LayoutData<int>& has_cf)
+              LayoutData<int>& has_cf, MFInfo const& info)
 {
-    iMultiFab mask(cmf.boxArray(), cmf.DistributionMap(), 1, cnghost);
+    iMultiFab mask(cmf.boxArray(), cmf.DistributionMap(), 1, cnghost, info);
     mask.setVal(crse_value);
 
     iMultiFab foo(amrex::coarsen(fmf.boxArray(),ratio), fmf.DistributionMap(),
@@ -579,7 +671,7 @@ makeFineMask (const FabArray<FAB>& cmf, const FabArray<FAB>& fmf,
 
 //! Average fine node-based MultiFab onto crse node-based MultiFab.
 //! This routine assumes that the crse BoxArray is a coarsened version of the fine BoxArray.
-template <typename FAB>
+template <BaseFabType FAB>
 void average_down_nodal (const FabArray<FAB>& fine, FabArray<FAB>& crse,
                          const IntVect& ratio, int ngcrse, bool mfiter_is_definitely_safe)
 {
@@ -621,13 +713,13 @@ void average_down_nodal (const FabArray<FAB>& fine, FabArray<FAB>& crse,
 // Average fine cell-based MultiFab onto crse cell-centered MultiFab.
 // We do NOT assume that the coarse layout is a coarsened version of the fine layout.
 // This version does NOT use volume-weighting
-template<typename FAB>
+template <BaseFabType FAB>
 void average_down (const FabArray<FAB>& S_fine, FabArray<FAB>& S_crse, int scomp, int ncomp, int rr)
 {
     average_down(S_fine,S_crse,scomp,ncomp,rr*IntVect::TheUnitVector());
 }
 
-template<typename FAB>
+template <BaseFabType FAB>
 void average_down (const FabArray<FAB>& S_fine, FabArray<FAB>& S_crse,
                    int scomp, int ncomp, const IntVect& ratio)
 {
@@ -887,11 +979,19 @@ NormHelper (const MMF& mask,
     return sm;
 }
 
-template <typename CMF, typename FMF,
-          std::enable_if_t<IsFabArray_v<CMF> && IsFabArray_v<FMF>, int> FOO>
+template <FabArrayType CMF, FabArrayType FMF>
 void average_face_to_cellcenter (CMF& cc, int dcomp,
                                  const Array<const FMF*,AMREX_SPACEDIM>& fc,
                                  int ngrow)
+{
+   IntVect ng_vect(ngrow);
+   average_face_to_cellcenter(cc, dcomp, fc, ng_vect);
+}
+
+template <FabArrayType CMF, FabArrayType FMF>
+void average_face_to_cellcenter (CMF& cc, int dcomp,
+                                 const Array<const FMF*,AMREX_SPACEDIM>& fc,
+                                 IntVect const& ng_vect)
 {
     AMREX_ASSERT(cc.nComp() >= dcomp + AMREX_SPACEDIM);
     AMREX_ASSERT(fc[0]->nComp() == 1);
@@ -902,7 +1002,7 @@ void average_face_to_cellcenter (CMF& cc, int dcomp,
         AMREX_D_TERM(auto const& fxma = fc[0]->const_arrays();,
                      auto const& fyma = fc[1]->const_arrays();,
                      auto const& fzma = fc[2]->const_arrays(););
-        ParallelFor(cc, IntVect(ngrow),
+        ParallelFor(cc, ng_vect,
         [=] AMREX_GPU_DEVICE (int box_no, int i, int j, int k) noexcept
         {
 #if (AMREX_SPACEDIM == 1)
@@ -929,7 +1029,7 @@ void average_face_to_cellcenter (CMF& cc, int dcomp,
 #endif
         for (MFIter mfi(cc,TilingIfNotGPU()); mfi.isValid(); ++mfi)
         {
-            const Box bx = mfi.growntilebox(ngrow);
+            const Box bx = mfi.growntilebox(ng_vect);
             auto const& ccarr = cc.array(mfi);
             AMREX_D_TERM(auto const& fxarr = fc[0]->const_array(mfi);,
                          auto const& fyarr = fc[1]->const_array(mfi);,
@@ -952,7 +1052,7 @@ void average_face_to_cellcenter (CMF& cc, int dcomp,
     }
 }
 
-template <typename MF, std::enable_if_t<IsFabArray<MF>::value,int>>
+template <FabArrayType MF>
 void average_down_faces (const Vector<const MF*>& fine,
                          const Vector<MF*>& crse,
                          const IntVect& ratio, int ngcrse)
@@ -965,14 +1065,14 @@ void average_down_faces (const Vector<const MF*>& fine,
                        ratio, ngcrse);
 }
 
-template <typename MF, std::enable_if_t<IsFabArray<MF>::value,int>>
+template <FabArrayType MF>
 void average_down_faces (const Vector<const MF*>& fine,
                          const Vector<MF*>& crse, int ratio, int ngcrse)
 {
     average_down_faces(fine,crse,IntVect{ratio},ngcrse);
 }
 
-template <typename MF, std::enable_if_t<IsFabArray<MF>::value,int>>
+template <FabArrayType MF>
 void average_down_faces (const Array<const MF*,AMREX_SPACEDIM>& fine,
                          const Array<MF*,AMREX_SPACEDIM>& crse,
                          int ratio, int ngcrse)
@@ -980,7 +1080,7 @@ void average_down_faces (const Array<const MF*,AMREX_SPACEDIM>& fine,
     average_down_faces(fine,crse,IntVect{ratio},ngcrse);
 }
 
-template <typename MF, std::enable_if_t<IsFabArray<MF>::value,int>>
+template <FabArrayType MF>
 void average_down_faces (const Array<const MF*,AMREX_SPACEDIM>& fine,
                          const Array<MF*,AMREX_SPACEDIM>& crse,
                          const IntVect& ratio, int ngcrse)
@@ -990,7 +1090,7 @@ void average_down_faces (const Array<const MF*,AMREX_SPACEDIM>& fine,
     }
 }
 
-template <typename FAB>
+template <BaseFabType FAB>
 void average_down_faces (const FabArray<FAB>& fine, FabArray<FAB>& crse,
                          const IntVect& ratio, int ngcrse)
 {
@@ -1050,7 +1150,7 @@ void average_down_faces (const FabArray<FAB>& fine, FabArray<FAB>& crse,
     }
 }
 
-template <typename MF, std::enable_if_t<IsFabArray<MF>::value,int>>
+template <FabArrayType MF>
 void average_down_faces (const Array<const MF*,AMREX_SPACEDIM>& fine,
                          const Array<MF*,AMREX_SPACEDIM>& crse,
                          const IntVect& ratio, const Geometry& crse_geom)
@@ -1060,7 +1160,7 @@ void average_down_faces (const Array<const MF*,AMREX_SPACEDIM>& fine,
     }
 }
 
-template <typename FAB>
+template <BaseFabType FAB>
 void average_down_faces (const FabArray<FAB>& fine, FabArray<FAB>& crse,
                          const IntVect& ratio, const Geometry& crse_geom)
 {
@@ -1070,7 +1170,7 @@ void average_down_faces (const FabArray<FAB>& fine, FabArray<FAB>& crse,
     crse.ParallelCopy(ctmp,0,0,crse.nComp(),0,0,crse_geom.periodicity());
 }
 
-template <typename MF, std::enable_if_t<IsFabArray<MF>::value,int> FOO>
+template <FabArrayType MF>
 Vector<typename MF::value_type> get_cell_data (MF const& mf, IntVect const& cell)
 {
     using T = typename MF::value_type;
@@ -1101,7 +1201,7 @@ Vector<typename MF::value_type> get_cell_data (MF const& mf, IntVect const& cell
     return hv;
 }
 
-template <typename MF, std::enable_if_t<IsFabArray<MF>::value,int> FOO>
+template <FabArrayType MF>
 MF get_line_data (MF const& mf, int dir, IntVect const& cell, Box const& bnd_bx)
 {
     bool do_bnd = (!bnd_bx.isEmpty());
@@ -1163,6 +1263,7 @@ MF get_line_data (MF const& mf, int dir, IntVect const& cell, Box const& bnd_bx)
     }
 }
 
+/// \cond DOXYGEN_IGNORE
 namespace detail {
 template <typename Op, typename T, typename F>
 void reduce_to_plane (Array4<T> const& ar, int direction, Box const& bx, int box_no,
@@ -1247,13 +1348,12 @@ void reduce_to_plane (Array4<T> const& ar, int direction, Box const& bx, int box
 #endif
 }
 }
+/// \endcond
 
-template <typename Op, typename T, typename FAB, typename F,
-          std::enable_if_t<IsBaseFab<FAB>::value
+template <typename Op, typename T, BaseFabType FAB, typename F>
 #ifndef AMREX_USE_CUDA
-                           && IsCallableR<T,F,int,int,int,int>::value
+requires (IsCallableR<T,F,int,int,int,int>::value)
 #endif
-                           , int> FOO>
 BaseFab<T>
 ReduceToPlane (int direction, Box const& a_domain, FabArray<FAB> const& mf, F const& f)
 {
@@ -1278,38 +1378,54 @@ ReduceToPlane (int direction, Box const& a_domain, FabArray<FAB> const& mf, F co
             detail::reduce_to_plane<Op, T>(ar, direction, bx, box_no, f);
         }
     }
-    Gpu::streamSynchronize();
+    if (!Gpu::inNoSyncRegion()) {
+        Gpu::streamSynchronize();
+    }
 
     return r;
 }
 
+/// \cond DOXYGEN_IGNORE
 namespace detail {
-template <typename Op, typename FA, typename F>
-FA reduce_to_plane (int direction, Box const& domain, FA const& mf, F const& f)
+template <typename Op, MultiFabLike FA, typename F>
+FA reduce_to_plane (int direction, Box const& domain, FA const& mf, F const& f,
+                    IntVect const& nghost = IntVect(0))
 {
     using T = typename FA::value_type;
 
     Box const ndomain = amrex::convert(domain, mf.ixType());
 
     auto npts = amrex::convert(mf.boxArray(),IntVect(0)).numPts();
-    if (npts != ndomain.numPts()) {
+    if (npts != amrex::convert(domain, amrex::IntVect(0)).numPts()) {
         amrex::Abort("ReduceToPlaneMF: mf's BoxArray must have a rectangular domain.");
     }
 
+    // the reduction reads mf's guard cells, so it cannot include more guard
+    // cells than mf actually has
+    AMREX_ALWAYS_ASSERT_WITH_MESSAGE(nghost.allLE(mf.nGrowVect()),
+        "ReduceToPlaneMF2: nghost must not exceed mf.nGrowVect().");
+
     T initval;
     Op().init(initval);
+
+    // guard cells in the reduction direction are summed into the plane; guard
+    // cells in the transverse directions are stored in the result's ghost cells
+    // (and folded into the valid region by the caller's ParallelAdd)
+    IntVect ng2d = nghost;
+    ng2d[direction] = 0;
+    Box const gdomain = amrex::grow(ndomain, nghost);
 
     BoxList bl = mf.boxArray().boxList();
     for (auto& b : bl) {
         b.setRange(direction, 0);
     }
     BoxArray ba(std::move(bl));
-    FA tmpfa(ba, mf.DistributionMap(), 1, 0);
+    FA tmpfa(ba, mf.DistributionMap(), 1, ng2d);
     tmpfa.setVal(initval);
 
     for (MFIter mfi(mf); mfi.isValid(); ++mfi)
     {
-        Box bx = mfi.validbox() & ndomain;
+        Box bx = amrex::grow(mfi.validbox(), nghost) & gdomain;
         if (bx.ok()) {
             int box_no = mfi.LocalIndex();
             detail::reduce_to_plane<Op, T>(tmpfa.array(mfi), direction, bx, box_no, f);
@@ -1318,15 +1434,15 @@ FA reduce_to_plane (int direction, Box const& domain, FA const& mf, F const& f)
 
     return tmpfa;
 }
-}
 
-template <typename Op, typename FA, typename F,
-          std::enable_if_t<IsMultiFabLike_v<FA>
+}
+/// \endcond
+
+template <typename Op, MultiFabLike FA, typename F>
 #ifndef AMREX_USE_CUDA
-                           && IsCallableR<typename FA::value_type,
-                                          F,int,int,int,int>::value
+requires (IsCallableR<typename FA::value_type,
+                      F,int,int,int,int>::value)
 #endif
-                           , int> FOO>
 FA ReduceToPlaneMF (int direction, Box const& domain, FA const& mf, F const& f)
 {
     auto [fa3, fa2] = ReduceToPlaneMF2<Op>(direction, domain, mf, f);
@@ -1334,28 +1450,100 @@ FA ReduceToPlaneMF (int direction, Box const& domain, FA const& mf, F const& f)
     return std::move(fa3);
 }
 
-template <typename Op, typename FA, typename F,
-          std::enable_if_t<IsMultiFabLike_v<FA>
+template <typename Op, MultiFabLike FA, typename F>
 #ifndef AMREX_USE_CUDA
-                           && IsCallableR<typename FA::value_type,
-                                          F,int,int,int,int>::value
+requires (IsCallableR<typename FA::value_type,
+                      F,int,int,int,int>::value)
 #endif
-                           , int> FOO>
 std::pair<FA,FA>
-ReduceToPlaneMF2 (int direction, Box const& domain, FA const& mf, F const& f)
+ReduceToPlaneMF2 (int direction, Box const& domain, FA const& mf, F const& f,
+                  IntVect const& nghost, Periodicity const& period)
 {
     using T = typename FA::value_type;
 
     T initval;
     Op().init(initval);
 
-    auto tmpmf = detail::reduce_to_plane<Op>(direction, domain, mf, f);
+    auto tmpmf = detail::reduce_to_plane<Op>(direction, domain, mf, f, nghost);
 
-    Box domain2d = amrex::convert(domain, mf.ixType());
-    domain2d.setRange(direction, 0);
+    BoxList bl2d(mf.ixType());
+    Vector<int> procmap2d;
+    auto const& ba3d = mf.boxArray();
+    auto const& dm3d = mf.DistributionMap();
+    int dlo = domain.smallEnd(direction);
+    for (int i = 0, N = mf.size(); i < N; ++i) {
+        Box b = ba3d[i];
+        if (b.smallEnd(direction) <= dlo && dlo <= b.bigEnd(direction)) {
+            b.setRange(direction, 0);
+            bl2d.push_back(b);
+            procmap2d.push_back(dm3d[i]);
+        }
+    }
 
-    BoxArray ba2d(domain2d);
-    ba2d.maxSize(mf.boxArray()[0].length());
+    BoxArray ba2d(std::move(bl2d));
+    DistributionMapping dm2d(std::move(procmap2d));
+
+    FA mf2d(ba2d, dm2d, 1, 0);
+    mf2d.setVal(initval);
+
+    static_assert(std::is_same_v<Op, ReduceOpSum>, "Currently only ReduceOpSum is supported.");
+    // fold the transverse guard cells of the local results into the valid
+    // region of the unique result (sums the quantity across box seams)
+    IntVect ng2d = nghost;
+    ng2d[direction] = 0;
+    mf2d.ParallelAdd(tmpmf, 0, 0, 1, ng2d, IntVect(0), IntVect(0), period);
+
+    return std::make_pair(std::move(tmpmf), std::move(mf2d));
+}
+
+template <typename Op, MultiFabLike FA, typename F>
+#ifndef AMREX_USE_CUDA
+requires (IsCallableR<typename FA::value_type,
+                      F,int,int,int,int>::value)
+#endif
+std::pair<FA,FA>
+ReduceToPlaneMF2Patchy (int direction, Box const& domain, FA const& mf,
+                        IntVect const& plane_max_grid_size, F const& f)
+{
+    AMREX_ALWAYS_ASSERT_WITH_MESSAGE(mf.is_cell_centered(),
+        "ReduceToPlaneMF2Patchy: only cell-centered data is supported.");
+
+    Box const ndomain = amrex::convert(domain, mf.ixType());
+    AMREX_ALWAYS_ASSERT_WITH_MESSAGE(ndomain.contains(mf.boxArray().minimalBox()),
+        "ReduceToPlaneMF2Patchy: subdomains are not supported; domain must cover the full extent of mf.boxArray().");
+
+    using T = typename FA::value_type;
+    T initval;
+    Op().init(initval);
+
+    BoxList bl_patch2d = mf.boxArray().boxList();
+    for (auto& b : bl_patch2d) {
+        b.setRange(direction, 0);
+    }
+    BoxArray ba_patch2d(std::move(bl_patch2d));
+    FA tmpmf(ba_patch2d, mf.DistributionMap(), 1, 0);
+    tmpmf.setVal(initval);
+
+    for (MFIter mfi(mf); mfi.isValid(); ++mfi)
+    {
+        Box bx = mfi.validbox() & ndomain;
+        if (bx.ok()) {
+            int box_no = mfi.LocalIndex();
+            detail::reduce_to_plane<Op, T>(tmpmf.array(mfi), direction, bx, box_no, f);
+        }
+    }
+
+    BoxList bl_unique = ba_patch2d.boxList();
+    bl_unique.simplify(); // reduces work for .removeOverlap()
+    BoxArray ba2d(std::move(bl_unique));
+    ba2d.removeOverlap();
+
+    AMREX_ALWAYS_ASSERT_WITH_MESSAGE(plane_max_grid_size.allGE(1),
+        "ReduceToPlaneMF2Patchy: plane_max_grid_size must be >= 1 in every direction.");
+    IntVect mgs2d = plane_max_grid_size;
+    mgs2d[direction] = 1;
+    ba2d.maxSize(mgs2d);
+
     DistributionMapping dm2d(ba2d);
 
     FA mf2d(ba2d, dm2d, 1, 0);

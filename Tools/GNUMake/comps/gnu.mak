@@ -47,8 +47,8 @@ gcc_major_ge_12 = $(shell expr $(gcc_major_version) \>= 12)
 INLINE_LIMIT ?= 43210
 
 ifneq ($(NO_CONFIG_CHECKING),TRUE)
-ifneq ($(gcc_major_ge_8),1)
-  $(error GCC < 8 not supported)
+ifneq ($(gcc_major_ge_11),1)
+  $(error GCC < 11 not supported)
 endif
 endif
 
@@ -83,8 +83,8 @@ CXXFLAGS += -Werror=return-type
 CFLAGS   += -Werror=return-type
 
 ifeq ($(DEBUG),TRUE)
-  CXXFLAGS += -g -O0 -ggdb -ftrapv
-  CFLAGS   += -g -O0 -ggdb -ftrapv
+  CXXFLAGS += -g -O$(DEBUG_OPT_LEVEL) -ggdb -ftrapv
+  CFLAGS   += -g -O$(DEBUG_OPT_LEVEL) -ggdb -ftrapv
 else
   CXXFLAGS += -g1 -O3
   CFLAGS   += -g1 -O3
@@ -148,7 +148,7 @@ ifdef CXXSTD
   CXXSTD := $(strip $(CXXSTD))
   CXXFLAGS += -std=$(CXXSTD)
 else
-  CXXFLAGS += -std=c++17
+  CXXFLAGS += -std=c++20
 endif
 
 CFLAGS   += -std=c11
@@ -176,8 +176,8 @@ F90FLAGS =
 
 ifeq ($(DEBUG),TRUE)
 
-  FFLAGS   += -g -O0 -ggdb -fcheck=bounds -fbacktrace -Wuninitialized -Wunused -ffpe-trap=invalid,zero -finit-real=snan -finit-integer=2147483647 -ftrapv
-  F90FLAGS += -g -O0 -ggdb -fcheck=bounds -fbacktrace -Wuninitialized -Wunused -ffpe-trap=invalid,zero -finit-real=snan -finit-integer=2147483647 -ftrapv
+  FFLAGS   += -g -O$(DEBUG_OPT_LEVEL) -ggdb -fcheck=bounds -fbacktrace -Wuninitialized -Wunused -ffpe-trap=invalid,zero -finit-real=snan -finit-integer=2147483647 -ftrapv
+  F90FLAGS += -g -O$(DEBUG_OPT_LEVEL) -ggdb -fcheck=bounds -fbacktrace -Wuninitialized -Wunused -ffpe-trap=invalid,zero -finit-real=snan -finit-integer=2147483647 -ftrapv
 
 else
 

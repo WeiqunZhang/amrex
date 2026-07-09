@@ -5,23 +5,30 @@
 #include <AMReX_Array.H>
 #include <AMReX_EB2_IF_Base.H>
 
+/**
+ * \file AMReX_EB2_IF_Ellipsoid.H
+ *
+ * Implicit function describing an ellipsoid aligned with the coordinate axes.
+ */
+
 // For all implicit functions, >0: body; =0: boundary; <0: fluid
 
 namespace amrex::EB2 {
 
+//! Signed implicit function for ellipsoids centered at \p a_center.
 class EllipsoidIF
     : public GPUable
 {
 public:
 
-    // inside: is the fluid inside the ellipsoid?
+    //! Construct an ellipsoid with semiaxes \p a_radii.
     EllipsoidIF (const RealArray& a_radii, const RealArray& a_center, bool a_inside)
         : m_radii(makeXDim3(a_radii)),
           m_center(makeXDim3(a_center)),
           m_sign( a_inside ? 1.0_rt : -1.0_rt )
         {}
 
-    [[nodiscard]] AMREX_GPU_HOST_DEVICE inline
+    [[nodiscard]] AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
     Real operator() (AMREX_D_DECL(Real x, Real y, Real z)) const noexcept {
         Real d2 = AMREX_D_TERM(  (x-m_center.x)*(x-m_center.x) / (m_radii.x*m_radii.x),
                                + (y-m_center.y)*(y-m_center.y) / (m_radii.y*m_radii.y),
@@ -29,7 +36,7 @@ public:
         return m_sign*(d2-1.0_rt);
     }
 
-    [[nodiscard]] inline Real operator() (const RealArray& p) const noexcept {
+    [[nodiscard]] AMREX_FORCE_INLINE Real operator() (const RealArray& p) const noexcept {
         return this->operator()(AMREX_D_DECL(p[0],p[1],p[2]));
     }
 

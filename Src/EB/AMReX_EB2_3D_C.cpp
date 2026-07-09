@@ -36,7 +36,7 @@ void set_eb_data (const int i, const int j, const int k,
                   Array4<Real> const& vfrac, Array4<Real> const& vcent,
                   Array4<Real> const& barea, Array4<Real> const& bcent,
                   Array4<Real> const& bnorm, Real small_volfrac,
-                  bool& is_small_cell, bool& is_multicut) noexcept
+                  bool& is_small_cell, bool& is_multicut)
 {
     const Real axm = apx(i,j,k);
     const Real axp = apx(i+1,j,k);
@@ -109,12 +109,12 @@ void set_eb_data (const int i, const int j, const int k,
     Real aay = 0.5_rt*(aym+ayp);
     Real aaz = 0.5_rt*(azm+azp);
     Real B0 = aax + aay + aaz;
-    Real Bx = -nx*aax + ny*(aym*fcy(i,j,k,0)-ayp*fcy(i,j+1,k,0))
-                      + nz*(azm*fcz(i,j,k,0)-azp*fcz(i,j,k+1,0));
-    Real By = -ny*aay + nx*(axm*fcx(i,j,k,0)-axp*fcx(i+1,j,k,0))
-                      + nz*(azm*fcz(i,j,k,1)-azp*fcz(i,j,k+1,1));
-    Real Bz = -nz*aaz + nx*(axm*fcx(i,j,k,1)-axp*fcx(i+1,j,k,1))
-                      + ny*(aym*fcy(i,j,k,1)-ayp*fcy(i,j+1,k,1));
+    Real Bx = -nx*aax + ny*(aym*fcy(i,j,k,0)-ayp*fcy(i,j+1,k,0)) * (dx[0]/dx[1])
+                      + nz*(azm*fcz(i,j,k,0)-azp*fcz(i,j,k+1,0)) * (dx[0]/dx[2]);
+    Real By = -ny*aay + nx*(axm*fcx(i,j,k,0)-axp*fcx(i+1,j,k,0)) * (dx[1]/dx[0])
+                      + nz*(azm*fcz(i,j,k,1)-azp*fcz(i,j,k+1,1)) * (dx[1]/dx[2]);
+    Real Bz = -nz*aaz + nx*(axm*fcx(i,j,k,1)-axp*fcx(i+1,j,k,1)) * (dx[2]/dx[0])
+                      + ny*(aym*fcy(i,j,k,1)-ayp*fcy(i,j+1,k,1)) * (dx[2]/dx[1]);
 
     vfrac(i,j,k) = 0.5_rt*(B0 + nx*Bx + ny*By + nz*Bz);
 
@@ -129,21 +129,31 @@ void set_eb_data (const int i, const int j, const int k,
     bcent(i,j,k,1) = (By + ny*vfrac(i,j,k)) * apnorminv * dx[0] * dx[2];
     bcent(i,j,k,2) = (Bz + nz*vfrac(i,j,k)) * apnorminv * dx[0] * dx[1];
 
-    Real b1 = 0.5_rt*(axp-axm) + 0.5_rt*(ayp*fcy(i,j+1,k,0) + aym*fcy(i,j,k,0)) + 0.5_rt*(azp*fcz(i,j,k+1,0) + azm*fcz(i,j,k,0));
-    Real b2 = 0.5_rt*(axp*fcx(i+1,j,k,0) + axm*fcx(i,j,k,0)) + 0.5_rt*(ayp-aym) + 0.5_rt*(azp*fcz(i,j,k+1,1) + azm*fcz(i,j,k,1));
-    Real b3 = 0.5_rt*(axp*fcx(i+1,j,k,1) + axm*fcx(i,j,k,1)) + 0.5_rt*(ayp*fcy(i,j+1,k,1) + aym*fcy(i,j,k,1)) + 0.5_rt*(azp-azm);
-    Real b4 = -nx*0.25_rt*(axp-axm) - ny*(m2y(i,j+1,k,0) - m2y(i,j,k,0)) - nz*(m2z(i,j,k+1,0) - m2z(i,j,k,0));
-    Real b5 = -nx*(m2x(i+1,j,k,0) - m2x(i,j,k,0)) - ny*0.25_rt*(ayp-aym) - nz*(m2z(i,j,k+1,1) - m2z(i,j,k,1));
-    Real b6 = -nx*(m2x(i+1,j,k,1) - m2x(i,j,k,1)) - ny*(m2y(i,j+1,k,1) - m2y(i,j,k,1)) - nz*0.25_rt*(azp-azm);
-    Real b7 = -nx*0.5_rt*(axp*fcx(i+1,j,k,0) + axm*fcx(i,j,k,0))
-              -ny*0.5_rt*(ayp*fcy(i,j+1,k,0) + aym*fcy(i,j,k,0))
-              -nz*(m2z(i,j,k+1,2) - m2z(i,j,k,2));
-    Real b8 = -nx*0.5_rt*(axp*fcx(i+1,j,k,1) + axm*fcx(i,j,k,1))
-              -ny*(m2y(i,j+1,k,2) - m2y(i,j,k,2))
-              -nz*0.5_rt*(azp*fcz(i,j,k+1,0) + azm*fcz(i,j,k,0));
-    Real b9 = -nx*(m2x(i+1,j,k,2) - m2x(i,j,k,2))
-              -ny*0.5_rt*(ayp*fcy(i,j+1,k,1) + aym*fcy(i,j,k,1))
-              -nz*0.5_rt*(azp*fcz(i,j,k+1,1) + azm*fcz(i,j,k,1));
+    Real dx1 = dx[0];
+    Real dx2 = dx1*dx1;
+    Real dx3 = dx2*dx1;
+    Real dy1 = dx[1];
+    Real dy2 = dy1*dy1;
+    Real dy3 = dy2*dy1;
+    Real dz1 = dx[2];
+    Real dz2 = dz1*dz1;
+    Real dz3 = dz2*dz1;
+
+    Real b1 = (0.5_rt*(axp-axm) + 0.5_rt*(ayp*fcy(i,j+1,k,0) + aym*fcy(i,j,k,0)) + 0.5_rt*(azp*fcz(i,j,k+1,0) + azm*fcz(i,j,k,0))) * dx2*dy1*dz1;
+    Real b2 = (0.5_rt*(axp*fcx(i+1,j,k,0) + axm*fcx(i,j,k,0)) + 0.5_rt*(ayp-aym) + 0.5_rt*(azp*fcz(i,j,k+1,1) + azm*fcz(i,j,k,1))) * dx1*dy2*dz1;
+    Real b3 = (0.5_rt*(axp*fcx(i+1,j,k,1) + axm*fcx(i,j,k,1)) + 0.5_rt*(ayp*fcy(i,j+1,k,1) + aym*fcy(i,j,k,1)) + 0.5_rt*(azp-azm)) * dx1*dy1*dz2;
+    Real b4 = -nx*0.25_rt*(axp-axm)*dx2*dy1*dz1 - ny*(m2y(i,j+1,k,0) - m2y(i,j,k,0))*dx3*dz1 - nz*(m2z(i,j,k+1,0) - m2z(i,j,k,0))*dx3*dy1;
+    Real b5 = -nx*(m2x(i+1,j,k,0) - m2x(i,j,k,0))*dy3*dz1 - ny*0.25_rt*(ayp-aym)*dx1*dy2*dz1 - nz*(m2z(i,j,k+1,1) - m2z(i,j,k,1))*dx1*dy3;
+    Real b6 = -nx*(m2x(i+1,j,k,1) - m2x(i,j,k,1))*dy1*dz3 - ny*(m2y(i,j+1,k,1) - m2y(i,j,k,1))*dx1*dz3 - nz*0.25_rt*(azp-azm)*dx1*dy1*dz2;
+    Real b7 = -nx*0.5_rt*(axp*fcx(i+1,j,k,0) + axm*fcx(i,j,k,0))*dx1*dy2*dz1
+              -ny*0.5_rt*(ayp*fcy(i,j+1,k,0) + aym*fcy(i,j,k,0))*dx2*dy1*dz1
+              -nz*(m2z(i,j,k+1,2) - m2z(i,j,k,2))*dx2*dy2;
+    Real b8 = -nx*0.5_rt*(axp*fcx(i+1,j,k,1) + axm*fcx(i,j,k,1))*dx1*dy1*dz2
+              -ny*(m2y(i,j+1,k,2) - m2y(i,j,k,2))*dx2*dz2
+              -nz*0.5_rt*(azp*fcz(i,j,k+1,0) + azm*fcz(i,j,k,0))*dx2*dy1*dz1;
+    Real b9 = -nx*(m2x(i+1,j,k,2) - m2x(i,j,k,2))*dy2*dz2
+              -ny*0.5_rt*(ayp*fcy(i,j+1,k,1) + aym*fcy(i,j,k,1))*dx1*dy1*dz2
+              -nz*0.5_rt*(azp*fcz(i,j,k+1,1) + azm*fcz(i,j,k,1))*dx1*dy2*dz1;
 
     Real ny2 = ny *ny;
     Real ny3 = ny2*ny;
@@ -186,16 +196,17 @@ void set_eb_data (const int i, const int j, const int k,
     Real den = 1._rt / (10._rt*(5._rt + 4._rt*nz2 - 4._rt*nz4 + 2._rt*ny4*(-2._rt + nz2) +
                                 2._rt*ny2*(2._rt - 3._rt*nz2 + nz4)) * (vfrac(i,j,k)+1.e-30_rt) );
 
-    vcent(i,j,k,0) = Sx * den;
-    vcent(i,j,k,1) = Sy * den;
-    vcent(i,j,k,2) = Sz * den;
+    vcent(i,j,k,0) = Sx * den / (dx2*dy1*dz1);
+    vcent(i,j,k,1) = Sy * den / (dx1*dy2*dz1);
+    vcent(i,j,k,2) = Sz * den / (dx1*dy1*dz2);
 }
 
 AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
 void cut_face_2d (Real& areafrac, Real& centx, Real& centy,
                   Real& Sx2, Real& Sy2, Real& Sxy,
                   Real axm, Real axp, Real aym, Real ayp,
-                  Real bcx, Real bcy) noexcept
+                  Real bcx, Real bcy,
+                  Real dxval, Real dyval) noexcept
 {
 #ifdef AMREX_USE_FLOAT
     constexpr Real sml = 1.e-5_rt;
@@ -204,9 +215,9 @@ void cut_face_2d (Real& areafrac, Real& centx, Real& centy,
     constexpr Real sml = 1.e-14;
     constexpr Real tiny  = 1.e-15;
 #endif
-    Real apnorm = std::hypot(axm-axp,aym-ayp);
-    Real nx = (axm-axp) * (1.0_rt/apnorm); // pointing to the wall
-    Real ny = (aym-ayp) * (1.0_rt/apnorm);
+    Real apnorm = std::hypot((axm-axp)*dyval,(aym-ayp)*dxval);
+    Real nx = dyval * (axm-axp) * (1.0_rt/apnorm); // pointing to the wall
+    Real ny = dxval * (aym-ayp) * (1.0_rt/apnorm);
 
     Real nxabs = std::abs(nx);
     Real nyabs = std::abs(ny);
@@ -264,9 +275,9 @@ void cut_face_2d (Real& areafrac, Real& centx, Real& centy,
         Real dx2 = dx * (x_ym + x_yp);
         Real dx3 = dx * (x_ym*x_ym + x_ym*x_yp + x_yp*x_yp);
         Real dx4 = dx * (x_ym + x_yp) * (x_ym*x_ym + x_yp*x_yp);
-        Real af1 = 0.5_rt*(axm+axp) + aa*0.5_rt*dx2;
-        centx = 0.125_rt*(axp-axm) + aa*(1.0_rt/6._rt)*dx3;
-        Sx2 = (1.0_rt/24._rt)*(axm+axp) + aa*(1.0_rt/12._rt)*dx4;
+        Real af1 = 0.5_rt*(axm+axp) + aa*0.5_rt*dx2*dxval/dyval;
+        centx = 0.125_rt*(axp-axm) + aa*(1.0_rt/6._rt)*dx3*dxval/dyval;
+        Sx2 = (1.0_rt/24._rt)*(axm+axp) + aa*(1.0_rt/12._rt)*dx4*dxval/dyval;
 
         Real signy = (ny > 0.0_rt) ? 1.0_rt : -1.0_rt;
         Real y_xm = (-0.5_rt + axm)*signy;
@@ -276,13 +287,13 @@ void cut_face_2d (Real& areafrac, Real& centx, Real& centy,
         Real dy2 = dy * (y_xm + y_xp);
         Real dy3 = dy * (y_xm*y_xm + y_xm*y_xp + y_xp*y_xp);
         Real dy4 = dy * (y_xm + y_xp) * (y_xm*y_xm + y_xp*y_xp);
-        Real af2 = 0.5_rt*(aym+ayp) + aa*0.5_rt*dy2;
-        centy = (1.0_rt/8._rt)*(ayp-aym) + aa*(1.0_rt/6._rt)*dy3;
-        Sy2 = (1.0_rt/24._rt)*(aym+ayp) + aa*(1.0_rt/12._rt)*dy4;
+        Real af2 = 0.5_rt*(aym+ayp) + aa*0.5_rt*dy2*dyval/dxval;
+        centy = (1.0_rt/8._rt)*(ayp-aym) + aa*(1.0_rt/6._rt)*dy3*dyval/dxval;
+        Sy2 = (1.0_rt/24._rt)*(aym+ayp) + aa*(1.0_rt/12._rt)*dy4*dyval/dxval;
 
         Real S_b = (nxabs < nyabs)
-            ? (Sx2 - (1.0_rt/24._rt) - signx*(1.0_rt/6._rt)*(x_ym*x_ym*x_ym+x_yp*x_yp*x_yp)) / ny
-            : (Sy2 - (1.0_rt/24._rt) - signy*(1.0_rt/6._rt)*(y_xm*y_xm*y_xm+y_xp*y_xp*y_xp)) / nx;
+            ? (Sx2 - (1.0_rt/24._rt) - signx*(1.0_rt/6._rt)*(x_ym*x_ym*x_ym+x_yp*x_yp*x_yp)) / ny * dxval/dyval
+            : (Sy2 - (1.0_rt/24._rt) - signy*(1.0_rt/6._rt)*(y_xm*y_xm*y_xm+y_xp*y_xp*y_xp)) / nx * dyval/dxval;
         Sxy = (nxabs < nyabs)
             ? -signy*(1.0_rt/16._rt)*dy2 + 0.5_rt*nx*S_b
             : -signx*(1.0_rt/16._rt)*dx2 + 0.5_rt*ny*S_b;
@@ -369,7 +380,7 @@ int build_faces (Box const& bx, Array4<EBCellFlag> const& cell,
                  Array4<Real> const& m2z,
                  GpuArray<Real,AMREX_SPACEDIM> const& dx,
                  GpuArray<Real,AMREX_SPACEDIM> const& problo,
-                 bool cover_multiple_cuts) noexcept
+                 bool cover_multiple_cuts)
 {
     Gpu::Buffer<int> nmulticuts = {0};
     int* hp = nmulticuts.hostData();
@@ -377,8 +388,10 @@ int build_faces (Box const& bx, Array4<EBCellFlag> const& cell,
 
 #ifdef AMREX_USE_FLOAT
     constexpr Real sml = 1.e-5_rt;
+    constexpr Real almostone = 1.0_rt - 1.e-5_rt;
 #else
     constexpr Real sml = 1.e-14;
+    constexpr Real almostone = 1.0 - 1.e-13;
 #endif
     const Real dxinv = 1.0_rt/dx[0];
     const Real dyinv = 1.0_rt/dx[1];
@@ -482,12 +495,12 @@ int build_faces (Box const& bx, Array4<EBCellFlag> const& cell,
                 bcz = 0.5_rt*bcz - 0.5_rt;
                 cut_face_2d(apx(i,j,k),fcx(i,j,k,0),fcx(i,j,k,1), // NOLINT(readability-suspicious-call-argument)
                             m2x(i,j,k,0),m2x(i,j,k,1),m2x(i,j,k,2),
-                            lzm,lzp,lym,lyp,bcy,bcz);
+                            lzm,lzp,lym,lyp,bcy,bcz,dx[1],dx[2]);
             }
 
             if (apx(i,j,k) == 0.0_rt) {
                 fx(i,j,k) = Type::covered;
-            } else if (apx(i,j,k) == 1.0_rt) {
+            } else if (apx(i,j,k) >= almostone) {
                 fx(i,j,k) = Type::regular;
             }
         }
@@ -590,12 +603,12 @@ int build_faces (Box const& bx, Array4<EBCellFlag> const& cell,
                 bcz = 0.5_rt*bcz - 0.5_rt;
                 cut_face_2d(apy(i,j,k),fcy(i,j,k,0),fcy(i,j,k,1), // NOLINT(readability-suspicious-call-argument)
                             m2y(i,j,k,0),m2y(i,j,k,1),m2y(i,j,k,2),
-                            lzm,lzp,lxm,lxp,bcx,bcz);
+                            lzm,lzp,lxm,lxp,bcx,bcz,dx[0],dx[2]);
             }
 
             if (apy(i,j,k) == 0.0_rt) {
                 fy(i,j,k) = Type::covered;
-            } else if (apy(i,j,k) == 1.0_rt) {
+            } else if (apy(i,j,k) >= almostone) {
                 fy(i,j,k) = Type::regular;
             }
         }
@@ -698,12 +711,12 @@ int build_faces (Box const& bx, Array4<EBCellFlag> const& cell,
                 bcy = 0.5_rt*bcy - 0.5_rt;
                 cut_face_2d(apz(i,j,k),fcz(i,j,k,0),fcz(i,j,k,1), // NOLINT(readability-suspicious-call-argument)
                             m2z(i,j,k,0),m2z(i,j,k,1),m2z(i,j,k,2),
-                            lym,lyp,lxm,lxp,bcx,bcy);
+                            lym,lyp,lxm,lxp,bcx,bcy,dx[0],dx[1]);
             }
 
             if (apz(i,j,k) == 0.0_rt) {
                 fz(i,j,k) = Type::covered;
-            } else if (apz(i,j,k) == 1.0_rt) {
+            } else if (apz(i,j,k) >= almostone) {
                 fz(i,j,k) = Type::regular;
             }
         }
@@ -788,7 +801,7 @@ void build_cells (Box const& bx, Array4<EBCellFlag> const& cell,
                   Array4<Real> const& bnorm, Array4<EBCellFlag> const& ctmp,
                   Array4<Real> const& levset, Real small_volfrac, Geometry const& geom,
                   bool extend_domain_face, bool cover_multiple_cuts,
-                  int& nsmallcells, int& nmulticuts) noexcept
+                  int& nsmallcells, int& nmulticuts)
 {
     Gpu::Buffer<int> n_smallcell_multicuts = {0,0};
     int* hp = n_smallcell_multicuts.hostData();

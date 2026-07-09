@@ -47,6 +47,9 @@ add_amrex_define( AMREX_TESTING NO_LEGACY IF AMReX_TESTING )
 add_amrex_define( AMREX_USE_MPI IF AMReX_MPI )
 add_amrex_define( AMREX_MPI_THREAD_MULTIPLE NO_LEGACY IF AMReX_MPI_THREAD_MULTIPLE)
 
+# SIMD
+add_amrex_define( AMREX_USE_SIMD NO_LEGACY IF AMReX_SIMD )
+
 # OpenMP -- This one has legacy definition only in Base/AMReX_omp_mod.F90
 add_amrex_define( AMREX_USE_OMP IF AMReX_OMP )
 
@@ -62,7 +65,7 @@ endif()
 if (AMReX_HIP)
    add_amrex_define( AMREX_USE_HIP NO_LEGACY )
    add_amrex_define( NDEBUG )  # This address a bug that causes slow build times
-   if (${AMReX_AMD_ARCH} MATCHES "gfx1[01].*")
+   if (${AMReX_AMD_ARCH} MATCHES "^gfx1..[a-z0-9]($|:)")
       add_amrex_define( AMREX_AMDGCN_WAVEFRONT_SIZE=32 NO_LEGACY )
    else ()
       add_amrex_define( AMREX_AMDGCN_WAVEFRONT_SIZE=64 NO_LEGACY )

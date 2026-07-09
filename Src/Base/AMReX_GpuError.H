@@ -9,7 +9,7 @@
 #include <hip/hip_runtime.h>
 #endif
 
-#if defined(AMREX_USE_GPU) && !defined(AMREX_GPU_NO_ERROR_CHECK) && !defined(AMREX_USE_SYCL)
+#if defined(AMREX_USE_GPU) && !defined(AMREX_USE_SYCL)
 
 namespace amrex {
 
@@ -47,7 +47,7 @@ gpuGetErrorString (gpuError_t error) {
 
 namespace Gpu {
 
-    inline void ErrorCheck (const char* file, int line) noexcept
+    inline void ErrorCheck (const char* file, int line)
     {
         gpuError_t err = gpuGetLastError();
         if (gpuSuccess != err) {
@@ -98,6 +98,15 @@ namespace Gpu {
         amrex::Abort(errStr); \
     }}
 
+#define AMREX_CUSPARSE_SAFE_CALL(call) { \
+    cusparseStatus_t amrex_i_err = call; \
+    if (CUSPARSE_STATUS_SUCCESS != amrex_i_err) { \
+        std::string errStr(std::string("CUSPARSER error ")+std::to_string(amrex_i_err) \
+                           + std::string(" in file ") + __FILE__        \
+                           + " line " + std::to_string(__LINE__));      \
+        amrex::Abort(errStr); \
+    }}
+
 #endif
 
 #ifdef AMREX_USE_HIP
@@ -123,6 +132,15 @@ namespace Gpu {
     auto amrex_i_err = call; \
     if (rocfft_status_success != amrex_i_err) { \
         std::string errStr(std::string("rocFFT error ")+std::to_string(amrex_i_err) \
+                           + std::string(" in file ") + __FILE__        \
+                           + " line " + std::to_string(__LINE__));      \
+        amrex::Abort(errStr); \
+    }}
+
+#define AMREX_ROCSPARSE_SAFE_CALL(call) { \
+    auto amrex_i_err = call; \
+    if (rocsparse_status_success != amrex_i_err) { \
+        std::string errStr(std::string("rocSPARSE error ")+std::to_string(amrex_i_err) \
                            + std::string(" in file ") + __FILE__        \
                            + " line " + std::to_string(__LINE__));      \
         amrex::Abort(errStr); \

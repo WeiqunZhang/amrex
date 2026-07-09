@@ -7,6 +7,11 @@
 #include <AMReX_BndryData.H>
 #include <AMReX_InterpBndryData_K.H>
 
+/**
+ * \file AMReX_InterpBndryData.H
+ * \brief Boundary data specialization that interpolates coarse data into fine ghost cells.
+ */
+
 namespace amrex {
 
 /**
@@ -78,7 +83,7 @@ public:
     void setPhysBndryValues (const MF& mf, int mf_start, int bnd_start, int num_comp);
 
     /**
-     * \briefSset bndry values at coarse/fine and physical boundaries
+     * \brief Sset bndry values at coarse/fine and physical boundaries
      *
      * \param crse      BndryRegister storing coarse level data
      * \param c_start   starting component of the coarse data
@@ -88,6 +93,7 @@ public:
      * \param num_comp  number of component
      * \param ratio     refinement ratio
      * \param max_order interpolation order
+     * \param max_width max width of the interpolation stencil
      */
     void setBndryValues (BndryRegisterT<MF> const& crse, int c_start, const MF& fine, int f_start,
                          int bnd_start, int num_comp, const IntVect& ratio,
@@ -102,6 +108,7 @@ public:
      * \param num_comp  number of component
      * \param ratio     refinement ratio
      * \param max_order interpolation order
+     * \param max_width max width of the interpolation stencil
      */
     void updateBndryValues (BndryRegisterT<MF>& crse, int c_start, int bnd_start, int num_comp,
                             const IntVect& ratio, int max_order = IBD_max_order_DEF, int max_width = 2);
@@ -271,7 +278,7 @@ template <typename MF>
 void
 InterpBndryDataT<MF>::setHomogValues ()
 {
-    this->setVal(0.);
+    this->setVal(0);
 }
 
 using InterpBndryData = InterpBndryDataT<MultiFab>;

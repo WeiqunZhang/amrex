@@ -11,6 +11,8 @@
 
 namespace amrex {
 
+#if (AMREX_SPACEDIM > 1)
+
 AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
 void hypmlabeclap_mat (GpuArray<Real,2*AMREX_SPACEDIM+1>& sten, int i, int j, int k,
                        Dim3 const& boxlo, Dim3 const& boxhi,
@@ -293,9 +295,13 @@ void hypmlabeclap_rhs (int i, int j, int k, Dim3 const& boxlo, Dim3 const& boxhi
 #endif
 }
 
+#endif
+
 }
 
-#if (AMREX_SPACEDIM == 2)
+#if (AMREX_SPACEDIM == 1)
+#include <AMReX_HypreMLABecLap_1D_K.H>
+#elif (AMREX_SPACEDIM == 2)
 #include <AMReX_HypreMLABecLap_2D_K.H>
 #else
 #include <AMReX_HypreMLABecLap_3D_K.H>

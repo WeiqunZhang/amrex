@@ -5,19 +5,31 @@
 #include <AMReX_EB2_IF_Base.H>
 #include <AMReX_Parser.H>
 
+/**
+ * \file AMReX_EB2_IF_Parser.H
+ *
+ * Parser-based implicit function that evaluates arbitrary expressions provided at runtime.
+ */
+
 // For all implicit functions, >0: body; =0: boundary; <0: fluid
 
 namespace amrex::EB2 {
 
+//! Implicit surface defined by an `amrex::Parser` expression.
 class ParserIF
     : public amrex::GPUable
 {
 public:
+    //! Store a compiled parser executor for later evaluation.
+    //! Note ParserExecutor<3> keeps pointers into the originating Parser instance, so
+    //! the Parser must outlive this object (e.g., use
+    //! `EB2::GeometryShop<EB2::ParserIF, amrex::Parser>` to keep both alive together).
     ParserIF (const ParserExecutor<3>& a_parser)
         : m_parser(a_parser)
         {}
 
-    [[nodiscard]] AMREX_GPU_HOST_DEVICE inline
+    //! Evaluate the expression at explicit coordinates.
+    [[nodiscard]] AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
     amrex::Real operator() (AMREX_D_DECL(amrex::Real x, amrex::Real y,
                                          amrex::Real z)) const noexcept {
 #if (AMREX_SPACEDIM == 2)
@@ -27,7 +39,8 @@ public:
 #endif
     }
 
-    [[nodiscard]] inline amrex::Real operator() (const amrex::RealArray& p) const noexcept {
+    //! Array-based overload forwarding to the coordinate form.
+    [[nodiscard]] AMREX_FORCE_INLINE amrex::Real operator() (const amrex::RealArray& p) const noexcept {
         return this->operator()(AMREX_D_DECL(p[0],p[1],p[2]));
     }
 

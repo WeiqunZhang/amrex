@@ -12,8 +12,10 @@
 
 namespace amrex {
 
-/*
-* A Collection of IArrayBoxes
+/**
+* \class amrex::iMultiFab
+* \ingroup amrex_multifab_containers
+* \brief A Collection of IArrayBoxes
 *
 * The iMultiFab class is publicly derived from the
 * FabArray<int,IArrayBox> class.  It is a collection (stored as an array) of
@@ -104,6 +106,8 @@ public:
     * iMultiFab.  The parameter nghost determines the number of
     * boundary cells to search for the minimum.  The default is to
     * search only the valid regions of the IArrayBoxes.
+    * \warning Unless \p local is true, this routine performs an MPI collective
+    * and every rank in the current active MPI communicator must participate.
     *
     * \param comp
     * \param nghost
@@ -116,8 +120,10 @@ public:
     /**
     * \brief Identical to the previous min() function, but confines its
     * search to intersection of Box b and the iMultiFab.
+    * \warning Unless \p local is true, this routine performs an MPI collective
+    * and every rank in the current active MPI communicator must participate.
     *
-    * \param b
+    * \param region
     * \param comp
     * \param nghost
     * \param local
@@ -132,6 +138,8 @@ public:
     * iMultiFab.  The parameter nghost determines the number of
     * boundary cells to search for the maximum.  The default is to
     * search only the valid regions of the IArrayBoxes.
+    * \warning Unless \p local is true, this routine performs an MPI collective
+    * and every rank in the current active MPI communicator must participate.
     *
     * \param comp
     * \param nghost
@@ -144,8 +152,10 @@ public:
     /**
     * \brief Identical to the previous max() function, but confines its
     * search to intersection of Box b and the iMultiFab.
+    * \warning Unless \p local is true, this routine performs an MPI collective
+    * and every rank in the current active MPI communicator must participate.
     *
-    * \param b
+    * \param region
     * \param comp
     * \param nghost
     * \param local
@@ -157,6 +167,8 @@ public:
 
     /**
     * \brief Returns the sum in component comp
+    * \warning Unless \p local is true, this routine performs an MPI collective
+    * and every rank in the current active MPI communicator must participate.
     *
     * \param comp
     * \param nghost
@@ -166,6 +178,8 @@ public:
 
     /**
     * \brief Returns the sum of component "comp" in the given "region". -- no ghost cells are included.
+    * \warning Unless \p local is true, this routine performs an MPI collective
+    * and every rank in the current active MPI communicator must participate.
     */
     [[nodiscard]] Long sum (Box const& region, int comp = 0, bool local = false) const;
 
@@ -346,9 +360,17 @@ public:
     void negate (const Box& region,
                  int        nghost = 0);
 
+    /**
+    * \warning This routine performs an MPI collective, so every rank in the
+    * current active MPI communicator must participate.
+    */
     [[nodiscard]] IntVect minIndex (int comp,
                       int nghost = 0) const;
 
+    /**
+    * \warning This routine performs an MPI collective, so every rank in the
+    * current active MPI communicator must participate.
+    */
     [[nodiscard]] IntVect maxIndex (int comp,
                       int nghost = 0) const;
 

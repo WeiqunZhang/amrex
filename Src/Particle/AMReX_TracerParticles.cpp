@@ -73,7 +73,7 @@ TracerParticleContainer::AdvectWithUmac (MultiFab* umac, int lev, Real dt)
                                [=] AMREX_GPU_DEVICE (int i)
             {
                 ParticleType& p = p_pbox[i];
-                if (p.id() <= 0) { return; }
+                if (!p.id().is_valid()) { return; }
                 ParticleReal v[AMREX_SPACEDIM];
                 mac_interpolate(p, plo, dxi, umacarr, v);
                 if (ipass == 0)
@@ -151,7 +151,7 @@ TracerParticleContainer::AdvectWithUcc (const MultiFab& Ucc, int lev, Real dt)
                                [=] AMREX_GPU_DEVICE (int i)
             {
                 ParticleType& p  = p_pbox[i];
-                if (p.id() <= 0) { return; }
+                if (!p.id().is_valid()) { return; }
                 ParticleReal v[AMREX_SPACEDIM];
 
                 cic_interpolate(p, plo, dxi, uccarr, v);
@@ -265,7 +265,7 @@ TracerParticleContainer::Timestamp (const std::string&      basename,
                 const auto M  = static_cast<int>(indices.size());
                 const BoxArray& ba = mf.boxArray();
 
-                std::vector<ParticleReal> vals(M);
+                std::vector<ParticleReal> vals(mf.nComp());
 
                 const auto& pmap = GetParticles(lev);
                 for (const auto& kv : pmap) {
@@ -298,7 +298,7 @@ TracerParticleContainer::Timestamp (const std::string&      basename,
                     {
                       const ParticleType& p = pbox[k];
 
-                      if (p.id() <= 0) { continue; }
+                      if (!p.id().is_valid()) { continue; }
 
                       const IntVect& iv = Index(p,lev);
 
@@ -320,11 +320,11 @@ TracerParticleContainer::Timestamp (const std::string&      basename,
 
                       if (M > 0)
                         {
-                          cic_interpolate(p, plo, dxi, uccarr, vals.data(), M);
+                          cic_interpolate(p, plo, dxi, uccarr, vals.data(), mf.nComp());
 
                           for (int i = 0; i < M; i++)
                             {
-                              TimeStampFile << ' ' << vals[i];
+                              TimeStampFile << ' ' << vals[indices[i]];
                             }
                         }
 

@@ -21,10 +21,10 @@ F90FLAGS =
 
 ifeq ($(DEBUG),TRUE)
 
-  CXXFLAGS += -g -O0 -ftrapv
-  CFLAGS   += -g -O0 -ftrapv
-  FFLAGS   += -g -O0 -ftrapv
-  F90FLAGS += -g -O0 -ftrapv
+  CXXFLAGS += -g -O$(DEBUG_OPT_LEVEL) -ftrapv
+  CFLAGS   += -g -O$(DEBUG_OPT_LEVEL) -ftrapv
+  FFLAGS   += -g -O$(DEBUG_OPT_LEVEL) -ftrapv
+  F90FLAGS += -g -O$(DEBUG_OPT_LEVEL) -ftrapv
 
 else
 
@@ -57,14 +57,14 @@ ifeq ($(WARN_ERROR),TRUE)
 endif
 
 # disable some warnings
-CXXFLAGS += -Wno-c++17-extensions
+# CXXFLAGS += -Wno-c++20-extensions # Do we need it?
 
 ########################################################################
 
 ifdef CXXSTD
   CXXSTD := $(strip $(CXXSTD))
 else
-  CXXSTD := c++17
+  CXXSTD := c++20
 endif
 
 CXXFLAGS += -std=$(CXXSTD)

@@ -23,11 +23,11 @@ COMP_VERSION = $(gcc_version)
 
 ifeq ($(DEBUG),TRUE)
 
-  CXXFLAGS += -g -O0 -fno-inline -ggdb -Wall -Wno-sign-compare -ftrapv
-  CFLAGS   += -g -O0 -fno-inline -ggdb -Wall -Wno-sign-compare -ftrapv
+  CXXFLAGS += -g -O$(DEBUG_OPT_LEVEL) -fno-inline -ggdb -Wall -Wno-sign-compare -ftrapv
+  CFLAGS   += -g -O$(DEBUG_OPT_LEVEL) -fno-inline -ggdb -Wall -Wno-sign-compare -ftrapv
 
-  FFLAGS   += -g -O0 -nan -C
-  F90FLAGS += -g -O0 -nan -C
+  FFLAGS   += -g -O$(DEBUG_OPT_LEVEL) -nan -C
+  F90FLAGS += -g -O$(DEBUG_OPT_LEVEL) -nan -C
 
 else
 
@@ -54,7 +54,7 @@ ifdef CXXSTD
   CXXSTD := $(strip $(CXXSTD))
   CXXFLAGS += -std=$(CXXSTD)
 else
-  CXXFLAGS += -std=c++17
+  CXXFLAGS += -std=c++20
 endif
 
 CFLAGS   += -std=c11

@@ -17,9 +17,7 @@ module amrex_physbc_module
    contains
      generic :: assignment(=) => amrex_physbc_assign  ! shallow copy
      procedure, private :: amrex_physbc_assign
-#if !defined(__GFORTRAN__) || (__GNUC__ > 4)
      final :: amrex_physbc_destroy
-#endif
   end type amrex_physbc
 
   interface
@@ -47,9 +45,11 @@ module amrex_physbc_module
      end subroutine amrex_fi_delete_physbc
   end interface
 
+#ifdef __NVCOMPILER
   interface amrex_physbc_destroy
     module procedure amrex_physbc_destroy
   end interface amrex_physbc_destroy
+#endif
 
 contains
 
@@ -57,6 +57,7 @@ contains
     type(amrex_physbc), intent(inout) :: pbc
     procedure(amrex_physbc_proc) :: fill
     type(amrex_geometry), intent(in) :: geom
+    call amrex_physbc_destroy(pbc)
     pbc%owner = .true.
     call amrex_fi_new_physbc(pbc%p, c_funloc(fill), geom%p)
   end subroutine amrex_physbc_build

@@ -73,6 +73,7 @@ public:
         const int lev = 0;  // only add particles on level 0
         const Real* dx = Geom(lev).CellSize();
         const Real* plo = Geom(lev).ProbLo();
+        const IntVect dom_lo = Geom(lev).Domain().smallEnd();
 
         const int num_ppc = AMREX_D_TERM( a_num_particles_per_cell[0],
                                          *a_num_particles_per_cell[1],
@@ -98,12 +99,12 @@ public:
                     ParticleType p;
                     p.id()  = ParticleType::NextID();
                     p.cpu() = ParallelDescriptor::MyProc();
-                    p.pos(0) = static_cast<ParticleReal> (plo[0] + (iv[0] + r[0])*dx[0]);
+                    p.pos(0) = static_cast<ParticleReal> (plo[0] + ((iv[0] - dom_lo[0]) + r[0])*dx[0]);
 #if AMREX_SPACEDIM > 1
-                    p.pos(1) = static_cast<ParticleReal> (plo[1] + (iv[1] + r[1])*dx[1]);
+                    p.pos(1) = static_cast<ParticleReal> (plo[1] + ((iv[1] - dom_lo[1]) + r[1])*dx[1]);
 #endif
 #if AMREX_SPACEDIM > 2
-                    p.pos(2) = static_cast<ParticleReal> (plo[2] + (iv[2] + r[2])*dx[2]);
+                    p.pos(2) = static_cast<ParticleReal> (plo[2] + ((iv[2] - dom_lo[2]) + r[2])*dx[2]);
 #endif
 
                     for (int i = 0; i < NSR; ++i) { p.rdata(i) = ParticleReal(p.id()); }
@@ -222,6 +223,32 @@ public:
 #endif
                     });
                 }
+
+                amrex::ParallelFor(np,
+                    [=] AMREX_GPU_DEVICE (size_t i) noexcept
+                    {
+                        ParticleType& p = pstruct[i];
+                        auto old_id = p.id();
+                        auto new_id = 5000 + p.id();
+                        p.atomicSetID(new_id);
+#ifndef AMREX_USE_GPU
+                        AMREX_ALWAYS_ASSERT_WITH_MESSAGE(p.id() == new_id,
+                                                         "atomicSetID failed: expected " +
+                                                         std::to_string(new_id) + " but got " +
+                                                         std::to_string(p.id()));
+#else
+                        AMREX_ALWAYS_ASSERT(p.id() == new_id);
+#endif
+                        p.atomicSetID(new_id - 5000);
+#ifndef AMREX_USE_GPU
+                        AMREX_ALWAYS_ASSERT_WITH_MESSAGE(p.id() == old_id,
+                                                         "atomicSetID failed: expected " +
+                                                         std::to_string(old_id) + " but got " +
+                                                         std::to_string(p.id()));
+#else
+                        AMREX_ALWAYS_ASSERT(p.id() == old_id);
+#endif
+                    });
             }
         }
     }

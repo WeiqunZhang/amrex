@@ -70,8 +70,8 @@ ifeq ($(DEBUG),TRUE)
 
   # 2016-12-02: pgi 16.10 doesn't appear to like -traceback together with c++11
 
-  CXXFLAGS += -g -O0 -Mbounds
-  CFLAGS   += -g -O0 -Mbounds
+  CXXFLAGS += -g -O$(DEBUG_OPT_LEVEL) -Mbounds
+  CFLAGS   += -g -O$(DEBUG_OPT_LEVEL) -Mbounds
 
 else
 
@@ -89,15 +89,15 @@ endif
 
 # The logic here should be consistent with what's in nvcc.mak
 
-ifeq ($(shell expr $(gcc_major_version) \< 8),1)
-  $(error GCC >= 8 required)
+ifeq ($(shell expr $(gcc_major_version) \< 11),1)
+  $(error GCC >= 11 required)
 endif
 
 ifdef CXXSTD
   CXXSTD := $(strip $(CXXSTD))
   CXXFLAGS += -std=$(CXXSTD)
 else
-  CXXFLAGS += -std=c++17
+  CXXFLAGS += -std=c++20
 endif
 
 CFLAGS   += -c11
@@ -140,8 +140,8 @@ ifeq ($(DEBUG),TRUE)
 
   # 2016-12-02: pgi 16.10 doesn't appear to like -traceback together with c++11
 
-  FFLAGS   += -g -O0 -Mbounds -Ktrap=divz,inv -Mchkptr
-  F90FLAGS += -g -O0 -Mbounds -Ktrap=divz,inv -Mchkptr
+  FFLAGS   += -g -O$(DEBUG_OPT_LEVEL) -Mbounds -Ktrap=divz,inv -Mchkptr
+  F90FLAGS += -g -O$(DEBUG_OPT_LEVEL) -Mbounds -Ktrap=divz,inv -Mchkptr
 
 else
 

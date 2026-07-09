@@ -278,25 +278,46 @@ void linear_interpolate_to_particle_z (const P& p,
         amrex::ignore_unused(ly);
         int const j  = p.idata(0);
 
-        amrex::Real hlo_xlo = amrex::Real(0.25)
-                                   * ( height_arr(i0                       , j                     , k)
-                                   +   height_arr(i0 + (!(is_nodal[d][0])) , j                     , k)
-                                   +   height_arr(i0                       , j + (!is_nodal[d][1]) , k)
-                                   +   height_arr(i0 + (!(is_nodal[d][0])) , j + (!is_nodal[d][1]) , k) );
-
-        amrex::Real hlo_xhi = amrex::Real(0.25)
-                                   * ( height_arr(i0 + 1                       , j                    , k )
-                                   +   height_arr(i0 + 1 + (!(is_nodal[d][0])) , j                    , k )
-                                   +   height_arr(i0 + 1                       , j + (!is_nodal[d][1]), k )
-                                   +   height_arr(i0 + 1 + (!(is_nodal[d][0])) , j + (!is_nodal[d][1]), k ) );
-
+        int j0 = j;
 
         amrex::Real const xint = lx - static_cast<Real>(i0);
         amrex::Real sx[] = { amrex::Real(1.) - xint, xint};
-        amrex::Real height_at_px = sx[0] * hlo_xlo + sx[1] * hlo_xhi;
 
-        int const j0 = (amrex::Real(p.pos(1)) >= height_at_px) ? j : j-1;
+        // hlo holds the height of the face-based velocity at the relevant face center, e.g.
+        //     for u it holds the height of the x-face centers of the two cells that will contribute
+        //     for v it holds the height of the y-face centers of the two cells that will contribute
+        //
+        // height_at_px is then the value of hlo interpolated to the (i) of the particle location
+        //
+        // We only use height_at_px to determine which cells (in the j-direction) we should use for interpolation
+        //  -- but ONLY for the lateral velocities because otherwise we risk using vertical velocity below the sfc
+        //
+        if (d != AMREX_SPACEDIM-1) {
+            amrex::Real hlo_xlo = amrex::Real(0.25)
+                                       * ( height_arr(i0                       , j                     , k)
+                                       +   height_arr(i0 + (!(is_nodal[d][0])) , j                     , k)
+                                       +   height_arr(i0                       , j + (!is_nodal[d][1]) , k)
+                                       +   height_arr(i0 + (!(is_nodal[d][0])) , j + (!is_nodal[d][1]) , k) );
 
+            amrex::Real hlo_xhi = amrex::Real(0.25)
+                                       * ( height_arr(i0 + 1                       , j                    , k )
+                                       +   height_arr(i0 + 1 + (!(is_nodal[d][0])) , j                    , k )
+                                       +   height_arr(i0 + 1                       , j + (!is_nodal[d][1]), k )
+                                       +   height_arr(i0 + 1 + (!(is_nodal[d][0])) , j + (!is_nodal[d][1]), k ) );
+
+           amrex::Real height_at_px = sx[0] * hlo_xlo + sx[1] * hlo_xhi;
+
+           if (amrex::Real(p.pos(1)) < height_at_px) {j0 = j-1;}
+
+        } // if not vertical direction
+
+        // ht holds the heights of the face-based velocity at the relevant face centers, e.g.
+        //     for u it holds the height of the x-face centers of the four cells that will contribute
+        //     for v it holds the height of the y-face centers of the four cells that will contribute
+        //
+        // ht differs from hlo in that it uses the correct j0 which may be different from k above
+        //    AND it computes all 4 values needed for 2D interpolation (hlo held only the lower 2)
+        //
         int yctr = 0;
         amrex::Real ht[4];
         for (int ii=0; ii < 2; ++ii) {
@@ -309,6 +330,7 @@ void linear_interpolate_to_particle_z (const P& p,
                 ++yctr;
             }
         }
+        // it is safe to assume the divisors here are not zero or near zero.
         amrex::Real hint_ilo = (p.pos(1) - ht[0]) / (ht[1] - ht[0]);
         amrex::Real hint_ihi = (p.pos(1) - ht[2]) / (ht[3] - ht[2]);
 
@@ -324,28 +346,52 @@ void linear_interpolate_to_particle_z (const P& p,
         amrex::Real sx[] = { amrex::Real(1.) - xint, xint};
         amrex::Real sy[] = { amrex::Real(1.) - yint, yint};
 
-        amrex::Real hlo[4];
-        int ilo = 0;
-        amrex::Real height_at_pxy = 0.;
-        for (int ii = 0; ii < 2; ++ii) {
-            for (int jj = 0; jj < 2; ++jj) {
-                hlo[ilo] = amrex::Real(0.125)
-                * ( height_arr(i0 + ii                    , j0 + jj                    , k                    )
-                +   height_arr(i0 + ii + (!is_nodal[d][0]), j0 + jj                    , k                    )
-                +   height_arr(i0 + ii                    , j0 + jj + (!is_nodal[d][1]), k                    )
-                +   height_arr(i0 + ii + (!is_nodal[d][0]), j0 + jj + (!is_nodal[d][1]), k                    )
-                +   height_arr(i0 + ii                    , j0 + jj                    , k + (!is_nodal[d][2]))
-                +   height_arr(i0 + ii + (!is_nodal[d][0]), j0 + jj                    , k + (!is_nodal[d][2]))
-                +   height_arr(i0 + ii                    , j0 + jj + (!is_nodal[d][1]), k + (!is_nodal[d][2]))
-                +   height_arr(i0 + ii + (!is_nodal[d][0]), j0 + jj + (!is_nodal[d][1]), k + (!is_nodal[d][2]))
-                );
-                height_at_pxy += hlo[ilo] * sx[ii] * sy[jj];
-                ++ilo;
+        int k0 = k;
+
+        // hlo holds the height of the face-based velocity at the relevant face center, e.g.
+        //     for u it holds the height of the x-face centers of the four cells that will contribute
+        //     for v it holds the height of the y-face centers of the four cells that will contribute
+        //     for w it holds the height of the z-face centers of the four cells that will contribute
+        //
+        // height_at_pxy is then the value of hlo interpolated to the (i,j) of the particle location
+        //
+        // We use height_at_pxy to determine which cells (in the k-direction) we should use for interpolation
+        //  -- but ONLY for the lateral velocities because otherwise we risk using vertical velocity below the sfc
+        //
+
+        if (d != AMREX_SPACEDIM-1) {
+            amrex::Real hlo[4];
+            int ilo = 0;
+            amrex::Real height_at_pxy = 0.;
+            for (int ii = 0; ii < 2; ++ii) {
+                for (int jj = 0; jj < 2; ++jj) {
+                    hlo[ilo] = amrex::Real(0.125)
+                    * ( height_arr(i0 + ii                    , j0 + jj                    , k                    )
+                    +   height_arr(i0 + ii + (!is_nodal[d][0]), j0 + jj                    , k                    )
+                    +   height_arr(i0 + ii                    , j0 + jj + (!is_nodal[d][1]), k                    )
+                    +   height_arr(i0 + ii + (!is_nodal[d][0]), j0 + jj + (!is_nodal[d][1]), k                    )
+                    +   height_arr(i0 + ii                    , j0 + jj                    , k + (!is_nodal[d][2]))
+                    +   height_arr(i0 + ii + (!is_nodal[d][0]), j0 + jj                    , k + (!is_nodal[d][2]))
+                    +   height_arr(i0 + ii                    , j0 + jj + (!is_nodal[d][1]), k + (!is_nodal[d][2]))
+                    +   height_arr(i0 + ii + (!is_nodal[d][0]), j0 + jj + (!is_nodal[d][1]), k + (!is_nodal[d][2]))
+                    );
+                    height_at_pxy += hlo[ilo] * sx[ii] * sy[jj];
+                    ++ilo;
+                }
             }
-        }
 
-        int const k0 = (amrex::Real(p.pos(2)) >= height_at_pxy ) ? k : k-1;
+            if (amrex::Real(p.pos(2)) < height_at_pxy ) {k0 = k-1;}
 
+        } // if not vertical direction
+
+        // ht holds the heights of the face-based velocity at the relevant face centers, e.g.
+        //     for u it holds the height of the x-face centers of the eight cells that will contribute
+        //     for v it holds the height of the y-face centers of the eight cells that will contribute
+        //     for w it holds the height of the z-face centers of the eight cells that will contribute
+        //
+        // ht differs from hlo in that it uses the correct k0 which may be different from k above
+        //    AND it computes all 8 values needed for 3D interpolation (hlo held only the lower 4)
+        //
         int zctr = 0;
         amrex::Real ht[8];
         for (int ii = 0; ii < 2; ++ii) {
@@ -363,7 +409,7 @@ void linear_interpolate_to_particle_z (const P& p,
              );
             ++zctr;
         }}}
-
+        // it is safe to assume the divisors here are not zero or near zero.
         amrex::Real hint_ilojlo = ( p.pos(2) - ht[0] ) / (ht[1] - ht[0]);
         amrex::Real hint_ilojhi = ( p.pos(2) - ht[2] ) / (ht[3] - ht[2]);
         amrex::Real hint_ihijlo = ( p.pos(2) - ht[4] ) / (ht[5] - ht[4]);

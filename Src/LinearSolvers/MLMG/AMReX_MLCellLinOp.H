@@ -15,14 +15,24 @@
 
 namespace amrex {
 
+/**
+ * \file AMReX_MLCellLinOp.H
+ *
+ * Cell-centered base class that implements shared boundary-condition handling,
+ * flux registers, and Gauss–Seidel flags for MLMG-compatible operators.
+ */
+
+template <typename T>
+struct MLMGABCTag;
+
 template <typename MF>
 class MLCellLinOpT  // NOLINT(cppcoreguidelines-virtual-class-destructor)
     : public MLLinOpT<MF>
 {
 public:
 
-    using FAB = typename MF::fab_type;
-    using RT  = typename MF::value_type;
+    using FAB = typename FabDataType<MF>::fab_type;
+    using RT  = typename FabDataType<MF>::value_type;
 
     using BCType = LinOpBCType;
     using BCMode    = typename MLLinOpT<MF>::BCMode;
@@ -37,84 +47,321 @@ public:
     MLCellLinOpT<MF>& operator= (const MLCellLinOpT<MF>&) = delete;
     MLCellLinOpT<MF>& operator= (MLCellLinOpT<MF>&&) = delete;
 
+    /**
+     * \brief Bind the operator to an AMR hierarchy.
+     *
+     * \param a_geom    Geometries per level (fine to coarse).
+     * \param a_grids   Grid arrays.
+     * \param a_dmap    Distribution mappings.
+     * \param a_info    Optional operator configuration overrides.
+     * \param a_factory Optional FAB factories (defaults to FArrayBox).
+     */
     void define (const Vector<Geometry>& a_geom,
                  const Vector<BoxArray>& a_grids,
                  const Vector<DistributionMapping>& a_dmap,
                  const LPInfo& a_info = LPInfo(),
                  const Vector<FabFactory<FAB> const*>& a_factory = {});
 
+    /**
+     * \brief Provide per-level inhomogeneous boundary data.
+     *
+     * Robin coefficients are required (non-null) when the operator has
+     * active Robin BCs; otherwise they are optional and passing nullptr
+     * keeps any previously stored values.
+     *
+     * \param amrlev      Target AMR level.
+     * \param levelbcdata Inhomogeneous BC data (nullptr uses homogeneous BCs).
+     * \param robinbc_a   Robin `a` coefficient MultiFab.
+     * \param robinbc_b   Robin `b` coefficient MultiFab.
+     * \param robinbc_f   Robin `f` coefficient MultiFab.
+     */
     void setLevelBC (int amrlev, const MF* levelbcdata,
                              const MF* robinbc_a = nullptr,
                              const MF* robinbc_b = nullptr,
                              const MF* robinbc_f = nullptr) final;
 
-    using MLLinOpT<MF>::setLevelBC;
+    template <MultiFabLike AMF>
+    requires (!std::same_as<MF,AMF>)
+    void setLevelBC (int amrlev, const AMF* levelbcdata,
+                     const AMF* robinbc_a = nullptr,
+                     const AMF* robinbc_b = nullptr,
+                     const AMF* robinbc_f = nullptr)
+    {
+        this->MLLinOpT<MF>::template setLevelBC<AMF>(amrlev, levelbcdata, robinbc_a, robinbc_b, robinbc_f);
+    }
 
     bool needsUpdate () const override {
         return MLLinOpT<MF>::needsUpdate();
     }
     void update () override;
 
+    /**
+     * \brief Toggle Gauss–Seidel smoothing in place of Jacobi relaxation.
+     *
+     * \param flag True selects Gauss–Seidel; false selects Jacobi.
+     *             (Gauss–Seidel is the default.)
+     */
     void setGaussSeidel (bool flag) noexcept { m_use_gauss_seidel = flag; }
 
+    //! Whether the stencil is the cross shape.
     virtual bool isCrossStencil () const { return true; }
+    //! Whether this operator is a tensor solve.
     virtual bool isTensorOp () const { return false; }
 
+    /**
+     * \brief Refresh stored solution BC data from coarse inputs.
+     *
+     * \param amrlev      AMR level index being refreshed.
+     * \param crse_bcdata Coarse BC MultiFab copied into the cache.
+     */
     void updateSolBC (int amrlev, const MF& crse_bcdata) const;
+    /**
+     * \brief Refresh stored correction BC data from coarse inputs.
+     *
+     * \param amrlev      AMR level index being refreshed.
+     * \param crse_bcdata Coarse BC MultiFab copied into the correction cache.
+     */
     void updateCorBC (int amrlev, const MF& crse_bcdata) const;
 
+    /**
+     * \brief Apply physical BCs (optionally skipping FillBoundary).
+     *
+     * \param amrlev AMR level index.
+     * \param mglev  Multigrid level index.
+     * \param in     MultiFab whose boundary values are updated.
+     * \param bc_mode Boundary-condition interpretation (solution vs correction).
+     * \param s_mode State interpretation (solution or correction).
+     * \param bndry  Optional cached boundary data.
+     * \param skip_fillboundary True to assume ghost cells already filled.
+     */
     virtual void applyBC (int amrlev, int mglev, MF& in, BCMode bc_mode, StateMode s_mode,
                           const MLMGBndryT<MF>* bndry=nullptr, bool skip_fillboundary=false) const;
 
+    //! Helper that builds a BoxArray for NSolve with boxes no larger than the requested \p grid_size.
     BoxArray makeNGrids (int grid_size) const;
 
-    void restriction (int, int, MF& crse, MF& fine) const override;
+    /**
+     * \brief Restrict a fine-grid field onto its coarse counterpart.
+     *
+     * \param amrlev AMR level whose data are being restricted.
+     * \param cmglev Multigrid level index on that AMR level.
+     * \param crse   Destination MultiFab on the coarse level.
+     * \param fine   Source MultiFab on the fine level.
+     */
+    void restriction (int amrlev, int cmglev, MF& crse, MF& fine) const override;
 
+    /**
+     * \brief Add the prolongation of coarse data onto the fine grid
+     * (\p fine += prolong(\p crse)).
+     *
+     * \param amrlev AMR level index.
+     * \param fmglev Multigrid level index within that AMR level.
+     * \param fine   Destination fine-grid data (updated in place).
+     * \param crse   Source coarse-grid data.
+     */
     void interpolation (int amrlev, int fmglev, MF& fine, const MF& crse) const override;
 
+    /**
+     * \brief Overwrite fine data with the prolongation of coarse data
+     * (\p fine = prolong(\p crse)).
+     *
+     * \param amrlev AMR level index.
+     * \param fmglev Multigrid level index within that AMR level.
+     * \param fine   Destination fine-grid data (overwritten in place).
+     * \param crse   Source coarse-grid data (its ghost cells may be modified).
+     */
     void interpAssign (int amrlev, int fmglev, MF& fine, MF& crse) const override;
 
+    /**
+     * \brief Prolong AMR-level data during FMG initialization.
+     *
+     * \param famrlev Fine AMR level receiving the data.
+     * \param fine    Destination fine data.
+     * \param crse    Source coarse data.
+     * \param nghost  Requested grow cells (currently unused in this base
+     *                implementation; overrides may use it).
+     */
     void interpolationAmr (int famrlev, MF& fine, const MF& crse,
                                    IntVect const& nghost) const override;
 
+    /**
+     * \brief Average fine solution/RHS onto the next coarser AMR level.
+     *
+     * \param camrlev   Coarse AMR level to update.
+     * \param crse_sol  Destination coarse solution.
+     * \param crse_rhs  Destination coarse RHS.
+     * \param fine_sol  Source fine solution.
+     * \param fine_rhs  Source fine RHS.
+     */
     void averageDownSolutionRHS (int camrlev, MF& crse_sol, MF& crse_rhs,
                                          const MF& fine_sol, const MF& fine_rhs) override;
 
+    /**
+     * \brief Apply the linear operator with boundary conditions.
+     *
+     * \param amrlev AMR level index.
+     * \param mglev  Multigrid level index.
+     * \param out    Destination array for A(in).
+     * \param in     Input state.
+     * \param bc_mode Boundary-condition mode (solution vs correction).
+     * \param s_mode State interpretation (solution or correction).
+     * \param bndry  Optional cached BC data (nullptr rebuilds on the fly).
+     */
     void apply (int amrlev, int mglev, MF& out, MF& in, BCMode bc_mode,
                         StateMode s_mode, const MLMGBndryT<MF>* bndry=nullptr) const override;
+    /**
+     * \brief Perform `niter` smoothing iterations on the supplied residual equation.
+     *
+     * \param amrlev AMR level index.
+     * \param mglev  Multigrid level index.
+     * \param sol    Correction updated in place.
+     * \param rhs    Right-hand side for the current level.
+     * \param skip_fillboundary True to assume ghost cells are already filled.
+     * \param niter  Number of smoothing passes to execute.
+     */
     void smooth (int amrlev, int mglev, MF& sol, const MF& rhs,
                  bool skip_fillboundary, int niter) const final;
 
+    /**
+     * \brief Compute the residual `resid = b - A(x)` using solution boundary data.
+     *
+     * \param amrlev      AMR level index.
+     * \param resid       Residual MultiFab (output).
+     * \param x           Solution MultiFab.
+     * \param b           Right-hand side MultiFab.
+     * \param crse_bcdata Optional coarse data used to populate coarse/fine BCs.
+     */
     void solutionResidual (int amrlev, MF& resid, MF& x, const MF& b,
                                    const MF* crse_bcdata=nullptr) override;
 
+    /**
+     * \brief Ensure BC caches are ready for flux computations (e.g., getFluxes).
+     *
+     * \param amrlev      AMR level index.
+     * \param crse_bcdata Optional coarse BC data applied during setup.
+     */
     void prepareForFluxes (int amrlev, const MF* crse_bcdata = nullptr) override;
 
+    /**
+     * \brief Compute the correction residual with optional coarse data.
+     *
+     * \param amrlev      AMR level index.
+     * \param mglev       Multigrid level index.
+     * \param resid       Output residual.
+     * \param x           Current correction.
+     * \param b           Right-hand side.
+     * \param bc_mode     Boundary-condition mode (usually homogeneous).
+     * \param crse_bcdata Optional coarse data for physical BCs.
+     */
     void correctionResidual (int amrlev, int mglev, MF& resid, MF& x, const MF& b,
                                      BCMode bc_mode, const MF* crse_bcdata=nullptr) final;
 
-    // The assumption is crse_sol's boundary has been filled, but not fine_sol.
+    /**
+     * \brief Reflux fine-level fluxes into the coarse residual.
+     *
+     * The unnamed arguments are the coarse RHS, fine residual, and fine RHS
+     * required by the MLLinOp interface; they are unused for cell-centered
+     * ABec ops.  Assumes coarse solutions already have valid ghost cells
+     * while fine solutions do not.
+     *
+     * \param crse_amrlev Coarse AMR level receiving refluxed updates.
+     * \param res         Residual updated in place on the coarse level.
+     * \param crse_sol    Coarse solution whose fluxes enter the reflux.
+     * \param fine_sol    Fine solution that supplies the opposing fluxes.
+     */
     void reflux (int crse_amrlev,
                          MF& res, const MF& crse_sol, const MF&,
                          MF&, MF& fine_sol, const MF&) const final;
+    /**
+     * \brief Compute face-centered fluxes from the supplied solution.
+     *
+     * \param amrlev AMR level index.
+     * \param fluxes Destination arrays for each spatial direction.
+     * \param sol    Solution whose gradient forms the flux.
+     * \param loc    Geometric location (face centers or centroids).
+     */
     void compFlux (int amrlev, const Array<MF*,AMREX_SPACEDIM>& fluxes,
                            MF& sol, Location loc) const override;
+    /**
+     * \brief Compute directional gradients of the solution.
+     *
+     * \param amrlev AMR level index.
+     * \param grad   Destination gradient arrays per direction.
+     * \param sol    Source solution.
+     * \param loc    Location where gradients are evaluated.
+     */
     void compGrad (int amrlev, const Array<MF*,AMREX_SPACEDIM>& grad,
                            MF& sol, Location loc) const override;
 
+    /**
+     * \brief Multiply the RHS by metric terms appropriate for curvilinear coordinates.
+     *
+     * \param amrlev AMR level index.
+     * \param mglev  Multigrid level index.
+     * \param rhs    Right-hand side updated in place.
+     */
     void applyMetricTerm (int amrlev, int mglev, MF& rhs) const final;
+    /**
+     * \brief Remove metric scaling previously applied to the RHS.
+     *
+     * \param amrlev AMR level index.
+     * \param mglev  Multigrid level index.
+     * \param rhs    Right-hand side updated in place.
+     */
     void unapplyMetricTerm (int amrlev, int mglev, MF& rhs) const final;
+    /**
+     * \brief Compute the average offset needed to enforce solvability constraints.
+     *
+     * \param amrlev AMR level index.
+     * \param mglev  Multigrid level index.
+     * \param rhs    Right-hand side used to evaluate the offset.
+     * \return Per-component offsets.
+     */
     Vector<RT> getSolvabilityOffset (int amrlev, int mglev,
                                              MF const& rhs) const override;
+    /**
+     * \brief Apply solvability offsets to the RHS (subtracting the average).
+     *
+     * \param amrlev AMR level index.
+     * \param mglev  Multigrid level index.
+     * \param rhs    Right-hand side updated in place.
+     * \param offset Offsets returned by getSolvabilityOffset().
+     */
     void fixSolvabilityByOffset (int amrlev, int mglev, MF& rhs,
                                          Vector<RT> const& offset) const override;
 
+    //! Prepare multilevel metadata before MLMG iterates (coefficients, BC caches, etc.).
     void prepareForSolve () override;
 
+    /**
+     * \brief Dot product helper.
+     *
+     * \param amrlev AMR level index.
+     * \param mglev  Multigrid level index.
+     * \param x      First field.
+     * \param y      Second field.
+     * \param local  True to skip the MPI reduction.
+     * \return Dot product.
+     */
     RT xdoty (int amrlev, int mglev, const MF& x, const MF& y, bool local) const final;
 
+    /**
+     * \brief Dot product over the composite AMR hierarchy, excluding cells
+     * covered by finer levels (used when the operator is a preconditioner).
+     *
+     * \param x Vector of MultiFabs (one per AMR level).
+     * \param y Vector of MultiFabs (one per AMR level).
+     * \return Dot product sum.
+     */
     RT dotProductPrecond (Vector<MF const*> const& x, Vector<MF const*> const& y) const final;
 
+    /**
+     * \brief L2 norm over the composite AMR hierarchy, excluding cells
+     * covered by finer levels (used when the operator is a preconditioner).
+     *
+     * \param x Vector of MultiFabs (one per AMR level).
+     * \return Resulting norm.
+     */
     RT norm2Precond (Vector<MF const*> const& x) const final;
 
     virtual void Fapply (int amrlev, int mglev, MF& out, const MF& in) const = 0;
@@ -123,27 +370,63 @@ public:
                         const Array<FAB*,AMREX_SPACEDIM>& flux,
                         const FAB& sol, Location loc, int face_only=0) const = 0;
 
+    /**
+     * \brief Optional hook for adding inhomogeneous Neumann contributions.
+     *
+     * Default implementation is a no-op; derived classes override if needed.  The
+     * interface receives the AMR level, the face-centered gradient arrays, the
+     * solution MultiFab, and a flag indicating whether beta coefficients
+     * have already been applied to those gradients.
+     */
     virtual void addInhomogNeumannFlux (int /*amrlev*/,
                                         const Array<MF*,AMREX_SPACEDIM>& /*grad*/,
                                         MF const& /*sol*/,
                                         bool /*mult_bcoef*/) const {}
 
+    /**
+     * \brief Infinity norm helper used by solvers and diagnostics.
+     *
+     * \param amrlev AMR level index.
+     * \param mf     MultiFab to measure.
+     * \param local  True to skip parallel reduction.
+     */
     RT normInf (int amrlev, MF const& mf, bool local) const override;
 
+    /**
+     * \brief Average the solution hierarchy down (fine-to-coarse) and sync.
+     *
+     * \param sol Vector of MultiFabs spanning all AMR levels.
+     */
     void averageDownAndSync (Vector<MF>& sol) const override;
 
+    /**
+     * \brief Average a residual from a fine AMR level to its coarse parent.
+     *
+     * \param clev Coarse level index to update.
+     * \param cres Destination coarse residual.
+     * \param fres Source fine residual.
+     */
     void avgDownResAmr (int clev, MF& cres, MF const& fres) const override;
 
+    //! Called when the operator starts being used as a preconditioner.
     void beginPrecondBC () override;
+    //! Called when the operator stops being used as a preconditioner.
     void endPrecondBC () override;
 
+    /// \cond DOXYGEN_IGNORE
     struct BCTL {
         BoundCond type;
         RT location;
     };
+    /// \endcond
 
     Vector<std::unique_ptr<MF> > m_robin_bcval;
 
+    /**
+     * \brief Control how many cells the interpolation boundary stencil spans.
+     *
+     * \param w Half-width (in cells) for the interpolation boundary stencil.
+     */
     void setInterpBndryHalfWidth (int w) { m_interpbndry_halfwidth = w; }
 
 protected:
@@ -163,6 +446,7 @@ protected:
     // bcond and bcloc for each MG level.
     using RealTuple = Array<RT,2*BL_SPACEDIM>;
     using BCTuple   = Array<BoundCond,2*BL_SPACEDIM>;
+    /// \cond DOXYGEN_IGNORE
     class BndryCondLoc
     {
     public:
@@ -198,6 +482,7 @@ protected:
         Gpu::DeviceVector<GpuArray<BCTL,2*AMREX_SPACEDIM> > bctl_dv;
         int m_ncomp;
     };
+    /// \endcond
     Vector<Vector<std::unique_ptr<BndryCondLoc> > > m_bcondloc;
 
     // used to save interpolation coefficients of the first interior cells
@@ -221,23 +506,22 @@ private:
     mutable Vector<Vector<RT> > m_volinv; // used by solvability fix
 
     int m_interpbndry_halfwidth = 2;
+
+    mutable Vector<Vector<TagVector<MLMGABCTag<RT>>>> m_bc_tags;
 };
+
+/// \cond DOXYGEN_IGNORE
 
 template <typename T>
 struct MLMGABCTag {
-    Array4<T> fab;
-    Array4<T const> bcval_lo;
-    Array4<T const> bcval_hi;
-    Array4<int const> mask_lo;
-    Array4<int const> mask_hi;
-    T bcloc_lo;
-    T bcloc_hi;
+    Array4<int const> mask;
+    T bcloc;
     Box bx;
-    BoundCond bctype_lo;
-    BoundCond bctype_hi;
+    BoundCond bctype;
     int blen;
     int comp;
-    int dir;
+    Orientation face;
+    int local_index;
 
     [[nodiscard]] AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
     Box const& box() const noexcept { return bx; }
@@ -351,6 +635,8 @@ setLOBndryConds (const Geometry& geom, const Real* dx,
     Gpu::streamSynchronize();
 }
 
+/// \endcond
+
 template <typename MF>
 MLCellLinOpT<MF>::MLCellLinOpT ()
 {
@@ -380,12 +666,14 @@ MLCellLinOpT<MF>::defineAuxData ()
     m_maskvals.resize(this->m_num_amr_levels);
     m_fluxreg.resize(this->m_num_amr_levels-1);
     m_norm_fine_mask.resize(this->m_num_amr_levels-1);
+    m_bc_tags.resize(this->m_num_amr_levels);
 
     const int ncomp = this->getNComp();
 
     for (int amrlev = 0; amrlev < this->m_num_amr_levels; ++amrlev)
     {
         m_undrrelxr[amrlev].resize(this->m_num_mg_levels[amrlev]);
+        m_bc_tags[amrlev].resize(this->m_num_mg_levels[amrlev]);
         for (int mglev = 0; mglev < this->m_num_mg_levels[amrlev]; ++mglev)
         {
             m_undrrelxr[amrlev][mglev].define(this->m_grids[amrlev][mglev],
@@ -414,7 +702,7 @@ MLCellLinOpT<MF>::defineAuxData ()
 
     for (int amrlev = 0; amrlev < this->m_num_amr_levels-1; ++amrlev)
     {
-        const IntVect ratio{this->m_amr_ref_ratio[amrlev]};
+        const IntVect ratio{this->AMRRefRatioVect(amrlev)};
         m_fluxreg[amrlev].define(this->m_grids[amrlev+1][0],
                                  this->m_grids[amrlev][0],
                                  this->m_dmap[amrlev+1][0],
@@ -422,6 +710,7 @@ MLCellLinOpT<MF>::defineAuxData ()
                                  this->m_geom[amrlev+1][0],
                                  this->m_geom[amrlev][0],
                                  ratio, amrlev+1, ncomp);
+        m_fluxreg[amrlev].setDeterministic(this->info.deterministic);
         m_norm_fine_mask[amrlev] = std::make_unique<iMultiFab>
             (makeFineMask(this->m_grids[amrlev][0], this->m_dmap[amrlev][0],
                           this->m_grids[amrlev+1][0],
@@ -462,7 +751,7 @@ MLCellLinOpT<MF>::defineBC ()
         const int in_rad = 0;
         const int out_rad = 1;
         const int extent_rad = 2;
-        const int crse_ratio = this->m_amr_ref_ratio[amrlev-1];
+        const IntVect crse_ratio = this->AMRRefRatioVect(amrlev-1);
         BoxArray cba = this->m_grids[amrlev][0];
         cba.coarsen(crse_ratio);
         m_crse_sol_br[amrlev] = std::make_unique<BndryRegisterT<MF>>
@@ -474,7 +763,7 @@ MLCellLinOpT<MF>::defineBC ()
         const int in_rad = 0;
         const int out_rad = 1;
         const int extent_rad = 2;
-        const int crse_ratio = this->m_amr_ref_ratio[amrlev-1];
+        const IntVect crse_ratio = this->AMRRefRatioVect(amrlev-1);
         BoxArray cba = this->m_grids[amrlev][0];
         cba.coarsen(crse_ratio);
         m_crse_cor_br[amrlev] = std::make_unique<BndryRegisterT<MF>>
@@ -491,7 +780,7 @@ MLCellLinOpT<MF>::defineBC ()
         bc_data.setVal(0.0);
 
         m_bndry_cor[amrlev]->setBndryValues(*m_crse_cor_br[amrlev], 0, bc_data, 0, 0, ncomp,
-                                            IntVect(this->m_amr_ref_ratio[amrlev-1]),
+                                            this->AMRRefRatioVect(amrlev-1),
                                             InterpBndryDataT<MF>::IBD_max_order_DEF,
                                             m_interpbndry_halfwidth);
 
@@ -499,7 +788,7 @@ MLCellLinOpT<MF>::defineBC ()
             (ncomp,Array<LinOpBCType,AMREX_SPACEDIM>{{AMREX_D_DECL(BCType::Dirichlet,
                                                                    BCType::Dirichlet,
                                                                    BCType::Dirichlet)}});
-        m_bndry_cor[amrlev]->setLOBndryConds(bclohi, bclohi, this->m_amr_ref_ratio[amrlev-1], RealVect{});
+        m_bndry_cor[amrlev]->setLOBndryConds(bclohi, bclohi, this->AMRRefRatioVect(amrlev-1), RealVect{});
     }
 
     m_bcondloc.resize(this->m_num_amr_levels);
@@ -549,7 +838,7 @@ MLCellLinOpT<MF>::setLevelBC (int amrlev, const MF* a_levelbcdata, const MF* rob
                 AMREX_ALWAYS_ASSERT(this->m_coarse_data_crse_ratio[hidden_dir] == 1);
             }
             br_ref_ratio = this->m_coarse_data_crse_ratio.allGT(0) ? this->m_coarse_data_crse_ratio : IntVect(2);
-            if (m_crse_sol_br[amrlev] == nullptr && br_ref_ratio.allGT(0))
+            if (this->m_crse_sol_br[amrlev] == nullptr && br_ref_ratio.allGT(0))
             {
                 const int in_rad = 0;
                 const int out_rad = 1;
@@ -557,43 +846,43 @@ MLCellLinOpT<MF>::setLevelBC (int amrlev, const MF* a_levelbcdata, const MF* rob
                 const IntVect crse_ratio = br_ref_ratio;
                 BoxArray cba = this->m_grids[amrlev][0];
                 cba.coarsen(crse_ratio);
-                m_crse_sol_br[amrlev] = std::make_unique<BndryRegisterT<MF>>
+                this->m_crse_sol_br[amrlev] = std::make_unique<BndryRegisterT<MF>>
                     (cba, this->m_dmap[amrlev][0], in_rad, out_rad, extent_rad, ncomp);
             }
             if (this->m_coarse_data_for_bc != nullptr) {
                 AMREX_ALWAYS_ASSERT(this->m_coarse_data_crse_ratio.allGT(0));
                 const Box& cbx = amrex::coarsen(this->m_geom[0][0].Domain(), this->m_coarse_data_crse_ratio);
-                m_crse_sol_br[amrlev]->copyFrom(*this->m_coarse_data_for_bc, 0, 0, 0, ncomp,
+                this->m_crse_sol_br[amrlev]->copyFrom(*(this->m_coarse_data_for_bc), 0, 0, 0, ncomp,
                                                 this->m_geom[0][0].periodicity(cbx));
             } else {
-                m_crse_sol_br[amrlev]->setVal(RT(0.0));
+                this->m_crse_sol_br[amrlev]->setVal(RT(0.0));
             }
-            m_bndry_sol[amrlev]->setBndryValues(*m_crse_sol_br[amrlev], 0,
+            this->m_bndry_sol[amrlev]->setBndryValues(*(this->m_crse_sol_br[amrlev]), 0,
                                                 bcdata, 0, 0, ncomp, br_ref_ratio,
                                                 InterpBndryDataT<MF>::IBD_max_order_DEF,
-                                                m_interpbndry_halfwidth);
+                                                this->m_interpbndry_halfwidth);
             br_ref_ratio = this->m_coarse_data_crse_ratio;
         }
         else
         {
-            m_bndry_sol[amrlev]->setPhysBndryValues(bcdata,0,0,ncomp);
+            this->m_bndry_sol[amrlev]->setPhysBndryValues(bcdata,0,0,ncomp);
             br_ref_ratio = IntVect(1);
         }
     }
     else
     {
-        m_bndry_sol[amrlev]->setPhysBndryValues(bcdata,0,0,ncomp);
-        br_ref_ratio = IntVect(this->m_amr_ref_ratio[amrlev-1]);
+        this->m_bndry_sol[amrlev]->setPhysBndryValues(bcdata,0,0,ncomp);
+        br_ref_ratio = this->AMRRefRatioVect(amrlev-1);
     }
 
     auto crse_fine_bc_type = (amrlev == 0) ? this->m_coarse_fine_bc_type : LinOpBCType::Dirichlet;
-    m_bndry_sol[amrlev]->setLOBndryConds(this->m_lobc, this->m_hibc, br_ref_ratio,
+    this->m_bndry_sol[amrlev]->setLOBndryConds(this->m_lobc, this->m_hibc, br_ref_ratio,
                                          this->m_coarse_bc_loc, crse_fine_bc_type);
 
     const Real* dx = this->m_geom[amrlev][0].CellSize();
     for (int mglev = 0; mglev < this->m_num_mg_levels[amrlev]; ++mglev)
     {
-        m_bcondloc[amrlev][mglev]->setLOBndryConds(this->m_geom[amrlev][mglev], dx,
+        this->m_bcondloc[amrlev][mglev]->setLOBndryConds(this->m_geom[amrlev][mglev], dx,
                                                    this->m_lobc, this->m_hibc,
                                                    br_ref_ratio, this->m_coarse_bc_loc,
                                                    this->m_domain_bloc_lo, this->m_domain_bloc_hi,
@@ -602,7 +891,7 @@ MLCellLinOpT<MF>::setLevelBC (int amrlev, const MF* a_levelbcdata, const MF* rob
 
     if (this->hasRobinBC()) {
         AMREX_ASSERT(robinbc_a != nullptr && robinbc_b != nullptr && robinbc_f != nullptr);
-        m_robin_bcval[amrlev] = std::make_unique<MF>(this->m_grids[amrlev][0],
+        this->m_robin_bcval[amrlev] = std::make_unique<MF>(this->m_grids[amrlev][0],
                                                      this->m_dmap[amrlev][0],
                                                      ncomp*3, 1);
         const Box& domain = this->m_geom[amrlev][0].Domain();
@@ -611,7 +900,7 @@ MLCellLinOpT<MF>::setLevelBC (int amrlev, const MF* a_levelbcdata, const MF* rob
 #ifdef AMREX_USE_OMP
 #pragma omp parallel if (Gpu::notInLaunchRegion())
 #endif
-        for (MFIter mfi(*m_robin_bcval[amrlev], mfi_info); mfi.isValid(); ++mfi) {
+        for (MFIter mfi(*(this->m_robin_bcval[amrlev]), mfi_info); mfi.isValid(); ++mfi) {
             Box const& vbx = mfi.validbox();
             Array4<RT const> const& ra = robinbc_a->const_array(mfi);
             Array4<RT const> const& rb = robinbc_b->const_array(mfi);
@@ -623,7 +912,7 @@ MLCellLinOpT<MF>::setLevelBC (int amrlev, const MF* a_levelbcdata, const MF* rob
                 bool outside_domain_hi = !(domain.contains(bhi));
                 if ((!outside_domain_lo) && (!outside_domain_hi)) { continue; }
                 for (int icomp = 0; icomp < ncomp; ++icomp) {
-                    Array4<RT> const& rbc = (*m_robin_bcval[amrlev])[mfi].array(icomp*3);
+                    Array4<RT> const& rbc = (*(this->m_robin_bcval[amrlev]))[mfi].array(icomp*3);
                     if (this->m_lobc_orig[icomp][idim] == LinOpBCType::Robin && outside_domain_lo)
                     {
                         AMREX_HOST_DEVICE_PARALLEL_FOR_3D(blo, i, j, k,
@@ -666,7 +955,7 @@ MLCellLinOpT<MF>::updateSolBC (int amrlev, const MF& crse_bcdata) const
     m_crse_sol_br[amrlev]->copyFrom(crse_bcdata, 0, 0, 0, ncomp,
                                     this->m_geom[amrlev-1][0].periodicity());
     m_bndry_sol[amrlev]->updateBndryValues(*m_crse_sol_br[amrlev], 0, 0, ncomp,
-                                           IntVect(this->m_amr_ref_ratio[amrlev-1]),
+                                           this->AMRRefRatioVect(amrlev-1),
                                            InterpBndryDataT<MF>::IBD_max_order_DEF,
                                            m_interpbndry_halfwidth);
 }
@@ -681,7 +970,7 @@ MLCellLinOpT<MF>::updateCorBC (int amrlev, const MF& crse_bcdata) const
     m_crse_cor_br[amrlev]->copyFrom(crse_bcdata, 0, 0, 0, ncomp,
                                     this->m_geom[amrlev-1][0].periodicity());
     m_bndry_cor[amrlev]->updateBndryValues(*m_crse_cor_br[amrlev], 0, 0, ncomp,
-                                           IntVect(this->m_amr_ref_ratio[amrlev-1]),
+                                           this->AMRRefRatioVect(amrlev-1),
                                            InterpBndryDataT<MF>::IBD_max_order_DEF,
                                            m_interpbndry_halfwidth);
 }
@@ -728,68 +1017,75 @@ MLCellLinOpT<MF>::applyBC (int amrlev, int mglev, MF& in, BCMode bc_mode, StateM
 #ifdef AMREX_USE_GPU
     if ((cross || tensorop) && Gpu::inLaunchRegion())
     {
-        Vector<MLMGABCTag<RT>> tags;
-        tags.reserve(in.local_size()*AMREX_SPACEDIM*ncomp);
+        if (! m_bc_tags[amrlev][mglev].is_defined()) {
+            Vector<MLMGABCTag<RT>> tags;
+            tags.reserve(in.local_size()*2*AMREX_SPACEDIM*ncomp);
+            for (MFIter mfi(in); mfi.isValid(); ++mfi) {
+                const Box& vbx = mfi.validbox();
+                const auto & bdlv = bcondloc.bndryLocs(mfi);
+                const auto & bdcv = bcondloc.bndryConds(mfi);
 
-        for (MFIter mfi(in); mfi.isValid(); ++mfi) {
-            const Box& vbx = mfi.validbox();
-            const auto& iofab = in.array(mfi);
-            const auto & bdlv = bcondloc.bndryLocs(mfi);
-            const auto & bdcv = bcondloc.bndryConds(mfi);
+                const int local_index = mfi.LocalIndex();
 
-            for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
-                if (idim != hidden_direction) {
-                    const Orientation olo(idim,Orientation::low);
-                    const Orientation ohi(idim,Orientation::high);
-                    const auto& bvlo = (bndry != nullptr) ?
-                        bndry->bndryValues(olo).const_array(mfi) : foo;
-                    const auto& bvhi = (bndry != nullptr) ?
-                        bndry->bndryValues(ohi).const_array(mfi) : foo;
-                    for (int icomp = 0; icomp < ncomp; ++icomp) {
-                        tags.emplace_back(MLMGABCTag<RT>{iofab, bvlo, bvhi,
-                                                 maskvals[olo].const_array(mfi),
-                                                 maskvals[ohi].const_array(mfi),
-                                                 bdlv[icomp][olo], bdlv[icomp][ohi],
-                                                 amrex::adjCell(vbx,olo),
-                                                 bdcv[icomp][olo], bdcv[icomp][ohi],
-                                                 vbx.length(idim), icomp, idim});
+                for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
+                    if (idim != hidden_direction) {
+                        const Orientation olo(idim,Orientation::low);
+                        const Orientation ohi(idim,Orientation::high);
+                        for (int icomp = 0; icomp < ncomp; ++icomp) {
+                            tags.emplace_back(MLMGABCTag<RT>{
+                                maskvals[olo].const_array(mfi),
+                                bdlv[icomp][olo],
+                                amrex::adjCell(vbx,olo),
+                                bdcv[icomp][olo], vbx.length(idim),
+                                icomp, olo, local_index
+                            });
+                            tags.emplace_back(MLMGABCTag<RT>{
+                                maskvals[ohi].const_array(mfi),
+                                bdlv[icomp][ohi],
+                                amrex::adjCell(vbx,ohi),
+                                bdcv[icomp][ohi], vbx.length(idim),
+                                icomp, ohi, local_index
+                            });
+                        }
                     }
                 }
             }
+            m_bc_tags[amrlev][mglev].define(tags);
         }
 
-        ParallelFor(tags,
+        MultiArray4<RT const> foo_ma;
+        Array<MultiArray4<RT const>, 2*AMREX_SPACEDIM> bndry_arrays;
+        for (OrientationIter oit; oit; ++oit) {
+            const Orientation ori = oit();
+            bndry_arrays[ori] = (bndry != nullptr) ?
+                bndry->bndryValues(ori).arrays() : foo_ma;
+        }
+
+        auto inma = in.arrays();
+        ParallelFor(m_bc_tags[amrlev][mglev],
         [=] AMREX_GPU_DEVICE (int i, int j, int k, MLMGABCTag<RT> const& tag) noexcept
         {
-            if (tag.dir == 0)
-            {
-                mllinop_apply_bc_x(0, i, j, k, tag.blen, tag.fab,
-                                   tag.mask_lo, tag.bctype_lo, tag.bcloc_lo, tag.bcval_lo,
-                                   imaxorder, dxi, flagbc, tag.comp);
-                mllinop_apply_bc_x(1, i+tag.blen+1, j, k, tag.blen, tag.fab,
-                                   tag.mask_hi, tag.bctype_hi, tag.bcloc_hi, tag.bcval_hi,
+            const auto& bcval = bndry_arrays[tag.face][tag.local_index];
+            const int side = tag.face.faceDir();
+            if (tag.face.coordDir() == 0) {
+                mllinop_apply_bc_x(side, i, j, k, tag.blen, inma[tag.local_index],
+                                   tag.mask, tag.bctype, tag.bcloc, bcval,
                                    imaxorder, dxi, flagbc, tag.comp);
             }
 #if (AMREX_SPACEDIM > 1)
             else
 #if (AMREX_SPACEDIM > 2)
-            if (tag.dir == 1)
+            if (tag.face.coordDir() == 1)
 #endif
             {
-                mllinop_apply_bc_y(0, i, j, k, tag.blen, tag.fab,
-                                   tag.mask_lo, tag.bctype_lo, tag.bcloc_lo, tag.bcval_lo,
-                                   imaxorder, dyi, flagbc, tag.comp);
-                mllinop_apply_bc_y(1, i, j+tag.blen+1, k, tag.blen, tag.fab,
-                                   tag.mask_hi, tag.bctype_hi, tag.bcloc_hi, tag.bcval_hi,
+                mllinop_apply_bc_y(side, i, j, k, tag.blen, inma[tag.local_index],
+                                   tag.mask, tag.bctype, tag.bcloc, bcval,
                                    imaxorder, dyi, flagbc, tag.comp);
             }
 #if (AMREX_SPACEDIM > 2)
             else {
-                mllinop_apply_bc_z(0, i, j, k, tag.blen, tag.fab,
-                                   tag.mask_lo, tag.bctype_lo, tag.bcloc_lo, tag.bcval_lo,
-                                   imaxorder, dzi, flagbc, tag.comp);
-                mllinop_apply_bc_z(1, i, j, k+tag.blen+1, tag.blen, tag.fab,
-                                   tag.mask_hi, tag.bctype_hi, tag.bcloc_hi, tag.bcval_hi,
+                mllinop_apply_bc_z(side, i, j, k, tag.blen, inma[tag.local_index],
+                                   tag.mask, tag.bctype, tag.bcloc, bcval,
                                    imaxorder, dzi, flagbc, tag.comp);
             }
 #endif
@@ -964,7 +1260,7 @@ MLCellLinOpT<MF>::interpolation (int amrlev, int fmglev, MF& fine, const MF& crs
 {
     const int ncomp = this->getNComp();
 
-    Dim3 ratio3 = {2,2,2};
+    Dim3 ratio3 = {.x = 2, .y = 2, .z = 2};
     IntVect ratio = (amrlev > 0) ? IntVect(2) : this->mg_coarsen_ratio_vec[fmglev];
     AMREX_D_TERM(ratio3.x = ratio[0];,
                  ratio3.y = ratio[1];,
@@ -982,7 +1278,9 @@ MLCellLinOpT<MF>::interpolation (int amrlev, int fmglev, MF& fine, const MF& crs
             int kc = amrex::coarsen(k,ratio3.z);
             finema[box_no](i,j,k,n) += crsema[box_no](ic,jc,kc,n);
         });
-        Gpu::streamSynchronize();
+        if (!Gpu::inNoSyncRegion()) {
+            Gpu::streamSynchronize();
+        }
     } else
 #endif
     {
@@ -1104,7 +1402,10 @@ MLCellLinOpT<MF>::interpolationAmr (int famrlev, MF& fine, const MF& crse,
                                     IntVect const& /*nghost*/) const
 {
     const int ncomp = this->getNComp();
-    const int refratio = this->AMRRefRatio(famrlev-1);
+    const IntVect refratioV = this->AMRRefRatioVect(famrlev-1);
+    // AMRRefRatioVect sets hidden direction to 1 and active directions to the
+    // scalar ratio; max() cleanly recovers the active ratio in all cases.
+    const int refratio = refratioV.max();
 
 #ifdef AMREX_USE_EB
     const auto *factory = dynamic_cast<EBFArrayBoxFactory const*>(this->Factory(famrlev));
@@ -1163,25 +1464,54 @@ MLCellLinOpT<MF>::interpolationAmr (int famrlev, MF& fine, const MF& crse,
 #endif
         if (call_lincc)
         {
-            switch(refratio) {
-            case 2:
-            {
-                AMREX_GPU_LAUNCH_HOST_DEVICE_LAMBDA_RANGE (bx, tbx,
+#if (AMREX_SPACEDIM == 3)
+            if (this->hasHiddenDimension()) {
+                Box const& bx_2d = this->compactify(bx);
+                auto const& ff_2d = this->compactify(ff);
+                auto const& cc_2d = this->compactify(cc);
+                switch(refratio) {
+                case 2:
                 {
-                    mlmg_lin_cc_interp_r2(tbx, ff, cc, ncomp);
-                });
-                break;
-            }
-            case 4:
-            {
-                AMREX_GPU_LAUNCH_HOST_DEVICE_LAMBDA_RANGE (bx, tbx,
+                    AMREX_GPU_LAUNCH_HOST_DEVICE_LAMBDA_RANGE (bx_2d, tbx,
+                    {
+                        TwoD::mlmg_lin_cc_interp_r2(tbx, ff_2d, cc_2d, ncomp);
+                    });
+                    break;
+                }
+                case 4:
                 {
-                    mlmg_lin_cc_interp_r4(tbx, ff, cc, ncomp);
-                });
-                break;
-            }
-            default:
-                amrex::Abort("mlmg_lin_cc_interp: only refratio 2 and 4 are supported");
+                    AMREX_GPU_LAUNCH_HOST_DEVICE_LAMBDA_RANGE (bx_2d, tbx,
+                    {
+                        TwoD::mlmg_lin_cc_interp_r4(tbx, ff_2d, cc_2d, ncomp);
+                    });
+                    break;
+                }
+                default:
+                    amrex::Abort("mlmg_lin_cc_interp: only refratio 2 and 4 are supported");
+                }
+            } else
+#endif
+            {
+                switch(refratio) {
+                case 2:
+                {
+                    AMREX_GPU_LAUNCH_HOST_DEVICE_LAMBDA_RANGE (bx, tbx,
+                    {
+                        mlmg_lin_cc_interp_r2(tbx, ff, cc, ncomp);
+                    });
+                    break;
+                }
+                case 4:
+                {
+                    AMREX_GPU_LAUNCH_HOST_DEVICE_LAMBDA_RANGE (bx, tbx,
+                    {
+                        mlmg_lin_cc_interp_r4(tbx, ff, cc, ncomp);
+                    });
+                    break;
+                }
+                default:
+                    amrex::Abort("mlmg_lin_cc_interp: only refratio 2 and 4 are supported");
+                }
             }
         }
     }
@@ -1192,7 +1522,7 @@ void
 MLCellLinOpT<MF>::averageDownSolutionRHS (int camrlev, MF& crse_sol, MF& crse_rhs,
                                           const MF& fine_sol, const MF& fine_rhs)
 {
-    const auto amrrr = this->AMRRefRatio(camrlev);
+    const auto amrrr = this->AMRRefRatioVect(camrlev);
     const int ncomp = this->getNComp();
     amrex::average_down(fine_sol, crse_sol, 0, ncomp, amrrr);
     amrex::average_down(fine_rhs, crse_rhs, 0, ncomp, amrrr);
@@ -1344,6 +1674,7 @@ MLCellLinOpT<MF>::reflux (int crse_amrlev, MF& res, const MF& crse_sol, const MF
     }
 
     fluxreg.Reflux(res);
+    this->applyOverset(crse_amrlev, res);
 }
 
 template <typename MF>
@@ -2146,14 +2477,14 @@ MLCellLinOpT<MF>::averageDownAndSync (Vector<MF>& sol) const
 #ifdef AMREX_USE_EB
         if (!sol[falev].isAllRegular()) {
             if constexpr (std::is_same<MF,MultiFab>()) {
-                amrex::EB_average_down(sol[falev], sol[falev-1], 0, ncomp, this->AMRRefRatio(falev-1));
+                amrex::EB_average_down(sol[falev], sol[falev-1], 0, ncomp, this->AMRRefRatioVect(falev-1));
             } else {
                 amrex::Abort("EB_average_down only works with MultiFab");
             }
         } else
 #endif
         {
-            amrex::average_down(sol[falev], sol[falev-1], 0, ncomp, this->AMRRefRatio(falev-1));
+            amrex::average_down(sol[falev], sol[falev-1], 0, ncomp, this->AMRRefRatioVect(falev-1));
         }
     }
 }
@@ -2166,7 +2497,7 @@ MLCellLinOpT<MF>::avgDownResAmr (int clev, MF& cres, MF const& fres) const
     if (!fres.isAllRegular()) {
         if constexpr (std::is_same<MF,MultiFab>()) {
             amrex::EB_average_down(fres, cres, 0, this->getNComp(),
-                                   this->AMRRefRatio(clev));
+                                   this->AMRRefRatioVect(clev));
         } else {
             amrex::Abort("EB_average_down only works with MultiFab");
         }
@@ -2174,7 +2505,7 @@ MLCellLinOpT<MF>::avgDownResAmr (int clev, MF& cres, MF const& fres) const
 #endif
     {
         amrex::average_down(fres, cres, 0, this->getNComp(),
-                            this->AMRRefRatio(clev));
+                            this->AMRRefRatioVect(clev));
     }
 }
 

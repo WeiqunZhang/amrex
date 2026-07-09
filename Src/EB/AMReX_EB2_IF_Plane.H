@@ -5,6 +5,12 @@
 #include <AMReX_Array.H>
 #include <AMReX_EB2_IF_Base.H>
 
+/**
+ * \file AMReX_EB2_IF_Plane.H
+ *
+ * Implicit description of a half-space bounded by a plane.
+ */
+
 namespace amrex::EB2 {
 
 // For all implicit functions, >0: body; =0: boundary; <0: fluid
@@ -14,13 +20,15 @@ class PlaneIF
 {
 public:
 
+    //! Build a plane through \p a_point with outward normal \p a_normal.
     PlaneIF (const RealArray& a_point, const RealArray& a_normal, bool a_inside = true)
         : m_point(makeXDim3(a_point)),
           m_normal(makeXDim3(a_normal)),
           m_sign( a_inside ? 1.0 : -1.0 )
     {}
 
-    [[nodiscard]] AMREX_GPU_HOST_DEVICE inline
+    //! Evaluate the implicit function at explicit coordinates.
+    [[nodiscard]] AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
     Real operator() (AMREX_D_DECL(Real x, Real y, Real z)) const noexcept
     {
         return AMREX_D_TERM( (x-m_point.x)*m_normal.x*m_sign,
@@ -28,7 +36,8 @@ public:
                             +(z-m_point.z)*m_normal.z*m_sign );
     }
 
-    [[nodiscard]] inline Real operator() (const RealArray& p) const noexcept
+    //! Array-based convenience overload.
+    [[nodiscard]] AMREX_FORCE_INLINE Real operator() (const RealArray& p) const noexcept
     {
         return this->operator()(AMREX_D_DECL(p[0],p[1],p[2]));
     }

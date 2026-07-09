@@ -5,6 +5,7 @@
 
 #include <AMReX_Algorithm.H>
 #include <AMReX_ArrayLim.H>
+#include <AMReX_BoxIterator.H>
 #include <AMReX_ccse-mpi.H>
 #include <AMReX_IntVect.H>
 #include <AMReX_IndexType.H>
@@ -19,14 +20,24 @@
 
 #include <iosfwd>
 
+/**
+ * \file AMReX_Box.H
+ * \brief Integer-lattice boxes and helpers for defining index-space regions.
+ */
+
 namespace amrex
 {
 template<int dim>
 class BoxND;
+//! \brief Box is an alias for \ref amrex::BoxND instantiated with <tt>AMREX_SPACEDIM</tt>.
 using Box = BoxND<AMREX_SPACEDIM>;
 class BoxCommHelper;
+template<int dim>
+class BoxIteratorND;
 
 /**
+* \class amrex::BoxND
+* \ingroup amrex_index_space
 * \brief A Rectangular Domain on an Integer Lattice
 *
 * A BoxND is an abstraction for defining discrete regions of
@@ -45,25 +56,28 @@ class BoxND
     friend class BoxCommHelper;
 
 public:
-    /*
-    * \brief The default constructor. For safety, the constructed BoxND is
-    * invalid and may be tested for validity with ok().
-    * DO NOT CHANGE THIS BEHAVIOR!
-    */
+    // DO NOT CHANGE THIS BEHAVIOR!
+    /**
+     * \brief Default constructor creates an invalid box (use ok() to test).
+     */
     AMREX_GPU_HOST_DEVICE
     constexpr BoxND () noexcept
         : smallend(1),
           bigend(0)
         {}
 
-    //! Construct cell-centered type BoxND.
+    //! Construct a cell-centered box spanning \p small through \p big.
     AMREX_GPU_HOST_DEVICE
     constexpr BoxND (const IntVectND<dim>& small, const IntVectND<dim>& big) noexcept
         : smallend(small),
           bigend(big)
         {}
 
-    //! Construct BoxND with specified lengths.
+    /**
+     * \brief Construct a box with lower corner \p small and lengths \p vec_len.
+     * \param small Lower corner.
+     * \param vec_len Array of lengths in each direction.
+     */
     AMREX_GPU_HOST_DEVICE
     BoxND (const IntVectND<dim>& small, const int* vec_len) noexcept
         : smallend(small),
@@ -71,9 +85,12 @@ public:
         {}
 
     /**
-    * \brief Construct BoxND with given type.  small and big are expected
-    * to be consistent with given type.
-    */
+     * \brief Construct a box with explicit nodal/cell flags per direction.
+     *
+     * \param small Lower corner.
+     * \param big Upper corner.
+     * \param typ IntVect of 0 (cell) / 1 (node) selectors.
+     */
     AMREX_GPU_HOST_DEVICE
     BoxND (const IntVectND<dim>& small, const IntVectND<dim>& big, const IntVectND<dim>& typ) noexcept
         : smallend(small),
@@ -83,7 +100,7 @@ public:
             BL_ASSERT(typ.allGE(0) && typ.allLE(1));
         }
 
-    //! Construct dimension specific Boxes.
+    //! Construct a box with the given index type descriptor.
     AMREX_GPU_HOST_DEVICE
     BoxND (const IntVectND<dim>& small, const IntVectND<dim>& big, IndexTypeND<dim> t) noexcept
         : smallend(small),
@@ -91,46 +108,50 @@ public:
           btype(t)
         {}
 
-    template <typename T, int Tdim=dim, std::enable_if_t<( 1<=Tdim && Tdim<=3 ), int> = 0>
+    //! Construct a box from an Array4 view (bounds are inferred from begin/end).
+    template <typename T>
+    requires ( 1<=dim && dim<=3 )
     AMREX_GPU_HOST_DEVICE
     explicit BoxND (Array4<T> const& a) noexcept
-        : smallend(a.begin),
-          bigend(IntVectND<dim>(a.end) - 1)
+        : smallend(IntVectShrink<dim>(a.begin)),
+          bigend(IntVectShrink<dim>(a.end) - 1)
         {}
 
     // dtor, copy-ctor, copy-op=, move-ctor, and move-op= are compiler generated.
 
-    //! Get the smallend of the BoxND.
+    //! Return the inclusive lower bound of the box.
     [[nodiscard]] AMREX_GPU_HOST_DEVICE
     const IntVectND<dim>& smallEnd () const& noexcept { return smallend; }
 
-    //! Get the smallend of the BoxND.
+    /// \cond DOXYGEN_IGNORE
     [[nodiscard]] const IntVectND<dim>& smallEnd () && = delete;
+    /// \endcond
 
-    //! Returns the coordinate of the low end in the given direction.
+    //! Return the inclusive lower bound in the given direction.
     [[nodiscard]] AMREX_GPU_HOST_DEVICE
     int smallEnd (int dir) const& noexcept { return smallend[dir]; }
 
-    //! Get the bigend.
+    //! Return the inclusive upper bound of the box.
     [[nodiscard]] AMREX_GPU_HOST_DEVICE
     const IntVectND<dim>& bigEnd () const& noexcept { return bigend; }
 
-    //! Get the bigend.
+    /// \cond DOXYGEN_IGNORE
     [[nodiscard]] const IntVectND<dim>& bigEnd () && = delete;
+    /// \endcond
 
-    //! Returns the coordinate of the high end in the given direction.
+    //! Return the inclusive upper bound in the given direction.
     [[nodiscard]] AMREX_GPU_HOST_DEVICE
     int bigEnd (int dir) const noexcept { return bigend[dir]; }
 
-    //! Returns the indexing type.
+    //! Return the indexing type.
     [[nodiscard]] AMREX_GPU_HOST_DEVICE
     IndexTypeND<dim> ixType () const noexcept { return btype; }
 
-    //! Returns the indexing type.
+    //! Return the indexing type.
     [[nodiscard]] AMREX_GPU_HOST_DEVICE
     IntVectND<dim> type () const noexcept { return btype.ixType(); }
 
-    //! Returns the indexing type in the specified direction.
+    //! Return the indexing type in the specified direction.
     [[nodiscard]] AMREX_GPU_HOST_DEVICE
     IndexType::CellIndex type (int dir) const noexcept { return btype.ixType(dir); }
 
@@ -152,39 +173,45 @@ public:
     [[nodiscard]] AMREX_GPU_HOST_DEVICE
     int length (int dir) const noexcept { return bigend[dir] - smallend[dir] + 1; }
 
-    template <int N=dim, std::enable_if_t<( 1<=N && N<=3 ), int> = 0>
+    //! Return lengths padded to 3D (missing dims default to 1).
     [[nodiscard]] AMREX_GPU_HOST_DEVICE
-    GpuArray<int,3> length3d () const noexcept {
+    GpuArray<int,3> length3d () const noexcept
+        requires (1 <= dim && dim <= 3)
+    {
         Dim3 len3d = length().dim3(1);
         return {{len3d.x, len3d.y, len3d.z}};
     }
 
-    template <int N=dim, std::enable_if_t<( 1<=N && N<=3 ), int> = 0>
+    //! Return low-end coordinates padded to 3D (missing dims default to 0).
     [[nodiscard]] AMREX_GPU_HOST_DEVICE
-    GpuArray<int,3> loVect3d () const noexcept {
+    GpuArray<int,3> loVect3d () const noexcept
+        requires (1 <= dim && dim <= 3)
+    {
         Dim3 lo3d = smallend.dim3(0);
         return {{lo3d.x, lo3d.y, lo3d.z}};
     }
 
-    template <int N=dim, std::enable_if_t<( 1<=N && N<=3 ), int> = 0>
+    //! Return high-end coordinates padded to 3D (missing dims default to 0).
     [[nodiscard]] AMREX_GPU_HOST_DEVICE
-    GpuArray<int,3> hiVect3d () const noexcept {
+    GpuArray<int,3> hiVect3d () const noexcept
+        requires (1 <= dim && dim <= 3)
+    {
         Dim3 hi3d = bigend.dim3(0);
         return {{hi3d.x, hi3d.y, hi3d.z}};
     }
 
-    //! Returns a constant pointer the array of low end coordinates. Useful for calls to FORTRAN.
+    //! Return a pointer to the low-end coordinates (useful for Fortran calls).
     [[nodiscard]] AMREX_GPU_HOST_DEVICE
     const int* loVect () const& noexcept { return smallend.getVect(); }
     AMREX_GPU_HOST_DEVICE
     const int* loVect () && = delete;
-    //! Returns a constant pointer the array of high end coordinates. Useful for calls to FORTRAN.
+    //! Return a pointer to the high-end coordinates (useful for Fortran calls).
     [[nodiscard]] AMREX_GPU_HOST_DEVICE
     const int* hiVect () const& noexcept { return bigend.getVect(); }
     AMREX_GPU_HOST_DEVICE
     const int* hiVect () && = delete;
 
-    //! Returns the coordinate normal to given face.
+    //! Return the coordinate normal to the given face.
     [[nodiscard]] AMREX_GPU_HOST_DEVICE
     int operator[] (Orientation face) const noexcept {
         const int dir = face.coordDir();
@@ -195,33 +222,37 @@ public:
     [[nodiscard]] AMREX_GPU_HOST_DEVICE
     bool isEmpty () const noexcept { return !ok(); }
 
-    //! Checks if it is a proper BoxND (including a valid type).
+    /**
+     * \brief Return true if high bounds are >= low bounds and the index type is valid.
+     */
     [[nodiscard]] AMREX_GPU_HOST_DEVICE
     bool ok () const noexcept { return bigend.allGE(smallend) && btype.ok(); }
 
-    //! Returns true if argument is contained within BoxND.
+    //! Return true if argument is contained within BoxND.
     [[nodiscard]] AMREX_GPU_HOST_DEVICE
     bool contains (const IntVectND<dim>& p) const noexcept {
         return p.allGE(smallend) && p.allLE(bigend);
     }
 
-    //! Returns true if argument is contained within BoxND.
-    template <int N=dim, std::enable_if_t<( 1<=N && N<=3 ), int> = 0>
+    //! Return true if argument is contained within BoxND.
     [[nodiscard]] AMREX_GPU_HOST_DEVICE
-    bool contains (const Dim3& p) const noexcept {
+    bool contains (const Dim3& p) const noexcept
+        requires (1 <= dim && dim <= 3)
+    {
         IntVectND<dim> piv{p};
         return contains(piv);
     }
 
-    //! Returns true if argument is contained within BoxND.
-    template <int N=dim, std::enable_if_t<( 1<=N && N<=3 ), int> = 0>
+    //! Return true if argument is contained within BoxND.
     [[nodiscard]] AMREX_GPU_HOST_DEVICE
-    bool contains (int i, int j, int k) const noexcept {
-        Dim3 p3d{i, j, k};
+    bool contains (int i, int j, int k) const noexcept
+        requires (1 <= dim && dim <= 3)
+    {
+        Dim3 p3d{.x = i, .y = j, .z = k};
         return contains(p3d);
     }
 
-    /** \brief Returns true if argument is contained within BoxND.
+    /** \brief Return true if argument is contained within BoxND.
     * It is an error if the Boxes have different types.
     */
     [[nodiscard]] AMREX_GPU_HOST_DEVICE
@@ -231,14 +262,14 @@ public:
         return b.smallend.allGE(smallend) && b.bigend.allLE(bigend);
     }
 
-    //! Returns true if argument is strictly contained within BoxND.
+    //! Return true if argument is strictly contained within BoxND.
     [[nodiscard]] AMREX_GPU_HOST_DEVICE
     bool strictly_contains (const IntVectND<dim>& p) const noexcept {
         return p.allGT(smallend) && p.allLT(bigend);
     }
 
     /**
-    * \brief Returns true if argument is strictly contained within BoxND.
+    * \brief Return true if argument is strictly contained within BoxND.
     * It is an error if the Boxes have different types.
     */
     [[nodiscard]] AMREX_GPU_HOST_DEVICE
@@ -248,31 +279,33 @@ public:
         return b.smallend.allGT(smallend) && b.bigend.allLT(bigend);
     }
 
-    //! Returns true if argument is strictly contained within BoxND.
-    template <int N=dim, std::enable_if_t<( 1<=N && N<=3 ), int> = 0>
+    //! Return true if argument is strictly contained within BoxND.
     [[nodiscard]] AMREX_GPU_HOST_DEVICE
-    bool strictly_contains (const Dim3& p) const noexcept {
+    bool strictly_contains (const Dim3& p) const noexcept
+        requires (1 <= dim && dim <= 3)
+    {
         IntVectND<dim> piv{p};
         return strictly_contains(piv);
     }
 
-    //! Returns true if argument is strictly contained within BoxND.
-    template <int N=dim, std::enable_if_t<( 1<=N && N<=3 ), int> = 0>
+    //! Return true if argument is strictly contained within BoxND.
     [[nodiscard]] AMREX_GPU_HOST_DEVICE
-    bool strictly_contains (int i, int j, int k) const noexcept {
-        Dim3 p3d{i, j, k};
+    bool strictly_contains (int i, int j, int k) const noexcept
+        requires (1 <= dim && dim <= 3)
+    {
+        Dim3 p3d{.x = i, .y = j, .z = k};
         return strictly_contains(p3d);
     }
 
     /**
-    * \brief Returns true if Boxes have non-null intersections.
+    * \brief Return true if Boxes have non-null intersections.
     * It is an error if the Boxes have different types.
     */
     [[nodiscard]] AMREX_GPU_HOST_DEVICE
     bool intersects (const BoxND& b) const noexcept { BoxND isect(*this); isect &= b; return isect.ok(); }
 
     /**
-    * \brief Returns true is Boxes same size, ie translates of each other,.
+    * \brief Return true is Boxes same size, ie translates of each other,.
     * It is an error if they have different types.
     */
     [[nodiscard]] AMREX_GPU_HOST_DEVICE
@@ -281,18 +314,19 @@ public:
         return length() == b.length();
     }
 
-    //! Returns true if Boxes have same type.
+    //! Return true if Boxes have same type.
     [[nodiscard]] AMREX_GPU_HOST_DEVICE
     bool sameType (const BoxND &b) const noexcept { return btype == b.btype; }
 
-    //! Returns true if Boxes are identical (including type).
+    //! Return true if Boxes are identical (including type).
     [[nodiscard]] AMREX_GPU_HOST_DEVICE
     bool operator== (const BoxND& b) const noexcept { return smallend == b.smallend && bigend == b.bigend && b.btype == btype; }
 
-    //! Returns true if Boxes differ (including type).
+    //! Return true if Boxes differ (including type).
     [[nodiscard]] AMREX_GPU_HOST_DEVICE
     bool operator!= (const BoxND& b) const noexcept { return !operator==(b); }
 
+    //! Lexicographic ordering (type, then lower, then upper corners).
     [[nodiscard]] AMREX_GPU_HOST_DEVICE
     bool operator< (const BoxND& rhs) const noexcept
     {
@@ -301,25 +335,29 @@ public:
                  (  (smallend < rhs.smallend) ||
                    ((smallend == rhs.smallend) && (bigend < rhs.bigend)) ));
     }
+    //! Return true if this box is <= rhs in the lexicographic ordering.
     [[nodiscard]] AMREX_GPU_HOST_DEVICE
     bool operator <= (const BoxND& rhs) const noexcept {
         return !(rhs < *this);
     }
+    //! Return true if this box is > rhs in the lexicographic ordering.
     [[nodiscard]] AMREX_GPU_HOST_DEVICE
     bool operator> (const BoxND& rhs) const noexcept {
         return rhs < *this;
     }
+    //! Return true if this box is >= rhs in the lexicographic ordering.
     [[nodiscard]] AMREX_GPU_HOST_DEVICE
     bool operator>= (const BoxND& rhs) const noexcept {
         return !(*this < rhs);
     }
 
-    //! Returns true if BoxND is cell-centered in all indexing directions.
+    //! Return true if BoxND is cell-centered in all indexing directions.
     [[nodiscard]] AMREX_GPU_HOST_DEVICE
     bool cellCentered () const noexcept { return !btype.any(); }
 
+    /// \cond DOXYGEN_IGNORE
     //! Assert that there are no int/Long overflows when calling length or numPts.
-    void checkOverflow () const noexcept {
+    void checkOverflow () const {
         if (ok()) {
             for (int i = 0; i < dim; ++i) {
                 auto lo = static_cast<Long>(smallend[i]);
@@ -338,9 +376,10 @@ public:
             }
         }
     }
+    /// \endcond
 
     /**
-    * \brief Returns the number of points contained in the BoxND.
+    * \brief Return the number of points contained in the BoxND.
     */
     [[nodiscard]] AMREX_GPU_HOST_DEVICE
     Long numPts () const noexcept {
@@ -359,7 +398,7 @@ public:
     }
 
     /**
-    * \brief Returns the number of points contained in the BoxND.
+    * \brief Return the number of points contained in the BoxND.
     * This is intended for use only in diagnostic messages.
     */
     [[nodiscard]] AMREX_GPU_HOST_DEVICE
@@ -394,7 +433,7 @@ public:
     }
 
     /**
-    * \brief Returns length of longest side.  dir is modified to give
+    * \brief Return length of longest side.  dir is modified to give
     * direction with longest side: 0...dim-1. Ignores type.
     */
     [[nodiscard]] AMREX_GPU_HOST_DEVICE
@@ -412,7 +451,7 @@ public:
         return maxlen;
     }
 
-    //! Returns length of longest side.  Ignores type.
+    //! Return length of longest side.  Ignores type.
     [[nodiscard]] AMREX_GPU_HOST_DEVICE
     int longside () const noexcept {
         int ignore = 0;
@@ -420,7 +459,7 @@ public:
     }
 
     /**
-    * \brief Returns length of shortest side.  dir is modified to give
+    * \brief Return length of shortest side.  dir is modified to give
     *  direction with shortest side: 0...dim-1.  Ignores type.
     */
     [[nodiscard]] AMREX_GPU_HOST_DEVICE
@@ -438,7 +477,7 @@ public:
         return minlen;
     }
 
-    //! Returns length of shortest side.  Ignores type.
+    //! Return length of shortest side.  Ignores type.
     [[nodiscard]] AMREX_GPU_HOST_DEVICE
     int shortside () const noexcept {
         int ignore = 0;
@@ -446,7 +485,7 @@ public:
     }
 
     /**
-    * \brief Returns offset of point from smallend; i.e.
+    * \brief Return offset of point from smallend; i.e.
     * index(smallend) -> 0, bigend would return numPts()-1.
     * Is used in accessing FArrayBox.
     */
@@ -457,11 +496,14 @@ public:
     [[nodiscard]] AMREX_GPU_HOST_DEVICE
     IntVectND<dim> atOffset (Long offset) const noexcept;
 
-    template <int N=dim, std::enable_if_t<( 1<=N && N<=3 ), int> = 0>
+    //! Given the offset, return its corresponding index vector in
+    //! GpuArray<int,3>. This function is available for 1D, 2D and 3D Boxes
+    //! only,
+    template <int N=dim>
+    requires (1 <= N && N <= 3)
     [[nodiscard]] AMREX_GPU_HOST_DEVICE
     GpuArray<int,3> atOffset3d (Long offset) const noexcept;
 
-    //! Redefine the small end of the BoxND.
     AMREX_GPU_HOST_DEVICE
     BoxND& setSmall (const IntVectND<dim>& sm) noexcept { smallend = sm; return *this; }
 
@@ -543,6 +585,7 @@ public:
     AMREX_GPU_HOST_DEVICE
     BoxND& surroundingNodes (int dir) noexcept;
 
+    //! Convert to NODE type in given direction.
     AMREX_GPU_HOST_DEVICE
     BoxND& surroundingNodes (Direction d) noexcept { return surroundingNodes(static_cast<int>(d)); }
 
@@ -554,6 +597,7 @@ public:
     AMREX_GPU_HOST_DEVICE
     BoxND& enclosedCells (int dir) noexcept;
 
+    //! Convert to CELL type in given Direction `d`.
     AMREX_GPU_HOST_DEVICE
     BoxND& enclosedCells (Direction d) noexcept { return enclosedCells(static_cast<int>(d)); }
 
@@ -605,8 +649,8 @@ public:
     BoxND operator- (const IntVectND<dim>& v) const noexcept { BoxND r(*this); r -= v; return r; }
 
     /**
-    * \brief Chop the BoxND at the chop_pnt in the dir direction
-    * returns one BoxND, modifies the object BoxND.
+    * \brief Chop the BoxND at \p chop_pnt in the \p dir direction
+    * return one BoxND and modify the object BoxND.
     * The union of the two is the original BoxND.
     * The modified BoxND is the low end, the returned BoxND
     * is the high end.  If type(dir) = CELL, the Boxes are disjoint
@@ -619,45 +663,47 @@ public:
     AMREX_GPU_HOST_DEVICE
     BoxND chop (int dir, int chop_pnt) noexcept;
 
-    /*
-    * \brief Grow BoxND in all directions by given amount.
-    * NOTE: n_cell negative shrinks the BoxND by that number of cells.
-    */
+    //! Grow in all directions by \p i cells (negative shrinks).
     AMREX_GPU_HOST_DEVICE
     BoxND& grow (int i) noexcept { smallend.diagShift(-i); bigend.diagShift(i); return *this; }
 
-    //! Grow BoxND in each direction by specified amount.
+    //! Grow in each direction by the supplied amount (negative shrinks).
     AMREX_GPU_HOST_DEVICE
     BoxND& grow (const IntVectND<dim>& v) noexcept { smallend -= v; bigend += v; return *this;}
 
     /**
-    * \brief Grow the BoxND on the low and high end by n_cell cells
-    * in direction idir.
+    * \brief Grow on both ends in direction \p idir by \p n_cell cells (negative shrinks).
     */
     AMREX_GPU_HOST_DEVICE
     BoxND& grow (int idir, int n_cell) noexcept { smallend.shift(idir, -n_cell); bigend.shift(idir, n_cell); return *this; }
 
+    /**
+    * \brief Grow on both ends in direction d by \p n_cell cells (negative shrinks).
+    */
     AMREX_GPU_HOST_DEVICE
     BoxND& grow (Direction d, int n_cell) noexcept { return grow(static_cast<int>(d), n_cell); }
 
     /**
-    * \brief Grow the BoxND on the low end by n_cell cells in direction idir.
-    * NOTE: n_cell negative shrinks the BoxND by that number of cells.
+    * \brief Grow on the low end by \p n_cell cells in direction \p idir (negative shrinks).
     */
     AMREX_GPU_HOST_DEVICE
     BoxND& growLo (int idir, int n_cell = 1) noexcept { smallend.shift(idir, -n_cell); return *this; }
 
+    /**
+    * \brief Grow on the low end by \p n_cell cells in direction \p d (negative shrinks).
+    */
     AMREX_GPU_HOST_DEVICE
     BoxND& growLo (Direction d, int n_cell = 1) noexcept { return growLo(static_cast<int>(d), n_cell); }
 
     /**
-    * \brief Grow the BoxND on the high end by n_cell cells in
-    * direction idir.  NOTE: n_cell negative shrinks the BoxND by that
-    * number of cells.
+    * \brief Grow on the high end by \p n_cell cells in direction \p idir (negative shrinks).
     */
     AMREX_GPU_HOST_DEVICE
     BoxND& growHi (int idir, int n_cell = 1) noexcept { bigend.shift(idir,n_cell); return *this; }
 
+    /**
+    * \brief Grow on the high end by \p n_cell cells in direction \p d (negative shrinks).
+    */
     AMREX_GPU_HOST_DEVICE
     BoxND& growHi (Direction d, int n_cell = 1) noexcept { return growHi(static_cast<int>(d), n_cell); }
 
@@ -685,7 +731,7 @@ public:
         return this->refine(IntVectND<dim>(ref_ratio));
     }
 
-    /*
+    /**
     * \brief Refine BoxND by given (positive) refinement ratio.
     * NOTE: if type(dir) = CELL centered: lo <- lo*ratio and
     * hi <- (hi+1)*ratio - 1.
@@ -741,8 +787,19 @@ public:
     [[nodiscard]] AMREX_GPU_HOST_DEVICE
     bool isSquare() const noexcept;
 
+    /**
+     * \brief Return whether this Box is coarsenable.
+     *
+     * A coasrenable Box means `box.coarsen(ratio).refine(ratio) == box`. A
+     * Box is considered uncoarsenable if the coarsened Box would have a
+     * length smaller than the given minimum width.
+     *
+     * \param refrat coarsening ratio
+     * \param min_width minimum width of coarsened Box.
+     * \return whether this Box is coarsenable.
+     */
     [[nodiscard]] AMREX_GPU_HOST_DEVICE
-    bool coarsenable(const IntVectND<dim>& refrat, const IntVectND<dim>& min_width) const noexcept
+    bool coarsenable (const IntVectND<dim>& refrat, const IntVectND<dim>& min_width) const noexcept
     {
         if (!size().allGE(refrat*min_width)) {
             return false;
@@ -754,17 +811,40 @@ public:
         }
     }
 
+    /**
+     * \brief Return whether this Box is coarsenable.
+     *
+     * A coasrenable Box means `box.coarsen(ratio).refine(ratio) == box`. A
+     * Box is considered uncoarsenable if the coarsened Box would have a
+     * length smaller than the given minimum width.
+     *
+     * \param refrat coarsening ratio
+     * \param min_width minimum width of coarsened Box.
+     * \return whether this Box is coarsenable.
+     */
     [[nodiscard]] AMREX_GPU_HOST_DEVICE
-    bool coarsenable(int refrat, int min_width=1) const noexcept {
+    bool coarsenable (int refrat, int min_width=1) const noexcept {
         return coarsenable(IntVectND<dim>(refrat), IntVectND<dim>(min_width));
     }
 
+    /**
+     * \brief Return whether this Box is coarsenable.
+     *
+     * A coasrenable Box means `box.coarsen(ratio).refine(ratio) == box`. A
+     * Box is considered uncoarsenable if the coarsened Box would have a
+     * length smaller than the given minimum width.
+     *
+     * \param refrat coarsening ratio
+     * \param min_width minimum width of coarsened Box.
+     * \return whether this Box is coarsenable.
+     */
     [[nodiscard]] AMREX_GPU_HOST_DEVICE
-    bool coarsenable(const IntVectND<dim>& refrat, int min_width=1) const noexcept
+    bool coarsenable (const IntVectND<dim>& refrat, int min_width=1) const noexcept
     {
         return coarsenable(refrat, IntVectND<dim>(min_width));
     }
 
+    //! Ensure each dimension has at least one cell or node by expanding empty directions.
     AMREX_GPU_HOST_DEVICE
     void normalize () noexcept
     {
@@ -775,12 +855,28 @@ public:
         }
     }
 
+    //! Collapse the box to a single slab at coordinate \p slab_index along \p direction.
     AMREX_GPU_HOST_DEVICE
     BoxND& makeSlab (int direction, int slab_index) noexcept
     {
         smallend[direction] = slab_index;
         bigend[direction] = slab_index;
         return *this;
+    }
+
+    /**
+    * \brief Return a BoxIteratorND that can be used to loop over the IntVects
+    * contained by the BoxND.
+    * \code{.cpp}
+    *   Box b;
+    *   ...
+    *   for (IntVect iv : b.iterator()) {
+    *       // do operations involving iv
+    *   }
+    * \endcode
+    */
+    [[nodiscard]] BoxIteratorND<dim> iterator () const noexcept {
+        return BoxIteratorND<dim>{*this};
     }
 
     [[nodiscard]] AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
@@ -794,7 +890,7 @@ public:
     }
 
     /**
-    * \brief Returns a new BoxND of dimension new_dim and
+    * \brief Return a new BoxND of dimension new_dim and
     * assigns the first new_dim dimension of this BoxND to it.
     */
     template<int new_dim>
@@ -808,7 +904,7 @@ public:
     }
 
     /**
-    * \brief Returns a new BoxND of size new_dim and
+    * \brief Return a new BoxND of size new_dim and
     * assigns all values of this BoxND to it and
     * (small=0, big=0, typ=CELL) to the remaining elements.
     */
@@ -823,7 +919,7 @@ public:
     }
 
     /**
-    * \brief Returns a new BoxND of size new_dim
+    * \brief Return a new BoxND of size new_dim
     * by either shrinking or expanding this BoxND
     */
     template<int new_dim>
@@ -1029,7 +1125,8 @@ BoxND<dim>::atOffset (Long offset) const noexcept
 }
 
 template<int dim>
-template <int N, std::enable_if_t<( 1<=N && N<=3 ), int>>
+template <int N>
+requires (1 <= N && N <= 3)
 AMREX_GPU_HOST_DEVICE
 AMREX_FORCE_INLINE
 GpuArray<int,3>
@@ -1170,6 +1267,7 @@ BoxND<dim>::shiftHalf (const IntVectND<dim>& iv) noexcept
     return *this;
 }
 
+/// \cond DOXYGEN_IGNORE
 class BoxCommHelper
 {
 public:
@@ -1189,6 +1287,7 @@ private:
     int* p;
     std::vector<int> v;
 };
+/// \endcond
 
 class BoxConverter { // NOLINT
 public:
@@ -1197,13 +1296,29 @@ public:
     virtual ~BoxConverter () = default;
 };
 
+/**
+ * \brief Gather boxes from all MPI ranks into \p bxs.
+ *
+ * On return, \p bxs contains the concatenation of every process' input boxes.
+ * The output vector reserves capacity for the gathered boxes plus
+ * \p n_extra_reserve additional entries. The extra reserve does not change the
+ * number of boxes gathered or the size of \p bxs.
+ *
+ * \param bxs On input, the local boxes; on output, the concatenation of all ranks.
+ * \param n_extra_reserve Additional output capacity to reserve after the gathered boxes.
+ */
 void AllGatherBoxes (Vector<Box>& bxs, int n_extra_reserve=0);
 
-    /**
-    * \brief Grow BoxND in all directions by given amount.
-
-    * NOTE: n_cell negative shrinks the BoxND by that number of cells.
-    */
+/**
+ * \ingroup amrex_index_space
+ * \brief Return a copy of \p b grown uniformly by \p i cells in every direction.
+ *
+ * Negative \p i values shrink the box by that many cells per direction.
+ *
+ * \param b Input Box.
+ * \param i Number of cells to add (negative shrinks).
+ * \return A copy of \p b after the grow operation.
+ */
 template<int dim>
 [[nodiscard]]
 AMREX_GPU_HOST_DEVICE
@@ -1215,7 +1330,13 @@ BoxND<dim> grow (const BoxND<dim>& b, int i) noexcept
     return result;
 }
 
-    //! Grow BoxND in each direction by specified amount.
+/**
+ * \ingroup amrex_index_space
+ * \overload
+ * \param b Input Box.
+ * \param v Direction-wise cell counts to add (negative shrinks).
+ * \return A copy of \p b after the grow operation.
+*/
 template<int dim>
 [[nodiscard]]
 AMREX_GPU_HOST_DEVICE
@@ -1227,7 +1348,14 @@ BoxND<dim> grow (const BoxND<dim>& b, const IntVectND<dim>& v) noexcept
     return result;
 }
 
-    //! Grow BoxND in direction idir be n_cell cells
+/**
+ * \ingroup amrex_index_space
+ * \overload
+ * \param b Input Box.
+ * \param idir Coordinate direction to grow.
+ * \param n_cell Number of cells to add to the given direction (negative shrinks).
+ * \return A copy of \p b after the grow operation.
+ */
 template<int dim>
 [[nodiscard]]
 AMREX_GPU_HOST_DEVICE
@@ -1239,6 +1367,10 @@ BoxND<dim> grow (const BoxND<dim>& b, int idir, int n_cell) noexcept
     return result;
 }
 
+/**
+ * \ingroup amrex_index_space
+ * \overload
+ */
 template<int dim>
 [[nodiscard]]
 AMREX_GPU_HOST_DEVICE
@@ -1248,6 +1380,17 @@ BoxND<dim> grow (const BoxND<dim>& b, Direction d, int n_cell) noexcept
     return grow(b, static_cast<int>(d), n_cell);
 }
 
+/**
+ * \ingroup amrex_index_space
+ * \brief Return a copy of \p b with the low end grown by \p n_cell cells in direction \p idir.
+ *
+ * Negative values shrink the low end of the returned box.
+ *
+ * \param b Input Box.
+ * \param idir Coordinate direction to grow.
+ * \param n_cell Number of cells to add (negative shrinks).
+ * \return A copy of \p b after the asymmetric grow.
+ */
 template<int dim>
 [[nodiscard]]
 AMREX_GPU_HOST_DEVICE
@@ -1259,6 +1402,10 @@ BoxND<dim> growLo (const BoxND<dim>& b, int idir, int n_cell) noexcept
     return result;
 }
 
+/**
+ * \ingroup amrex_index_space
+ * \overload
+ */
 template<int dim>
 [[nodiscard]]
 AMREX_GPU_HOST_DEVICE
@@ -1268,6 +1415,17 @@ BoxND<dim> growLo (const BoxND<dim>& b, Direction d, int n_cell) noexcept
     return growLo(b, static_cast<int>(d), n_cell);
 }
 
+/**
+ * \ingroup amrex_index_space
+ * \brief Return a copy of \p b with the high end grown by \p n_cell cells in direction \p idir.
+ *
+ * Negative values shrink the high end of the returned box.
+ *
+ * \param b Input Box.
+ * \param idir Coordinate direction to grow.
+ * \param n_cell Number of cells to add (negative shrinks).
+ * \return A copy of \p b after the asymmetric grow.
+ */
 template<int dim>
 [[nodiscard]]
 AMREX_GPU_HOST_DEVICE
@@ -1279,6 +1437,10 @@ BoxND<dim> growHi (const BoxND<dim>& b, int idir, int n_cell) noexcept
     return result;
 }
 
+/**
+ * \ingroup amrex_index_space
+ * \overload
+ */
 template<int dim>
 [[nodiscard]]
 AMREX_GPU_HOST_DEVICE
@@ -1288,15 +1450,18 @@ BoxND<dim> growHi (const BoxND<dim>& b, Direction d, int n_cell) noexcept
     return growHi(b, static_cast<int>(d), n_cell);
 }
 
-    /**
-    * \brief Coarsen BoxND by given (positive) refinement ratio.
-    * NOTE: if type(dir) = CELL centered: lo <- lo/ratio and
-    * hi <- hi/ratio.
-    * NOTE: if type(dir) = NODE centered: lo <- lo/ratio and
-    * hi <- hi/ratio + ((hi%ratio)==0 ? 0 : 1).
-    * That is, refinement of coarsened BoxND must contain
-    * the original BoxND.
-    */
+/**
+ * \ingroup amrex_index_space
+ * \brief Return a copy of \p b coarsened by the isotropic ratio \p ref_ratio.
+ *
+ * Refinement of the coarsened box is guaranteed to contain the original box
+ * (taking nodal types into account). The two are equal only when the
+ * original box is coarsenable.
+ *
+ * \param b Box to coarsen.
+ * \param ref_ratio Positive refinement ratio applied to every direction.
+ * \return A copy of \p b after coarsening.
+ */
 template<int dim>
 [[nodiscard]]
 AMREX_GPU_HOST_DEVICE
@@ -1308,15 +1473,13 @@ BoxND<dim> coarsen (const BoxND<dim>& b, int ref_ratio) noexcept
     return result;
 }
 
-    /**
-    * \brief Coarsen BoxND by given (positive) refinement ratio.
-    * NOTE: if type(dir) = CELL centered: lo <- lo/ratio and
-    * hi <- hi/ratio.
-    * NOTE: if type(dir) = NODE centered: lo <- lo/ratio and
-    * hi <- hi/ratio + ((hi%ratio)==0 ? 0 : 1).
-    * That is, refinement of coarsened BoxND must contain
-    * the original BoxND.
-    */
+/**
+ * \ingroup amrex_index_space
+ * \overload
+ * \param b Box to coarsen.
+ * \param ref_ratio Direction-wise positive refinement ratios.
+ * \return A copy of \p b after coarsening.
+ */
 template<int dim>
 [[nodiscard]]
 AMREX_GPU_HOST_DEVICE
@@ -1328,13 +1491,18 @@ BoxND<dim> coarsen (const BoxND<dim>& b, const IntVectND<dim>& ref_ratio) noexce
     return result;
 }
 
-    /**
-    * Refine BoxND by given (positive) refinement ratio.
-    * NOTE: if type(dir) = CELL centered: lo <- lo*ratio and
-    * hi <- (hi+1)*ratio - 1.
-    * NOTE: if type(dir) = NODE centered: lo <- lo*ratio and
-    * hi <- hi*ratio.
-    */
+/**
+ * \ingroup amrex_index_space
+ * \brief Return a copy of \p b refined by the isotropic ratio \p ref_ratio.
+ *
+ * Each direction is scaled by \p ref_ratio while respecting whether the box is
+ * cell- or node-centered so that coarsening by the same ratio recovers the
+ * original extent.
+ *
+ * \param b Box to refine.
+ * \param ref_ratio Positive refinement ratio applied to every direction.
+ * \return A copy of \p b after refinement.
+ */
 template<int dim>
 [[nodiscard]]
 AMREX_GPU_HOST_DEVICE
@@ -1346,13 +1514,13 @@ BoxND<dim> refine (const BoxND<dim>& b, int ref_ratio) noexcept
     return result;
 }
 
-    /**
-    * \brief Refine BoxND by given (positive) refinement ratio.
-    * NOTE: if type(dir) = CELL centered: lo <- lo*ratio and
-    * hi <- (hi+1)*ratio - 1.
-    * NOTE: if type(dir) = NODE centered: lo <- lo*ratio and
-    * hi <- hi*ratio.
-    */
+/**
+ * \ingroup amrex_index_space
+ * \overload
+ * \param b Box to refine.
+ * \param ref_ratio Direction-wise positive refinement ratios.
+ * \return A copy of \p b after refinement.
+ */
 template<int dim>
 [[nodiscard]]
 AMREX_GPU_HOST_DEVICE
@@ -1364,7 +1532,15 @@ BoxND<dim> refine (const BoxND<dim>& b, const IntVectND<dim>& ref_ratio) noexcep
     return result;
 }
 
-    //! Return a BoxND with indices shifted by nzones in dir direction.
+/**
+ * \ingroup amrex_index_space
+ * \brief Return a copy of \p b shifted by \p nzones cells in direction \p dir.
+ *
+ * \param b Box to shift.
+ * \param dir Coordinate direction to shift.
+ * \param nzones Signed number of cells to shift by.
+ * \return A copy of \p b after shifting.
+ */
 template<int dim>
 [[nodiscard]]
 AMREX_GPU_HOST_DEVICE
@@ -1376,6 +1552,13 @@ BoxND<dim> shift (const BoxND<dim>& b, int dir, int nzones) noexcept
     return result;
 }
 
+/**
+ * \ingroup amrex_index_space
+ * \overload
+ * \param b Box to shift.
+ * \param nzones Direction-wise signed cell offsets.
+ * \return A copy of \p b after shifting.
+ */
 template<int dim>
 [[nodiscard]]
 AMREX_GPU_HOST_DEVICE
@@ -1387,11 +1570,11 @@ BoxND<dim> shift (const BoxND<dim>& b, const IntVectND<dim>& nzones) noexcept
     return result;
 }
 
-    /**
-    * \brief Returns a BoxND with NODE based coordinates in direction dir
-    * that encloses BoxND b.  NOTE: equivalent to b.convert(dir,NODE)
-    * NOTE: error if b.type(dir) == NODE.
-    */
+/**
+ * \ingroup amrex_index_space
+ * \brief Return a BoxND with NODE based coordinates in direction \p dir
+ * that encloses BoxND \p b.
+ */
 template<int dim>
 [[nodiscard]]
 AMREX_GPU_HOST_DEVICE
@@ -1403,6 +1586,10 @@ BoxND<dim> surroundingNodes (const BoxND<dim>& b, int dir) noexcept
     return bx;
 }
 
+/**
+ * \ingroup amrex_index_space
+ * \overload
+ */
 template<int dim>
 [[nodiscard]]
 AMREX_GPU_HOST_DEVICE
@@ -1412,10 +1599,11 @@ BoxND<dim> surroundingNodes (const BoxND<dim>& b, Direction d) noexcept
     return surroundingNodes(b, static_cast<int>(d));
 }
 
-    /**
-    * \brief Returns a BoxND with NODE based coordinates in all
-    * directions that encloses BoxND b.
-    */
+/**
+ * \ingroup amrex_index_space
+ * \brief Return a BoxND with NODE based coordinates in all directions
+ * that encloses BoxND \p b.
+ */
 template<int dim>
 [[nodiscard]]
 AMREX_GPU_HOST_DEVICE
@@ -1427,7 +1615,14 @@ BoxND<dim> surroundingNodes (const BoxND<dim>& b) noexcept
     return bx;
 }
 
-    //! Returns a BoxND with different type
+/**
+ * \ingroup amrex_index_space
+ * \brief Return a copy of \p b converted to the nodal flags \p typ.
+ *
+ * \param b Box to convert.
+ * \param typ Direction-wise nodal flags (0 cell, 1 node).
+ * \return A copy of \p b after conversion.
+ */
 template<int dim>
 [[nodiscard]]
 AMREX_GPU_HOST_DEVICE
@@ -1439,6 +1634,13 @@ BoxND<dim> convert (const BoxND<dim>& b, const IntVectND<dim>& typ) noexcept
     return bx;
 }
 
+/**
+ * \ingroup amrex_index_space
+ * \overload
+ * \param b Box to convert.
+ * \param typ Target index type descriptor.
+ * \return A copy of \p b after conversion.
+ */
 template<int dim>
 [[nodiscard]]
 AMREX_GPU_HOST_DEVICE
@@ -1450,12 +1652,11 @@ BoxND<dim> convert (const BoxND<dim>& b, const IndexTypeND<dim>& typ) noexcept
     return bx;
 }
 
-    /**
-    * \brief Returns a BoxND with CELL based coordinates in
-    * direction dir that is enclosed by b.
-    * NOTE: equivalent to b.convert(dir,CELL)
-    * NOTE: error if b.type(dir) == CELL.
-    */
+/**
+ * \ingroup amrex_index_space
+ * \brief Return a BoxND with CELL based coordinates in direction \p dir
+ * that is enclosed by \p b.
+ */
 template<int dim>
 [[nodiscard]]
 AMREX_GPU_HOST_DEVICE
@@ -1467,6 +1668,10 @@ BoxND<dim> enclosedCells (const BoxND<dim>& b, int dir) noexcept
     return bx;
 }
 
+/**
+ * \ingroup amrex_index_space
+ * \overload
+ */
 template<int dim>
 [[nodiscard]]
 AMREX_GPU_HOST_DEVICE
@@ -1476,10 +1681,11 @@ BoxND<dim> enclosedCells (const BoxND<dim>& b, Direction d) noexcept
     return enclosedCells(b, static_cast<int>(d));
 }
 
-    /**
-    * \brief Returns a BoxND with CELL based coordinates in all
-    * directions that is enclosed by b.
-    */
+/**
+ * \ingroup amrex_index_space
+ * \brief Return a BoxND with CELL based coordinates in all directions
+ * that is enclosed by \p b.
+ */
 template<int dim>
 [[nodiscard]]
 AMREX_GPU_HOST_DEVICE
@@ -1491,10 +1697,17 @@ BoxND<dim> enclosedCells (const BoxND<dim>& b) noexcept
     return bx;
 }
 
-    /**
-    * \brief Returns the edge-centered BoxND (in direction dir) defining
-    * the low side of BoxND b.
-    */
+/**
+ * \ingroup amrex_index_space
+ * \brief Return the BoxND of length \p len on the low boundary of \p b
+ * along coordinate direction \p dir.
+ *
+ * The returned BoxND is NODE based in direction \p dir and identical to \p b
+ * in the other directions.
+ * \param b Input Box.
+ * \param dir Coordinate direction.
+ * \param len Length of the boundary box in direction \p dir.
+ */
 template<int dim>
 [[nodiscard]]
 AMREX_GPU_HOST_DEVICE
@@ -1514,10 +1727,17 @@ BoxND<dim> bdryLo (const BoxND<dim>& b, int dir, int len=1) noexcept
     return BoxND<dim>(low,hi,typ);
 }
 
-    /**
-    * \brief Returns the edge-centered BoxND (in direction dir) defining
-    * the high side of BoxND b.
-    */
+/**
+ * \ingroup amrex_index_space
+ * \brief Return the BoxND of length \p len on the high boundary of \p b
+ * along coordinate direction \p dir.
+ *
+ * The returned BoxND is NODE based in direction \p dir and identical to \p b
+ * in the other directions.
+ * \param b Input Box.
+ * \param dir Coordinate direction.
+ * \param len Length of the boundary box in direction \p dir.
+ */
 template<int dim>
 [[nodiscard]]
 AMREX_GPU_HOST_DEVICE
@@ -1538,10 +1758,17 @@ BoxND<dim> bdryHi (const BoxND<dim>& b, int dir, int len=1) noexcept
     return BoxND<dim>(low,hi,typ);
 }
 
-    /**
-    * \brief Similar to bdryLo and bdryHi except that it operates on the
-    * given face of  box b.
-    */
+/**
+ * \ingroup amrex_index_space
+ * \brief Similar to bdryLo and bdryHi except that it operates on the
+ * given face of BoxND \p b.
+ *
+ * The returned BoxND is NODE based in the face direction and identical to \p b
+ * in the other directions.
+ * \param b Input Box.
+ * \param face The face of \p b to operate on.
+ * \param len Length of the boundary box along the face direction.
+ */
 template<int dim>
 [[nodiscard]]
 AMREX_GPU_HOST_DEVICE
@@ -1572,18 +1799,17 @@ BoxND<dim> bdryNode (const BoxND<dim>& b, Orientation face, int len=1) noexcept
     return BoxND<dim>(low,hi,typ);
 }
 
-    /**
-    * \brief Returns the cell centered BoxND of length len adjacent
-    * to b on the low end along the coordinate direction dir.
-    * The return BoxND is identical to b in the other directions.
-    * The return BoxND and b have an empty intersection.
-    * NOTE:  len >= 1
-    * NOTE:  BoxND retval = b.adjCellLo(b,dir,len)
-    * is equivalent to the following set of operations:
-    * BoxND retval(b);
-    * retval.convert(dir,BoxND::CELL);
-    * retval.setrange(dir,retval.smallEnd(dir)-len,len);
-    */
+/**
+ * \ingroup amrex_index_space
+ * \brief Return the BoxND of length \p len adjacent to \p b on the low end
+ * along coordinate direction \p dir.
+ *
+ * The returned BoxND is CELL based in direction \p dir and identical to \p b
+ * in the other directions.
+ * \param b Input Box.
+ * \param dir Coordinate direction.
+ * \param len Length of the adjacent box in direction \p dir.
+ */
 template<int dim>
 [[nodiscard]]
 AMREX_GPU_HOST_DEVICE
@@ -1604,7 +1830,17 @@ BoxND<dim> adjCellLo (const BoxND<dim>& b, int dir, int len=1) noexcept
     return BoxND<dim>(low,hi,typ);
 }
 
-    //! Similar to adjCellLo but builds an adjacent BoxND on the high end.
+/**
+ * \ingroup amrex_index_space
+ * \brief Return the BoxND of length \p len adjacent to \p b on the high end
+ * along coordinate direction \p dir.
+ *
+ * The returned BoxND is CELL based in direction \p dir and identical to \p b
+ * in the other directions.
+ * \param b Input Box.
+ * \param dir Coordinate direction.
+ * \param len Length of the adjacent box in direction \p dir.
+ */
 template<int dim>
 [[nodiscard]]
 AMREX_GPU_HOST_DEVICE
@@ -1626,7 +1862,17 @@ BoxND<dim> adjCellHi (const BoxND<dim>& b, int dir, int len=1) noexcept
     return BoxND<dim>(low,hi,typ);
 }
 
-    //! Similar to adjCellLo and adjCellHi; operates on given face.
+/**
+ * \ingroup amrex_index_space
+ * \brief Similar to adjCellLo and adjCellHi except that it operates on the
+ * given face of BoxND \p b.
+ *
+ * The returned BoxND is CELL based in the face direction and identical to \p b
+ * in the other directions.
+ * \param b Input Box.
+ * \param face The face of \p b to operate on.
+ * \param len Length of the adjacent box along the face direction.
+ */
 template<int dim>
 [[nodiscard]]
 AMREX_GPU_HOST_DEVICE
@@ -1658,11 +1904,16 @@ BoxND<dim> adjCell (const BoxND<dim>& b, Orientation face, int len=1) noexcept
     return BoxND<dim>(low,hi,typ);
 }
 
-    /**
-    * \brief Modify BoxND to that of the minimum BoxND containing both
-    * the original BoxND and the argument.
-    * Both BoxNDes must have identical type.
-    */
+/**
+ * \ingroup amrex_index_space
+ * \brief Return the minimal BoxND containing both \p b1 and \p b2.
+ *
+ * The boxes must share the same index type.
+ *
+ * \param b1 First box.
+ * \param b2 Second box.
+ * \return The minimal box that contains both inputs.
+ */
 template<int dim>
 [[nodiscard]]
 AMREX_GPU_HOST_DEVICE
@@ -1674,6 +1925,7 @@ BoxND<dim> minBox (const BoxND<dim>& b1, const BoxND<dim>& b2) noexcept
     return result;
 }
 
+/// \cond DOXYGEN_IGNORE
 namespace detail {
     std::ostream& box_write (std::ostream& os, const int * smallend, const int * bigend,
                              const int * type, int dim);
@@ -1686,8 +1938,15 @@ namespace detail {
         return makeTuple(BoxND(get<Ns>(lo), get<Ns>(hi), get<Ns>(typ))...);
     }
 }
+/// \endcond
 
-//! Write an ASCII representation to the ostream.
+/**
+ * \brief Write an ASCII representation of \p bx to \p os.
+ *
+ * \param os Output stream.
+ * \param bx Box to print.
+ * \return The output stream.
+ */
 template<int dim>
 std::ostream& operator<< (std::ostream& os, const BoxND<dim>& bx)
 {
@@ -1695,7 +1954,13 @@ std::ostream& operator<< (std::ostream& os, const BoxND<dim>& bx)
     return detail::box_write(os, bx.smallEnd().begin(), bx.bigEnd().begin(), type.begin(), dim);
 }
 
-//! Read from istream.
+/**
+ * \brief Read a BoxND from \p is.
+ *
+ * \param is Input stream.
+ * \param bx Box filled by the read.
+ * \return The input stream.
+ */
 template<int dim>
 std::istream& operator>> (std::istream& is, BoxND<dim>& bx) {
     IntVectND<dim> small;
@@ -1707,9 +1972,14 @@ std::istream& operator>> (std::istream& is, BoxND<dim>& bx) {
 }
 
 /**
-* \brief Returns a BoxND obtained by concatenating the input BoxNDs.
-* The dimension of the return value equals the sum of the dimensions of the inputted BoxNDs.
-*/
+ * \brief Concatenate boxes along their dimensions.
+ *
+ * The returned box has dimension equal to the sum of the input dimensions.
+ *
+ * \param bx First box.
+ * \param boxes Remaining boxes.
+ * \return The concatenated box.
+ */
 template<int d, int...dims>
 AMREX_GPU_HOST_DEVICE
 AMREX_FORCE_INLINE
@@ -1722,9 +1992,11 @@ BoxCat (const BoxND<d>& bx, const BoxND<dims>&...boxes) noexcept {
 }
 
 /**
-* \brief Returns a tuple of BoxNDs obtained by splitting the input BoxND
-* according to the dimensions specified by the template arguments.
-*/
+ * \brief Split \p bx into boxes whose dimensions match the template arguments.
+ *
+ * \param bx Source box to split.
+ * \return A tuple containing the split boxes.
+ */
 template<int d, int...dims>
 AMREX_GPU_HOST_DEVICE
 AMREX_FORCE_INLINE
@@ -1737,9 +2009,11 @@ BoxSplit (const BoxND<detail::get_sum<d, dims...>()>& bx) noexcept {
 }
 
 /**
-* \brief Returns a new BoxND of dimension new_dim and
-* assigns the first new_dim dimension of this BoxND to it.
-*/
+ * \brief Shrink \p bx to its first \p new_dim directions.
+ *
+ * \param bx Box to shrink.
+ * \return A lower-dimensional view of \p bx.
+ */
 template<int new_dim, int old_dim>
 AMREX_GPU_HOST_DEVICE
 AMREX_FORCE_INLINE
@@ -1749,10 +2023,13 @@ BoxShrink (const BoxND<old_dim>& bx) noexcept {
 }
 
 /**
-* \brief Returns a new BoxND of size new_dim and
-* assigns all values of this BoxND to it and
-* (small=0, big=0, typ=CELL) to the remaining elements.
-*/
+ * \brief Expand \p bx to \p new_dim directions, padding with zeros.
+ *
+ * Additional dimensions are initialized to cell-centered [0,0].
+ *
+ * \param bx Box to expand.
+ * \return A higher-dimensional box containing \p bx.
+ */
 template<int new_dim, int old_dim>
 AMREX_GPU_HOST_DEVICE
 AMREX_FORCE_INLINE
@@ -1762,9 +2039,11 @@ BoxExpand (const BoxND<old_dim>& bx) noexcept {
 }
 
 /**
-* \brief Returns a new BoxND of size new_dim
-* by either shrinking or expanding this BoxND
-*/
+ * \brief Resize \p bx to \p new_dim directions via shrink or expand.
+ *
+ * \param bx Box to resize.
+ * \return The resized box.
+ */
 template<int new_dim, int old_dim>
 AMREX_GPU_HOST_DEVICE
 AMREX_FORCE_INLINE
@@ -1773,6 +2052,12 @@ BoxResize (const BoxND<old_dim>& bx) noexcept {
     return bx.template resize<new_dim>();
 }
 
+/**
+ * \brief Return the inclusive lower corner of \p box as an IntVectND.
+ *
+ * \param box Box to query.
+ * \return The lower corner.
+ */
 template<int dim>
 [[nodiscard]]
 AMREX_GPU_HOST_DEVICE
@@ -1782,6 +2067,12 @@ IntVectND<dim> lbound_iv (BoxND<dim> const& box) noexcept
     return box.smallEnd();
 }
 
+/**
+ * \brief Return the inclusive upper corner of \p box as an IntVectND.
+ *
+ * \param box Box to query.
+ * \return The upper corner.
+ */
 template<int dim>
 [[nodiscard]]
 AMREX_GPU_HOST_DEVICE
@@ -1791,6 +2082,12 @@ IntVectND<dim> ubound_iv (BoxND<dim> const& box) noexcept
     return box.bigEnd();
 }
 
+/**
+ * \brief Return the iterator begin IntVectND for \p box.
+ *
+ * \param box Box to query.
+ * \return The first valid index.
+ */
 template<int dim>
 [[nodiscard]]
 AMREX_GPU_HOST_DEVICE
@@ -1800,6 +2097,14 @@ IntVectND<dim> begin_iv (BoxND<dim> const& box) noexcept
     return box.smallEnd();
 }
 
+/**
+ * \brief Return the iterator end IntVectND for \p box.
+ *
+ * The end corresponds to one past the last valid index.
+ *
+ * \param box Box to query.
+ * \return One-past-the-end index.
+ */
 template<int dim>
 [[nodiscard]]
 AMREX_GPU_HOST_DEVICE
@@ -1809,6 +2114,12 @@ IntVectND<dim> end_iv (BoxND<dim> const& box) noexcept
     return box.bigEnd() + 1;
 }
 
+/**
+ * \brief Return the side lengths of \p box as an IntVectND.
+ *
+ * \param box Box to query.
+ * \return Direction-wise lengths.
+ */
 template<int dim>
 [[nodiscard]]
 AMREX_GPU_HOST_DEVICE
@@ -1818,7 +2129,13 @@ IntVectND<dim> length_iv (BoxND<dim> const& box) noexcept
     return box.bigEnd() - box.smallEnd() + 1;
 }
 
-// Max of lower bound
+/**
+ * \brief Return the component-wise maximum of the lower corners of two boxes.
+ *
+ * \param b1 First box.
+ * \param b2 Second box.
+ * \return The maximum lower corner.
+ */
 template<int dim>
 [[nodiscard]]
 AMREX_GPU_HOST_DEVICE
@@ -1828,6 +2145,13 @@ IntVectND<dim> max_lbound_iv (BoxND<dim> const& b1, BoxND<dim> const& b2) noexce
     return max(b1.smallEnd(), b2.smallEnd());
 }
 
+/**
+ * \brief Return the component-wise maximum of the lower corner of \p b1 and \p lo.
+ *
+ * \param b1 Box to query.
+ * \param lo Lower corner candidate.
+ * \return The maximum lower corner.
+ */
 template<int dim>
 [[nodiscard]]
 AMREX_GPU_HOST_DEVICE
@@ -1837,7 +2161,13 @@ IntVectND<dim> max_lbound_iv (BoxND<dim> const& b1, IntVectND<dim> const& lo) no
     return max(b1.smallEnd(), lo);
 }
 
-// Min of upper bound
+/**
+ * \brief Return the component-wise minimum of the upper corners of two boxes.
+ *
+ * \param b1 First box.
+ * \param b2 Second box.
+ * \return The minimum upper corner.
+ */
 template<int dim>
 [[nodiscard]]
 AMREX_GPU_HOST_DEVICE
@@ -1847,6 +2177,13 @@ IntVectND<dim> min_ubound_iv (BoxND<dim> const& b1, BoxND<dim> const& b2) noexce
     return min(b1.bigEnd(), b2.bigEnd());
 }
 
+/**
+ * \brief Return the component-wise minimum of the upper corner of \p b1 and \p hi.
+ *
+ * \param b1 Box to query.
+ * \param hi Upper corner candidate.
+ * \return The minimum upper corner.
+ */
 template<int dim>
 [[nodiscard]]
 AMREX_GPU_HOST_DEVICE
@@ -1856,7 +2193,14 @@ IntVectND<dim> min_ubound_iv (BoxND<dim> const& b1, IntVectND<dim> const& hi) no
     return min(b1.bigEnd(), hi);
 }
 
-template<int dim, std::enable_if_t<( 1<=dim && dim<=3 ), int> = 0>
+/**
+ * \brief Return the inclusive lower corner of \p box padded to Dim3.
+ *
+ * \param box Box to query.
+ * \return The lower corner as Dim3.
+ */
+template<int dim>
+requires ( 1<=dim && dim<=3 )
 [[nodiscard]]
 AMREX_GPU_HOST_DEVICE
 AMREX_FORCE_INLINE
@@ -1865,7 +2209,14 @@ Dim3 lbound (BoxND<dim> const& box) noexcept
     return box.smallEnd().dim3();
 }
 
-template<int dim, std::enable_if_t<( 1<=dim && dim<=3 ), int> = 0>
+/**
+ * \brief Return the inclusive upper corner of \p box padded to Dim3.
+ *
+ * \param box Box to query.
+ * \return The upper corner as Dim3.
+ */
+template<int dim>
+requires ( 1<=dim && dim<=3 )
 [[nodiscard]]
 AMREX_GPU_HOST_DEVICE
 AMREX_FORCE_INLINE
@@ -1874,7 +2225,14 @@ Dim3 ubound (BoxND<dim> const& box) noexcept
     return box.bigEnd().dim3();
 }
 
-template<int dim, std::enable_if_t<( 1<=dim && dim<=3 ), int> = 0>
+/**
+ * \brief Return the iterator begin coordinate of \p box as Dim3.
+ *
+ * \param box Box to query.
+ * \return The first valid index.
+ */
+template<int dim>
+requires ( 1<=dim && dim<=3 )
 [[nodiscard]]
 AMREX_GPU_HOST_DEVICE
 AMREX_FORCE_INLINE
@@ -1883,7 +2241,16 @@ Dim3 begin (BoxND<dim> const& box) noexcept
     return box.smallEnd().dim3();
 }
 
-template<int dim, std::enable_if_t<( 1<=dim && dim<=3 ), int> = 0>
+/**
+ * \brief Return the iterator end coordinate of \p box as Dim3.
+ *
+ * The end coordinate is one past the last valid index.
+ *
+ * \param box Box to query.
+ * \return One-past-the-end index.
+ */
+template<int dim>
+requires ( 1<=dim && dim<=3 )
 [[nodiscard]]
 AMREX_GPU_HOST_DEVICE
 AMREX_FORCE_INLINE
@@ -1892,7 +2259,14 @@ Dim3 end (BoxND<dim> const& box) noexcept
     return (box.bigEnd() + 1).dim3(1);
 }
 
-template<int dim, std::enable_if_t<( 1<=dim && dim<=3 ), int> = 0>
+/**
+ * \brief Return the side lengths of \p box as Dim3.
+ *
+ * \param box Box to query.
+ * \return Direction-wise lengths.
+ */
+template<int dim>
+requires ( 1<=dim && dim<=3 )
 [[nodiscard]]
 AMREX_GPU_HOST_DEVICE
 AMREX_FORCE_INLINE
@@ -1901,8 +2275,15 @@ Dim3 length (BoxND<dim> const& box) noexcept
     return (box.bigEnd() - box.smallEnd() + 1).dim3(1);
 }
 
-// Max of lower bound
-template<int dim, std::enable_if_t<( 1<=dim && dim<=3 ), int> = 0>
+/**
+ * \brief Return the Dim3 maximum of the lower corners of two boxes.
+ *
+ * \param b1 First box.
+ * \param b2 Second box.
+ * \return Component-wise maximum lower corner.
+ */
+template<int dim>
+requires ( 1<=dim && dim<=3 )
 [[nodiscard]]
 AMREX_GPU_HOST_DEVICE
 AMREX_FORCE_INLINE
@@ -1911,7 +2292,15 @@ Dim3 max_lbound (BoxND<dim> const& b1, BoxND<dim> const& b2) noexcept
     return max(b1.smallEnd(), b2.smallEnd()).dim3();
 }
 
-template<int dim, std::enable_if_t<( 1<=dim && dim<=3 ), int> = 0>
+/**
+ * \brief Return the Dim3 maximum of the lower corner of \p b1 and \p lo.
+ *
+ * \param b1 Box to query.
+ * \param lo Candidate lower corner.
+ * \return Component-wise maximum lower corner.
+ */
+template<int dim>
+requires ( 1<=dim && dim<=3 )
 [[nodiscard]]
 AMREX_GPU_HOST_DEVICE
 AMREX_FORCE_INLINE
@@ -1920,8 +2309,15 @@ Dim3 max_lbound (BoxND<dim> const& b1, Dim3 const& lo) noexcept
     return max(b1.smallEnd(), IntVectND<dim>(lo)).dim3();
 }
 
-// Min of upper bound
-template<int dim, std::enable_if_t<( 1<=dim && dim<=3 ), int> = 0>
+/**
+ * \brief Return the Dim3 minimum of the upper corners of two boxes.
+ *
+ * \param b1 First box.
+ * \param b2 Second box.
+ * \return Component-wise minimum upper corner.
+ */
+template<int dim>
+requires ( 1<=dim && dim<=3 )
 [[nodiscard]]
 AMREX_GPU_HOST_DEVICE
 AMREX_FORCE_INLINE
@@ -1930,7 +2326,15 @@ Dim3 min_ubound (BoxND<dim> const& b1, BoxND<dim> const& b2) noexcept
     return min(b1.bigEnd(), b2.bigEnd()).dim3();
 }
 
-template<int dim, std::enable_if_t<( 1<=dim && dim<=3 ), int> = 0>
+/**
+ * \brief Return the Dim3 minimum of the upper corner of \p b1 and \p hi.
+ *
+ * \param b1 Box to query.
+ * \param hi Candidate upper corner.
+ * \return Component-wise minimum upper corner.
+ */
+template<int dim>
+requires ( 1<=dim && dim<=3 )
 [[nodiscard]]
 AMREX_GPU_HOST_DEVICE
 AMREX_FORCE_INLINE
@@ -1939,10 +2343,6 @@ Dim3 min_ubound (BoxND<dim> const& b1, Dim3 const& hi) noexcept
     return min(b1.bigEnd(), IntVectND<dim>(hi)).dim3();
 }
 
-// Returns a BoxND that covers all the argument Boxes in index
-// space. The types are ignored. Thus, the arguments can have
-// different index types, and the returned BoxND's index type has no
-// meaning.
 template<int dim>
 [[nodiscard]]
 AMREX_FORCE_INLINE
@@ -1951,6 +2351,17 @@ BoxND<dim> getIndexBounds (BoxND<dim> const& b1) noexcept
     return b1;
 }
 
+/**
+ * \ingroup amrex_index_space
+ * \brief Return the minimal index-space box covering \p b1 and \p b2.
+ *
+ * The index types of \p b1 and \p b2 do not need to be the same.
+ * The result adopts the index type of \p b2.
+ *
+ * \param b1 First box.
+ * \param b2 Second box (also supplies the target index type).
+ * \return A box covering both inputs.
+ */
 template<int dim>
 [[nodiscard]]
 AMREX_FORCE_INLINE
@@ -1962,6 +2373,18 @@ BoxND<dim> getIndexBounds (BoxND<dim> const& b1, BoxND<dim> const& b2) noexcept
     return b;
 }
 
+/**
+ * \brief Return the minimal index-space box covering all inputs.
+ *
+ * The index types of the inputs do not need to be the same.
+ * Merges arguments recursively; the returned box's index type is that of the
+ * last Box merged in the final pairwise step.
+ *
+ * \param b1 First box-like object.
+ * \param b2 Second box-like object.
+ * \param b3 Additional box-like objects.
+ * \return A box covering every input in index space.
+ */
 template <class T, class ... Ts>
 [[nodiscard]]
 AMREX_FORCE_INLINE
@@ -1970,7 +2393,14 @@ auto getIndexBounds (T const& b1, T const& b2, Ts const& ... b3) noexcept
     return getIndexBounds(getIndexBounds(b1,b2),b3...);
 }
 
-
+/**
+ * \brief Return the point coordinate corresponding to the flattened index \p icell.
+ *
+ * \param boxes Pointer to an array of boxes.
+ * \param nboxes Number of boxes in the array.
+ * \param icell Zero-based flattened point index across all boxes.
+ * \return The IntVectND coordinate of the requested point.
+ */
 template<int dim>
 [[nodiscard]]
 AMREX_GPU_HOST_DEVICE
@@ -1991,6 +2421,14 @@ IntVectND<dim> getCell (BoxND<dim> const* boxes, int nboxes, Long icell) noexcep
     return boxes[ibox].atOffset(offset);
 }
 
+/**
+ * \brief Return a copy of \p b collapsed to a slab perpendicular to \p direction.
+ *
+ * \param b Box to slice.
+ * \param direction Coordinate direction of the slab.
+ * \param slab_index Coordinate value at which to slice.
+ * \return A slab box extracted from \p b.
+ */
 template<int dim>
 [[nodiscard]]
 AMREX_GPU_HOST_DEVICE
@@ -2002,17 +2440,36 @@ BoxND<dim> makeSlab (BoxND<dim> const& b, int direction, int slab_index) noexcep
     return r;
 }
 
-template<int dim=AMREX_SPACEDIM, std::enable_if_t<( 1<=dim && dim<=3 ), int> = 0>
+/**
+ * \ingroup amrex_index_space
+ * \brief Create a single-cell box at coordinates (\p i,\p j,\p k).
+ *
+ * \param i Cell index along x.
+ * \param j Cell index along y.
+ * \param k Cell index along z.
+ * \param typ Target index type (cell by default).
+ * \return A single-cell box.
+ */
+template<int dim=AMREX_SPACEDIM>
+requires ( 1<=dim && dim<=3 )
 [[nodiscard]]
 AMREX_GPU_HOST_DEVICE
 AMREX_FORCE_INLINE
 BoxND<dim> makeSingleCellBox (int i, int j, int k, IndexTypeND<dim> typ = IndexTypeND<dim>::TheCellType())
 {
-    Dim3 p3d{i, j, k};
+    Dim3 p3d{.x = i, .y = j, .z = k};
     IntVectND<dim> vect{p3d};
     return BoxND<dim>{vect, vect, typ};
 }
 
+/**
+ * \ingroup amrex_index_space
+ * \brief Create a single-cell box at \p vect.
+ *
+ * \param vect Cell indices of the single cell.
+ * \param typ Target index type (cell by default).
+ * \return A single-cell box.
+ */
 template<int dim>
 [[nodiscard]]
 AMREX_GPU_HOST_DEVICE
@@ -2022,6 +2479,16 @@ BoxND<dim> makeSingleCellBox (IntVectND<dim> const& vect, IndexTypeND<dim> typ =
     return BoxND<dim>{vect, vect, typ};
 }
 
+/**
+ * \brief Utility that maps flattened point indices back to IntVectND coordinates.
+ *
+ * The constructor captures a sequence of \ref Math::FastDivmodU64 helpers that
+ * implement fast division by the running products of box lengths, so repeated
+ * calls to \ref intVect or the Dim3 functor avoid costly integer divisions while
+ * walking a \ref BoxND.
+ *
+ * \tparam dim Box dimensionality.
+ */
 template<int dim>
 struct BoxIndexerND
 {
@@ -2040,6 +2507,12 @@ struct BoxIndexerND
             }
         }
 
+    /**
+     * \brief Convert flattened point index \p icell to its IntVectND coordinate.
+     *
+     * \param icell Zero-based flattened point index.
+     * \return Coordinate within the tracked box.
+     */
     [[nodiscard]] AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
     IntVectND<dim> intVect (std::uint64_t icell) const
     {
@@ -2057,17 +2530,31 @@ struct BoxIndexerND
         return retval;
     }
 
-    template <int N=dim, std::enable_if_t<( 1<=N && N<=3 ), int> = 0>
+    /**
+     * \brief Functor returning the coordinate padded to Dim3.
+     *
+     * \param icell Zero-based flattened point index.
+     * \return Coordinate as Dim3.
+     */
     [[nodiscard]] AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
-    Dim3 operator() (std::uint64_t icell) const
+    Dim3 operator()(std::uint64_t icell) const
+        requires (1 <= dim && dim <= 3)
     {
         return intVect(icell).dim3();
     }
 
+    /**
+     * \brief Return the number of points covered by the indexed box.
+     *
+     * \return Total number of points.
+     */
     [[nodiscard]] AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
     std::uint64_t numPts () const { return npts; }
 };
 
+/**
+ * \brief Specialization for the 1D case where no fast-division table is needed.
+ */
 template<>
 struct BoxIndexerND<1>
 {
@@ -2075,11 +2562,22 @@ struct BoxIndexerND<1>
 
     int lo;
 
+    /**
+     * \brief Construct the 1D indexer; no fast divisors are needed because only one axis exists.
+     *
+     * \param box Box that supplies the span.
+     */
     BoxIndexerND (BoxND<1> const& box)
         : npts(box.numPts()),
           lo(box.smallEnd(0))
         {}
 
+    /**
+     * \brief Convert flattened point index \p icell to the 1D coordinate.
+     *
+     * \param icell Zero-based flattened point index.
+     * \return Coordinate within the tracked box.
+     */
     [[nodiscard]] AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
     IntVectND<1> intVect (std::uint64_t icell) const
     {
@@ -2087,11 +2585,22 @@ struct BoxIndexerND<1>
     }
 
     [[nodiscard]] AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+    /**
+     * \brief Return the coordinate padded to Dim3.
+     *
+     * \param icell Zero-based flattened point index.
+     * \return Coordinate as Dim3.
+     */
     Dim3 operator() (std::uint64_t icell) const
     {
-        return {int(icell)+lo, 0, 0};
+        return Dim3{.x = int(icell)+lo, .y = 0, .z = 0};
     }
 
+    /**
+     * \brief Return the number of points covered by the indexed box.
+     *
+     * \return Total number of points.
+     */
     [[nodiscard]] AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
     std::uint64_t numPts () const { return npts; }
 };

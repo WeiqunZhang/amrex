@@ -35,9 +35,7 @@ module amrex_geometry_module
      procedure :: get_physical_location => amrex_geometry_get_ploc
      procedure, private :: amrex_geometry_assign
      procedure, private :: amrex_geometry_install
-#if !defined(__GFORTRAN__) || (__GNUC__ > 4)
      final :: amrex_geometry_destroy
-#endif
   end type amrex_geometry
 
   ! interfaces to c++ functions
@@ -76,9 +74,11 @@ module amrex_geometry_module
      end subroutine amrex_fi_geometry_get_intdomain
   end interface
 
+#ifdef __NVCOMPILER
   interface amrex_geometry_destroy
      module procedure amrex_geometry_destroy
   end interface amrex_geometry_destroy
+#endif
 
 contains
 
@@ -128,6 +128,7 @@ contains
   subroutine amrex_geometry_build (geom, domain)
     type(amrex_geometry) :: geom
     type(amrex_box), intent(in) :: domain
+    call amrex_geometry_destroy(geom)
     geom%owner = .true.
     call amrex_fi_new_geometry(geom%p, domain%lo, domain%hi)
     call amrex_geometry_init_data(geom)
@@ -174,6 +175,7 @@ contains
   subroutine amrex_geometry_install (this, p)
     class(amrex_geometry), intent(inout) :: this
     type(c_ptr), intent(in) :: p
+    call amrex_geometry_destroy(this)
     this%owner  = .false.
     this%p      = p
     call amrex_geometry_init_data(this)

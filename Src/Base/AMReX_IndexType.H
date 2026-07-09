@@ -12,6 +12,7 @@
 namespace amrex {
 
 /**
+* \ingroup amrex_index_space
 * \brief Type for defining CellIndex so that all IndexTypeND with different dimensions
 * have the same CellIndex type.
 */
@@ -21,6 +22,8 @@ struct CellIndexEnum {
 };
 
 /**
+* \class amrex::IndexTypeND
+* \ingroup amrex_index_space
 * \brief Cell-Based or Node-Based Indices
 *
 * The class IndexTypeND defines an index as being cell based or node (edge)
@@ -50,11 +53,9 @@ public:
     * each direction.  The inputs for this constructor are N CellIndex,
     * where N is equal to the number of dimensions of the IndexTypeND.
     */
-    template <class...Args,
-        std::enable_if_t<
-            (sizeof...(Args)+1 == dim) &&
-            IsConvertible_v<CellIndex, Args...>,
-        int> = 0>
+    template <class...Args>
+    requires ((sizeof...(Args)+1 == dim) &&
+              IsConvertible_v<CellIndex, Args...>)
     AMREX_GPU_HOST_DEVICE
     constexpr IndexTypeND (CellIndex i, Args...js) noexcept {
         CellIndex locarr[dim] = {i, static_cast<CellIndex>(js)...};
@@ -235,6 +236,8 @@ private:
     unsigned int itype{0};
 };
 
+//! \brief IndexType is an alias for \ref amrex::IndexTypeND instantiated
+//! with <tt>AMREX_SPACEDIM</tt>.
 using IndexType = IndexTypeND<AMREX_SPACEDIM>;
 
 // Template deduction guide for IndexTypeND
@@ -243,13 +246,12 @@ AMREX_GPU_HOST_DEVICE // __device__ for HIP
 IndexTypeND(const IntVectND<dim>&) -> IndexTypeND<dim>;
 
 // Template deduction guide for IndexTypeND
-template <class...Args,
-    std::enable_if_t<
-        IsConvertible_v<IndexType::CellIndex, Args...>,
-    int> = 0>
+template <class...Args>
+requires (IsConvertible_v<IndexType::CellIndex, Args...>)
 AMREX_GPU_HOST_DEVICE // __device__ for HIP
 IndexTypeND(IndexType::CellIndex, Args...) -> IndexTypeND<sizeof...(Args)+1>;
 
+/// \cond DOXYGEN_IGNORE
 namespace detail {
     std::ostream& index_type_write (std::ostream& os, const unsigned int& iv, int dim);
     std::istream& index_type_read (std::istream& is, unsigned int& iv, int dim);
@@ -268,6 +270,7 @@ namespace detail {
         return retval;
     }
 }
+/// \endcond
 
 //! Write an IndexTypeND to an ostream in ASCII.
 template<int dim>

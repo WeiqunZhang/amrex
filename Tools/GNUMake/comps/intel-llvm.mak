@@ -25,10 +25,10 @@ COMP_VERSION = $(intel_version)
 
 ifeq ($(DEBUG),TRUE)
 
-  CXXFLAGS += -g -O0 -ftrapv
-  CFLAGS   += -g -O0 -ftrapv
-  FFLAGS   += -g -O0 -ftrapuv -check bounds,pointers,uninit -traceback
-  F90FLAGS += -g -O0 -ftrapuv -check bounds,pointers,uninit -traceback
+  CXXFLAGS += -g -O$(DEBUG_OPT_LEVEL) -ftrapv
+  CFLAGS   += -g -O$(DEBUG_OPT_LEVEL) -ftrapv
+  FFLAGS   += -g -O$(DEBUG_OPT_LEVEL) -ftrapuv -check bounds,pointers -traceback
+  F90FLAGS += -g -O$(DEBUG_OPT_LEVEL) -ftrapuv -check bounds,pointers -traceback
 
 else
 
@@ -71,7 +71,7 @@ ifdef CXXSTD
   CXXSTD := $(strip $(CXXSTD))
   CXXFLAGS += -std=$(CXXSTD)
 else
-  CXXFLAGS += -std=c++17
+  CXXFLAGS += -std=c++20
 endif
 
 CFLAGS   += -std=c11
@@ -97,6 +97,11 @@ CXXFLAGS += $(GENERIC_COMP_FLAGS) -pthread
 CFLAGS   += $(GENERIC_COMP_FLAGS)
 FFLAGS   += $(GENERIC_COMP_FLAGS)
 F90FLAGS += $(GENERIC_COMP_FLAGS)
+
+ifneq ($(USE_F_INTERFACES),TRUE)
+  F90FLAGS += -nofor-main
+  FFLAGS   += -nofor-main
+endif
 
 ########################################################################
 

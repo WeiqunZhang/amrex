@@ -449,6 +449,7 @@ void eb_interp_centroid2facecent_x (Box const& ubx,
           Real a1_jj = d0_jj / (d0_jj + d1_jj);                                // coefficient of phi(i-1,jj,k,n)
 
           Real phi01    = a0    *   phi(i, j,k,n)  + a1    *   phi(ii, j,k,n); // interpolation of phi   in x-direction
+          // NOLINTNEXTLINE(misc-confusable-identifiers)
           Real y01      = a0    * ccent(i, j,k,1)  + a1    * ccent(ii, j,k,1); // interpolation of y-loc in x-direction
 
           Real phi01_jj = a0_jj *   phi(i,jj,k,n)  + a1_jj *   phi(ii,jj,k,n); // interpolation of phi   in x-direction
@@ -520,8 +521,8 @@ void eb_interp_centroid2facecent_y (Box const& vbx,
           Real d0    = 0.5_rt + ccent(i, j,k,1);                                 // distance in y-dir from centroid(i,j  ) to face(i,j)
           Real d1    = 0.5_rt - ccent(i,jj,k,1);                                 // distance in y-dir from centroid(i,j-1) to face(i,j)
 
-          Real d0_ii = 0.5_rt + ccent(ii, j,k,0);                                 // distance from centroid(ii,j  ) to face(ii,j)
-          Real d1_ii = 0.5_rt - ccent(ii,jj,k,0);                                 // distance from centroid(ii,j-1) to face(ii,j)
+          Real d0_ii = 0.5_rt + ccent(ii, j,k,1);                                 // distance from centroid(ii,j  ) to face(ii,j)
+          Real d1_ii = 0.5_rt - ccent(ii,jj,k,1);                                 // distance from centroid(ii,j-1) to face(ii,j)
 
           Real a0    = d1 / (d0 + d1);                                         // coefficient of phi(i,j  ,k,n)
           Real a1    = d0 / (d0 + d1);                                         // coefficient of phi(i,j-1,k,n)
@@ -606,7 +607,12 @@ void eb_add_divergence_from_flow (int i, int j, int k, int n, Array4<Real> const
         Real Ueb_dot_n = vel_eb(i,j,k,0)*bnorm(i,j,k,0)
                        + vel_eb(i,j,k,1)*bnorm(i,j,k,1);
 
-        divu(i,j,k,n) += Ueb_dot_n * barea(i,j,k) * dxinv[0] / vfrc(i,j,k);
+        Real nx_dxinv = bnorm(i,j,k,0) * dxinv[0];
+        Real ny_dyinv = bnorm(i,j,k,1) * dxinv[1];
+
+        Real dl_eb_inv = std::hypot(nx_dxinv, ny_dyinv);
+
+        divu(i,j,k,n) += Ueb_dot_n * barea(i,j,k) * dl_eb_inv / vfrc(i,j,k);
     }
 }
 

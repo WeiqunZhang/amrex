@@ -12,6 +12,7 @@ namespace amrex {
 
 #ifdef AMREX_USE_GPU
 
+/// \cond DOXYGEN_IGNORE
 namespace detail
 {
     template <typename T, typename F>
@@ -51,10 +52,13 @@ namespace detail
             {
                 amrex::Swap(p[i], p[n2-1-i]);
             });
-            Gpu::streamSynchronize();
+            if (!Gpu::inNoSyncRegion()) {
+                Gpu::streamSynchronize();
+            }
         }
     }
 }
+/// \endcond
 
 /**
  * \brief A GPU-capable partition function for contiguous data.
@@ -83,7 +87,7 @@ int Partition (T* data, int beg, int end, F && f)
     Gpu::DeviceVector<T> v2(n);
     int tot = detail::amrex_partition_helper(data + beg, v2.dataPtr(), n, std::forward<F>(f));
     Gpu::copy(Gpu::deviceToDevice, v2.begin(), v2.end(), data + beg);
-    return tot;
+    return beg + tot;
 }
 
 /**
@@ -100,7 +104,7 @@ int Partition (T* data, int beg, int end, F && f)
  * \tparam F type of the predicate function.
  *
  * \param data pointer to the data to be partitioned
- * \param N the number of elements in the array
+ * \param n the number of elements in the array
  * \param f predicate function that returns 1 or 0 for each input
  *
  * Returns the index of the first element for which f is 0.
@@ -164,10 +168,10 @@ int Partition (Gpu::DeviceVector<T>& v, F && f)
 template <typename T, typename F>
 int StablePartition (T* data, int beg, int end, F && f)
 {
-    int n = Partition(data, beg, end, std::forward<F>(f));
-    int n2 = end - beg - n;
-    detail::amrex_stable_partition_helper(data + beg + n, n2);
-    return n;
+    int mid = Partition(data, beg, end, std::forward<F>(f));
+    int n2 = end - mid;
+    detail::amrex_stable_partition_helper(data + mid, n2);
+    return mid;
 }
 
 /**
@@ -186,7 +190,7 @@ int StablePartition (T* data, int beg, int end, F && f)
  * \tparam F type of the predicate function.
  *
  * \param data pointer to the data to be partitioned
- * \param N the number of elements in the array
+ * \param n the number of elements in the array
  * \param f predicate function that returns 1 or 0 for each input
  *
  * Returns the index of the first element for which f is 0.
@@ -252,7 +256,7 @@ template <typename T, typename F>
 int Partition (T* data, int beg, int end, F && f)
 {
     auto it = std::partition(data + beg, data + end, f);
-    return static_cast<int>(std::distance(data + beg, it));
+    return static_cast<int>(std::distance(data, it));
 }
 
 /**
@@ -269,7 +273,7 @@ int Partition (T* data, int beg, int end, F && f)
  * \tparam F type of the predicate function.
  *
  * \param data pointer to the data to be partitioned
- * \param N the number of elements in the array
+ * \param n the number of elements in the array
  * \param f predicate function that returns 1 or 0 for each input
  *
  * Returns the index of the first element for which f is 0.
@@ -331,7 +335,7 @@ template <typename T, typename F>
 int StablePartition (T* data, int beg, int end, F && f)
 {
     auto it = std::stable_partition(data + beg, data + end, f);
-    return static_cast<int>(std::distance(data + beg, it));
+    return static_cast<int>(std::distance(data, it));
 }
 
 /**
@@ -350,7 +354,7 @@ int StablePartition (T* data, int beg, int end, F && f)
  * \tparam F type of the predicate function.
  *
  * \param data pointer to the data to be partitioned
- * \param N the number of elements in the array
+ * \param n the number of elements in the array
  * \param f predicate function that returns 1 or 0 for each input
  *
  * Returns the index of the first element for which f is 0.

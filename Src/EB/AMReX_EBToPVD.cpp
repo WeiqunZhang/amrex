@@ -201,7 +201,7 @@ void EBToPVD::WriteEBVTP(const int myID) const
       myfile << "<VTKFile type=\"PolyData\" version=\"0.1\" byte_order=\"LittleEndian\">\n";
       myfile << "<PolyData>\n";
       myfile << "<Piece NumberOfPoints=\"" << m_points.size() << "\" NumberOfVerts=\"0\" " // NOLINT
-         << "NumberOfLines=\"0\" NumberOfString=\"0\" NumberOfPolys=\" " // NOLINT
+         << "NumberOfLines=\"0\" NumberOfStrips=\"0\" NumberOfPolys=\" " // NOLINT
          << m_connectivity.size() << "\">\n";
       print_points(myfile);
       print_connectivity(myfile);
@@ -348,7 +348,7 @@ void EBToPVD::calc_alpha(std::array<Real,12>& alpha,
       const Real* dx)
 {
    // default (large) value
-   std::fill(alpha.begin(), alpha.end(), 10.0);
+   std::ranges::fill(alpha, 10.0);
 
    // Ray-xAxis intersection
    if(std::abs(n0[0]) > std::numeric_limits<Real>::epsilon()) {
@@ -379,7 +379,7 @@ void EBToPVD::calc_intersects(int& int_count, std::array<bool,12>& intersects_fl
       const std::array<Real,12>& alpha)
 {
    int_count = 0;
-   std::fill(intersects_flags.begin(), intersects_flags.end(), false);
+   std::ranges::fill(intersects_flags, false);
 
    for(int lc1 = 0; lc1 < 12; ++lc1) {
       if(intersects(alpha[lc1])) {

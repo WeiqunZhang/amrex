@@ -23,11 +23,11 @@ COMP_VERSION = $(clang_version)
 
 ifeq ($(DEBUG),TRUE)
 
-  CXXFLAGS += -g -O0 -ftrapv
-  CFLAGS   += -g -O0 -ftrapv
+  CXXFLAGS += -g -O$(DEBUG_OPT_LEVEL) -ftrapv
+  CFLAGS   += -g -O$(DEBUG_OPT_LEVEL) -ftrapv
 
-  FFLAGS   += -g -O0 -ggdb -fbounds-check -fbacktrace -Wuninitialized -Wunused -ffpe-trap=invalid,zero -finit-real=snan -finit-integer=2147483647 -ftrapv
-  F90FLAGS += -g -O0 -ggdb -fbounds-check -fbacktrace -Wuninitialized -Wunused -ffpe-trap=invalid,zero -finit-real=snan -finit-integer=2147483647 -ftrapv
+  FFLAGS   += -g -O$(DEBUG_OPT_LEVEL) -ggdb -fbounds-check -fbacktrace -Wuninitialized -Wunused -ffpe-trap=invalid,zero -finit-real=snan -finit-integer=2147483647 -ftrapv
+  F90FLAGS += -g -O$(DEBUG_OPT_LEVEL) -ggdb -fbounds-check -fbacktrace -Wuninitialized -Wunused -ffpe-trap=invalid,zero -finit-real=snan -finit-integer=2147483647 -ftrapv
 
 else
 
@@ -65,19 +65,22 @@ ifeq ($(USE_COMPILE_PIC),TRUE)
 endif
 
 # disable some warnings
-CXXFLAGS += -Wno-c++17-extensions
+# CXXFLAGS += -Wno-c++20-extensions # Do we need it?
 
 ########################################################################
 
 ifdef CXXSTD
   CXXSTD := $(strip $(CXXSTD))
 else
-  CXXSTD := c++17
+  CXXSTD := c++20
 endif
 
 CXXFLAGS += -std=$(CXXSTD)
 CFLAGS   += -std=c11
 
+ifeq ($(USE_LIBCXX),TRUE)
+  CXXFLAGS += -stdlib=libc++
+endif
 
 ifeq ($(USE_COMPILE_PIC),TRUE)
 

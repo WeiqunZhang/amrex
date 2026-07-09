@@ -11,8 +11,9 @@
 #include <AMReX_TagBox.H>
 #include <AMReX_Vector.H>
 
-#include <string>
+#include <iterator>
 #include <memory>
+#include <string>
 
 namespace amrex {
 
@@ -22,25 +23,6 @@ extern "C"
 
     /**
     * \brief Type of extern "C" function called by ErrorRec to do tagging of cells for refinement.
-    *
-    * \param tag
-    * \param tlo
-    * \param thi
-    * \param tagval
-    * \param clearval
-    * \param data
-    * \param data_lo
-    * \param data_hi
-    * \param lo
-    * \param hi
-    * \param nvar
-    * \param domain_lo
-    * \param domain_hi
-    * \param dx
-    * \param xlo
-    * \param prob_lo
-    * \param time
-    * \param level
     */
     using ErrorFuncDefault = void (*)(int* tag, AMREX_ARLIM_P(tlo), AMREX_ARLIM_P(thi),
                                       const int* tagval, const int* clearval,
@@ -63,24 +45,24 @@ extern "C"
     * \brief Dimension agnostic version that always has three elements.
     * Note that this is only implemented for the ErrorFunc class, not ErrorFunc2.
     *
-    * \param tag
-    * \param tlo
-    * \param thi
-    * \param tagval
-    * \param clearval
-    * \param data
-    * \param data_lo
-    * \param data_hi
-    * \param lo
-    * \param hi
-    * \param nvar
-    * \param domain_lo
-    * \param domain_hi
-    * \param dx
-    * \param xlo
-    * \param prob_lo
-    * \param time
-    * \param level
+    * \param tag      Cell-status array to update (tagged or clear).
+    * \param tlo      Lower bounds of the tag array.
+    * \param thi      Upper bounds of the tag array.
+    * \param tagval   Value that indicates a tagged cell.
+    * \param clearval Value that indicates an untagged cell.
+    * \param data     Pointer to data.
+    * \param data_lo  Lower bounds of the data array.
+    * \param data_hi  Upper bounds of the data array.
+    * \param lo       Lower bounds of the tile being tagged.
+    * \param hi       Upper bounds of the tile being tagged.
+    * \param nvar     Number of data components supplied.
+    * \param domain_lo Lower bounds of the problem domain.
+    * \param domain_hi Upper bounds of the problem domain.
+    * \param dx       Cell spacing vector.
+    * \param xlo      Physical location of the lower corner of the tile.
+    * \param prob_lo  Physical location of the lower domain corner.
+    * \param time     Current simulation time.
+    * \param level    AMR level index being tagged.
     */
     using ErrorFunc3DDefault = void (*)(int* tag, const int* tlo, const int* thi,
                                         const int* tagval, const int* clearval,
@@ -156,25 +138,6 @@ public:
 
         /**
         * \brief Tag cells using "regular" function.
-        *
-        * \param tag
-        * \param tlo
-        * \param thi
-        * \param tagval
-        * \param clearval
-        * \param data
-        * \param data_lo
-        * \param data_hi
-        * \param lo
-        * \param hi
-        * \param nvar
-        * \param domain_lo
-        * \param domain_hi
-        * \param dx
-        * \param xlo
-        * \param prob_lo
-        * \param time
-        * \param level
         */
         virtual void operator () (int* tag, AMREX_ARLIM_P(tlo), AMREX_ARLIM_P(thi),
                                   const int* tagval, const int* clearval,
@@ -188,24 +151,24 @@ public:
         /**
         * \brief Tag cells using dimension-agnostic "regular" function.
         *
-        * \param tag
-        * \param tlo
-        * \param thi
-        * \param tagval
-        * \param clearval
-        * \param data
-        * \param data_lo
-        * \param data_hi
-        * \param lo
-        * \param hi
-        * \param nvar
-        * \param domain_lo
-        * \param domain_hi
-        * \param dx
-        * \param xlo
-        * \param prob_lo
-        * \param time
-        * \param level
+        * \param tag      Cell-status array to update (tagged or clear).
+        * \param tlo      Lower bounds of the tag array.
+        * \param thi      Upper bounds of the tag array.
+        * \param tagval   Value that indicates a tagged cell.
+        * \param clearval Value that indicates an untagged cell.
+        * \param data     Pointer to data.
+        * \param dlo      Lower bounds of the data array.
+        * \param dhi      Upper bounds of the data array.
+        * \param lo       Lower bounds of the tile being tagged.
+        * \param hi       Upper bounds of the tile being tagged.
+        * \param nvar     Number of data components supplied.
+        * \param domain_lo Lower bounds of the problem domain.
+        * \param domain_hi Upper bounds of the problem domain.
+        * \param dx       Cell spacing vector.
+        * \param xlo      Physical location of the lower corner of the tile.
+        * \param prob_lo  Physical location of the lower domain corner.
+        * \param time     Current simulation time.
+        * \param level    AMR level index being tagged.
         */
         virtual void operator () (int* tag, const int* tlo, const int* thi,
                                   const int* tagval, const int* clearval,
@@ -253,25 +216,26 @@ public:
         ErrorFunc2& operator= (ErrorFunc2 const&) = default;
         ErrorFunc2& operator= (ErrorFunc2 &&) = delete;
 
+        /// \cond DOXYGEN_IGNORE
         /**
-        * \brief Tag cells cells using "v2" interface
+        * \brief Tag cells using the alternative interface that supports average-based tagging.
         *
-        * \param tag
-        * \param tlo
-        * \param thi
-        * \param tagval
-        * \param clearval
-        * \param data
-        * \param data_lo
-        * \param data_hi
-        * \param lo
-        * \param hi
-        * \param nvar
-        * \param domain_lo
-        * \param domain_hi
-        * \param dx
-        * \param level
-        * \param avg
+        * \param tag      Cell-status array to update (tagged or clear).
+        * \param tlo      Lower bounds of the tag array.
+        * \param thi      Upper bounds of the tag array.
+        * \param tagval   Value indicating a tagged cell.
+        * \param clearval Value indicating an untagged cell.
+        * \param data     Pointer to data.
+        * \param data_lo  Lower bounds of the data array.
+        * \param data_hi  Upper bounds of the data array.
+        * \param lo       Lower bounds of the tile being tagged.
+        * \param hi       Upper bounds of the tile being tagged.
+        * \param nvar     Number of state components supplied.
+        * \param domain_lo Lower bounds of the problem domain.
+        * \param domain_hi Upper bounds of the problem domain.
+        * \param dx       Cell spacing vector.
+        * \param level    AMR level index.
+        * \param avg      Optional coarse-level averages for comparison.
         */
         virtual void operator () (int* tag, AMREX_ARLIM_P(tlo), AMREX_ARLIM_P(thi),
                                   const int* tagval, const int* clearval,
@@ -279,22 +243,24 @@ public:
                                   const int* lo, const int * hi, const int* nvar,
                                   const int* domain_lo, const int* domain_hi,
                                   const Real* dx, const int* level, const Real* avg) const;
+        /// \endcond
     protected:
 
         ErrorFunc2Default  m_func{nullptr};
     };
 
     /**
-    * \brief The constructors.
+    * \brief Construct an error record that uses the ErrorFunc2 interface.
     *
-    * \param nm
-    * \param ng
-    * \param etyp
-    * \param f2
+    * \param nm   Derived quantity name used for tagging.
+    * \param ng   Number of grow cells required by the tagging functor.
+    * \param etyp Error tagging type (Special/Standard/UseAverage).
+    * \param f2   Functor describing how to tag cells.
     */
     ErrorRec (std::string nm, int ng, ErrorType etyp,
               const ErrorRec::ErrorFunc2& f2);
 
+    //! Construct an error record that uses the ErrorFunc interface (same parameters as above).
     ErrorRec (std::string nm, int ng, ErrorType etyp,
               const ErrorRec::ErrorFunc& f);
 
@@ -361,16 +327,17 @@ public:
     /**
     * \brief Append a new ErrorRec to the list.
     *
-    * \param name
-    * \param nextra
-    * \param typ
-    * \param func
+    * \param name   Derived quantity name used for tagging.
+    * \param nextra Number of grow cells required by the functor.
+    * \param typ    Tagging type (Special/Standard/UseAverage).
+    * \param func   ErrorFunc functor describing tagging logic.
     */
     void add (const std::string&  name,
               int                 nextra,
               ErrorRec::ErrorType typ,
               const ErrorRec::ErrorFunc&    func);
 
+    //! Overload that accepts ErrorFunc2 instead of ErrorFunc.
     void add (const std::string&  name,
               int                 nextra,
               ErrorRec::ErrorType typ,
@@ -388,6 +355,7 @@ private:
 
 std::ostream& operator << (std::ostream& os, const ErrorList& elst);
 
+  //! Optional knobs that control AMRErrorTag behavior (time window, level limits, etc.).
   struct AMRErrorTagInfo
   {
     int m_max_level = 1000;
@@ -423,6 +391,9 @@ std::ostream& operator << (std::ostream& os, const ErrorList& elst);
     }
   };
 
+  /**
+   * \brief Flexible tagging rule that supports gradients, thresholds, boxes, and user functors.
+   */
   class AMRErrorTag
   {
   public:
@@ -447,26 +418,44 @@ std::ostream& operator << (std::ostream& os, const ErrorList& elst);
                                char                                    clearval) = 0;
     };
 
+    //! Construct a tag with default BOX test and the supplied metadata.
     explicit AMRErrorTag (const AMRErrorTagInfo& info = AMRErrorTagInfo()) noexcept
       : m_info(info), m_ngrow(SetNGrow()) {}
 
+    /**
+     * \brief Construct a tag using a scalar threshold across all levels.
+     *
+     * \param value Threshold (or reference) value.
+     * \param test  Test mode (e.g., GREATER, LESS).
+     * \param field MultiFab component name to examine.
+     * \param info  Optional metadata describing min/max time, level limits, etc.
+     */
     AMRErrorTag (amrex::Real            value,
                  AMRErrorTag::TEST      test,
                  std::string            field,
                  const AMRErrorTagInfo& info = AMRErrorTagInfo()) noexcept
-      : m_value(info.m_max_level, value), m_test(test), m_field(std::move(field)), m_info(info),
+      : m_value((info.m_max_level > 0) ? info.m_max_level : 1, value),
+        m_test(test), m_field(std::move(field)), m_info(info),
         m_ngrow(SetNGrow())
       {
       }
 
-    AMRErrorTag (amrex::Vector<amrex::Real>  value,
-                 AMRErrorTag::TEST           test,
-                 std::string                 field,
-                 const AMRErrorTagInfo&      info = AMRErrorTagInfo()) noexcept
+    /**
+     * \brief Construct a tag with per-level threshold values.
+     *
+     * \param value Vector of thresholds (last entry reused for higher levels if needed).
+     * \param test  Test mode.
+     * \param field MultiFab component name to examine.
+     * \param info  Optional metadata (time window, level window, etc.).
+     */
+    AMRErrorTag (amrex::Vector<amrex::Real> const& value,
+                 AMRErrorTag::TEST                test,
+                 std::string                      field,
+                 const AMRErrorTagInfo&           info = AMRErrorTagInfo()) noexcept
       : m_test(test), m_field(std::move(field)), m_info(info), m_ngrow(SetNGrow())
       {
           AMREX_ASSERT(!value.empty());
-          m_value.resize(info.m_max_level);
+          m_value.resize((info.m_max_level > 0) ? info.m_max_level : 1);
           for (int i = 0; i < m_value.size() && i < value.size(); ++i) {
               m_value[i] = value[i];
           }
@@ -477,6 +466,14 @@ std::ostream& operator << (std::ostream& os, const ErrorList& elst);
           }
       }
 
+    /**
+     * \brief Construct a tag that delegates to a user functor.
+     *
+     * \param userfunc User-defined functor (ownership retained by caller).
+     * \param field    MultiFab component name to examine.
+     * \param ngrow    Number of grow cells the functor requires.
+     * \param info     Optional metadata.
+     */
     AMRErrorTag (AMRErrorTag::UserFunc* userfunc,
                  std::string            field,
                  int                    ngrow,
@@ -489,20 +486,39 @@ std::ostream& operator << (std::ostream& os, const ErrorList& elst);
     explicit AMRErrorTag (Parser parser,
                           const AMRErrorTagInfo& info = AMRErrorTagInfo());
 
+    /**
+     * \brief Apply the tagging rule to a TagBoxArray/MultiFab pair.
+     *
+     * \param tb      Destination TagBoxArray to update.
+     * \param mf      MultiFab whose data drive data-dependent modes. Must be non-null for USER,
+     *                 GRAD, RELGRAD, LESS, GREATER, and VORT modes; may be nullptr for BOX
+     *                 and PARSER modes.
+     * \param clearval Value indicating an untagged cell.
+     * \param tagval   Value indicating a tagged cell.
+     * \param time     Simulation time.
+     * \param level    AMR level index.
+     * \param geom     Geometry describing the level (for coordinate-dependent tests).
+     */
     void operator() (amrex::TagBoxArray&    tb,
                      const amrex::MultiFab* mf,
                      char                   clearval,
                      char                   tagval,
                      amrex::Real            time,
                      int                    level,
-                     const amrex::Geometry& geom) const noexcept;
+                     const amrex::Geometry& geom) const;
 
     [[nodiscard]] int NGrow() const noexcept {return m_ngrow;}
     [[nodiscard]] const std::string& Field () const noexcept {return m_field;}
 
     [[nodiscard]] AMRErrorTagInfo& GetInfo () noexcept {return m_info;}
     [[nodiscard]] AMRErrorTagInfo const& GetInfo () const noexcept {return m_info;}
-    void SetInfo (AMRErrorTagInfo const& info) noexcept {m_info = info;}
+    void SetInfo (AMRErrorTagInfo const& info) noexcept
+    {
+        if (!m_value.empty() && info.m_max_level > std::ssize(m_value)) {
+            m_value.resize(info.m_max_level, m_value.back());
+        }
+        m_info = info;
+    }
 
   protected:
     [[nodiscard]] int SetNGrow () const noexcept;

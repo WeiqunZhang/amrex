@@ -131,7 +131,7 @@ void abec_gsrb_os (int i, int, int, int n, Array4<T> const& phi, Array4<T const>
 {
     if ((i+redblack)%2 == 0) {
         if (osm(i,0,0) == 0) {
-            phi(i,0,0) = T(0.0);
+            phi(i,0,0,n) = T(0.0);
         } else {
             const auto vlo = amrex::lbound(vbox);
             const auto vhi = amrex::ubound(vbox);
@@ -199,7 +199,7 @@ void abec_jacobi_os (int i, int, int, int n, Array4<T> const& phi,
                      Box const& vbox) noexcept
 {
     if (osm(i,0,0) == 0) {
-        phi(i,0,0) = T(0.0);
+        phi(i,0,0,n) = T(0.0);
     } else {
         const auto vlo = amrex::lbound(vbox);
         const auto vhi = amrex::ubound(vbox);
@@ -229,7 +229,7 @@ void abec_gsrb_with_line_solve (
                 Array4<int const> const& /*m1*/,
                 Array4<T const> const& /*f0*/,
                 Array4<T const> const& /*f1*/,
-                Box const& /*vbox*/, int /*redblack*/, int /*nc*/) noexcept
+                Box const& /*vbox*/, int /*redblack*/, int /*nc*/)
 {
     amrex::Abort("abec_gsrb_with_line_solve not implemented in 1D");
 }

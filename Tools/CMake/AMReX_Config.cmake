@@ -13,6 +13,13 @@
 function (configure_amrex AMREX_TARGET)
 
    #
+   # Include the required modules
+   #
+   include( AMReX_ThirdPartyProfilers )
+   include( AMReXGenexHelpers )
+   include( AMReXFlagsTargets )
+
+   #
    # Check if target "amrex" has been defined before
    # calling this macro
    #
@@ -24,31 +31,26 @@ function (configure_amrex AMREX_TARGET)
    # Check that needed options have already been defined
    #
    if ( ( NOT ( DEFINED AMReX_MPI ) ) OR ( NOT (DEFINED AMReX_OMP) )
-	 OR ( NOT (DEFINED AMReX_PIC) ) OR (NOT (DEFINED AMReX_FPE)))
+	 OR ( NOT (DEFINED AMReX_PIC) ) OR (NOT (DEFINED AMReX_FASTMATH))
+     OR (NOT (DEFINED AMReX_FPE)))
       message ( AUTHOR_WARNING "Required options are not defined" )
    endif ()
 
    #
-   # Include the required modules
-   #
-   include( AMReX_ThirdPartyProfilers )
-   include( AMReXGenexHelpers )
-
-   #
    # Setup compilers
    #
-   # Set C++ standard and disable compiler-specific extensions, like "-std=gnu++17" for GNU
+   # Set C++ standard and disable compiler-specific extensions, like "-std=gnu++20" for GNU
    # This will also enforce the same standard with the CUDA compiler
    # Moreover, it will also enforce such standard on all the consuming targets
    #
    set_target_properties(${AMREX_TARGET} PROPERTIES CXX_EXTENSIONS OFF)
-   # minimum: C++17
-   target_compile_features(${AMREX_TARGET} PUBLIC cxx_std_17)
+   # minimum: C++20
+   target_compile_features(${AMREX_TARGET} PUBLIC cxx_std_20)
 
    if (AMReX_CUDA)
       set_target_properties(${AMREX_TARGET} PROPERTIES CUDA_EXTENSIONS OFF)
-      # minimum: C++17
-      target_compile_features(${AMREX_TARGET} PUBLIC cuda_std_17)
+      # minimum: C++20
+      target_compile_features(${AMREX_TARGET} PUBLIC cuda_std_20)
    endif()
 
    #
@@ -72,7 +74,6 @@ function (configure_amrex AMREX_TARGET)
    )
 
    unset(_condition)
-   unset(_cxx_msvc)
 
    #
    # Setup OpenMP
@@ -146,10 +147,20 @@ function (configure_amrex AMREX_TARGET)
       endif()
    endif()
 
+   # fast math
+   if (AMReX_FASTMATH)
+       target_link_libraries(${AMREX_TARGET} PUBLIC AMReX::Flags_FASTMATH)
+   endif()
+
    #
    # Setup third-party profilers
    #
    set_amrex_profilers(${AMREX_TARGET})
+
+   #
+   # clean up helpers
+   #
+   unset(_cxx_msvc)
 
 endfunction ()
 

@@ -41,8 +41,8 @@ public:
     TinyProfiler& operator= (TinyProfiler const&) = delete;
     TinyProfiler& operator= (TinyProfiler &&) = delete;
 
-    void start () noexcept;
-    void stop () noexcept;
+    void start ();
+    void stop ();
 
     void memory_start () const noexcept;
     void memory_stop () const noexcept;
@@ -52,10 +52,10 @@ public:
     static void memory_free (std::size_t nbytes, MemStat* stat) noexcept;
 
     static void Initialize ();
-    static void Finalize (bool bFlushing = false) noexcept;
+    static void Finalize (bool bFlushing = false);
 
     static void MemoryInitialize ();
-    static void MemoryFinalize (bool bFlushing = false) noexcept;
+    static void MemoryFinalize (bool bFlushing = false);
 
     static bool RegisterArena (const std::string& memory_name,
                                std::map<std::string, MemStat>& memstats) noexcept;
@@ -66,6 +66,7 @@ public:
     static void StopRegion (const std::string& regname) noexcept;
 
     static void PrintCallStack (std::ostream& os);
+    static void PrintMemoryUsage (std::ostream* os, bool only_local) noexcept;
 
 private:
     struct Stats
@@ -101,6 +102,7 @@ private:
     {
         Long nalloc = 0;
         Long nfree = 0;
+        Long curmem_max = 0;
         Long avgmem_min = std::numeric_limits<Long>::max();
         Long avgmem_avg = 0;
         Long avgmem_max = 0;
@@ -132,9 +134,11 @@ private:
     static std::vector<std::string> all_memnames;
 
     static std::vector<std::string> regionstack;
+    static std::vector<std::pair<std::string,bool> > regionstartstack;
     static std::deque<std::tuple<double,double,std::string*> > ttstack;
     static std::map<std::string,std::map<std::string, Stats> > statsmap;
     static double t_init;
+    static double t_memory_init;
     static bool device_synchronize_around_region;
     static int n_print_tabs;
     static int verbose;
@@ -148,7 +152,7 @@ private:
                             std::ostream* os);
     static void PrintMemStats (std::map<std::string, MemStat>& memstats,
                                std::string const& memname, double dt_max,
-                               double t_final, std::ostream* os);
+                               double t_final, std::ostream* os, bool only_local);
 };
 
 class TinyProfileRegion

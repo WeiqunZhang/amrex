@@ -29,6 +29,10 @@
 #include <AMReX_Sundials.H>
 #endif
 
+#ifdef AMREX_USE_PETSC
+#include <petscsys.h>
+#endif
+
 #ifdef AMREX_USE_CUPTI
 #include <AMReX_CuptiTrace.H>
 #endif
@@ -54,6 +58,8 @@
 #ifdef AMREX_MEM_PROFILING
 #include <AMReX_MemProfiler.H>
 #endif
+
+#include <iterator>
 
 #ifdef AMREX_USE_OMP
 #include <AMReX_OpenMP.H>
@@ -135,6 +141,12 @@ namespace {
     std::vector<std::string> command_arguments;
 }
 
+#ifdef AMREX_USE_PETSC
+namespace {
+    bool petsc_initialized_by_amrex = false;
+}
+#endif
+
 namespace {
     std::streamsize  prev_out_precision;
     std::streamsize  prev_err_precision;
@@ -196,10 +208,9 @@ amrex::write_to_stderr_without_buffering (const char* str)
     {
         std::ostringstream procall;
         procall << ParallelDescriptor::MyProc() << "::";
-        auto tmp = procall.str();
-        const char *cprocall = tmp.c_str();
+        auto const tmp = procall.view();
         const char * const end = " !!!\n";
-        std::fwrite(cprocall, strlen(cprocall), 1, stderr);
+        std::fwrite(tmp.data(), tmp.size(), 1, stderr);
         std::fwrite(str, strlen(str), 1, stderr);
         std::fwrite(end, strlen(end), 1, stderr);
     }
@@ -269,17 +280,18 @@ amrex::Warning_host (const char * msg)
 }
 
 void
-amrex::Assert_host (const char* EX, const char* file, int line, const char* msg)
+amrex::Assert_host (const char* EX, const char* file, int line, const char* msg,
+                    std::size_t msg_size)
 {
 #ifdef AMREX_USE_COVERITY
     amrex_coverity_abort();
 #else
-    const int N = 512;
+    const std::size_t N = 512 + msg_size;
 
-    char buf[N];
+    std::vector<char> buf(N);
 
     if (msg) {
-        snprintf(buf,
+        snprintf(buf.data(),
                  N,
                  "Assertion `%s' failed, file \"%s\", line %d, Msg: %s",
                  EX,
@@ -287,7 +299,7 @@ amrex::Assert_host (const char* EX, const char* file, int line, const char* msg)
                  line,
                  msg);
     } else {
-        snprintf(buf,
+        snprintf(buf.data(),
                  N,
                  "Assertion `%s' failed, file \"%s\", line %d",
                  EX,
@@ -296,11 +308,11 @@ amrex::Assert_host (const char* EX, const char* file, int line, const char* msg)
     }
 
     if (system::error_handler) {
-        system::error_handler(buf);
+        system::error_handler(buf.data());
     } else if (system::throw_exception) {
-        throw RuntimeError(buf);
+        throw RuntimeError(buf.data());
     } else {
-       write_to_stderr_without_buffering(buf);
+       write_to_stderr_without_buffering(buf.data());
 #ifdef AMREX_USE_OMP
 #pragma omp critical (amrex_abort_omp_critical)
 #endif
@@ -330,28 +342,29 @@ amrex::ExecOnInitialize (std::function<void()> f)
 amrex::AMReX*
 amrex::Initialize (MPI_Comm mpi_comm,
                    std::ostream& a_osout, std::ostream& a_oserr,
-                   ErrorHandler a_errhandler)
+                   ErrorHandler a_errhandler, int a_device_id)
 {
     int argc = 0;
     char** argv = nullptr;
-    return Initialize(argc, argv, false, mpi_comm, {}, a_osout, a_oserr, a_errhandler);
+    return Initialize(argc, argv, false, mpi_comm, {}, a_osout, a_oserr,
+                      a_errhandler, a_device_id);
 }
 
 amrex::AMReX*
 amrex::Initialize (int& argc, char**& argv,
                    const std::function<void()>& func_parm_parse,
                    std::ostream& a_osout, std::ostream& a_oserr,
-                   ErrorHandler a_errhandler)
+                   ErrorHandler a_errhandler, int a_device_id)
 {
     return Initialize(argc, argv, true, MPI_COMM_WORLD, func_parm_parse,
-                      a_osout, a_oserr, a_errhandler);
+                      a_osout, a_oserr, a_errhandler, a_device_id);
 }
 
 amrex::AMReX*
 amrex::Initialize (int& argc, char**& argv, bool build_parm_parse,
                    MPI_Comm mpi_comm, const std::function<void()>& func_parm_parse,
                    std::ostream& a_osout, std::ostream& a_oserr,
-                   ErrorHandler a_errhandler)
+                   ErrorHandler a_errhandler, int a_device_id)
 {
     system::exename.clear();
     if (initialization_by_init_minimal) {
@@ -406,8 +419,11 @@ amrex::Initialize (int& argc, char**& argv, bool build_parm_parse,
     if (argc > 0)
     {
         if (argv[0][0] != '/') {
-            system::exename = FileSystem::CurrentPath();
-            system::exename += "/";
+            auto cwd = FileSystem::CurrentPath();
+            if (!cwd.empty()) {
+                system::exename = std::move(cwd);
+                system::exename += "/";
+            }
         }
         system::exename += argv[0];
 
@@ -540,9 +556,10 @@ amrex::Initialize (int& argc, char**& argv, bool build_parm_parse,
 
     Machine::Initialize();
 
+    amrex::ignore_unused(a_device_id);
 #ifdef AMREX_USE_GPU
     // Initialize after ParmParse so that we can read inputs.
-    Gpu::Device::Initialize(initialization_by_init_minimal);
+    Gpu::Device::Initialize(initialization_by_init_minimal, a_device_id);
 #ifdef AMREX_USE_CUPTI
     CuptiInitialize();
 #endif
@@ -699,7 +716,7 @@ amrex::Initialize (int& argc, char**& argv, bool build_parm_parse,
     VectorGrowthStrategy::Initialize();
 
 #ifdef AMREX_USE_FFT
-    FFT::Initialize();
+    FFT::detail::Initialize();
 #endif
 
 #ifdef AMREX_USE_EB
@@ -741,8 +758,39 @@ amrex::Initialize (int& argc, char**& argv, bool build_parm_parse,
         hypre_HandleDefaultExecPolicy(hypre_handle()) = HYPRE_EXEC_DEVICE;
         hypre_HandleSpgemmUseCusparse(hypre_handle()) = 0;
 #endif
+#if (HYPRE_RELEASE_NUMBER >= 23100)
+        // Discussion in https://github.com/AMReX-Codes/amrex/pull/5336
+        HYPRE_DeviceInitialize();
+#endif
 #endif
 
+        if (system::verbose > 0) {
+#if defined(HYPRE_DEVELOP_STRING) && defined(HYPRE_BRANCH_NAME)
+            amrex::Print() << "HYPRE (" << HYPRE_DEVELOP_STRING
+                           << " - " << HYPRE_BRANCH_NAME
+                           << " branch) initialized" << '\n';
+
+#elif defined(HYPRE_DEVELOP_STRING) && !defined(HYPRE_BRANCH_NAME)
+            amrex::Print() << "HYPRE (" << HYPRE_DEVELOP_STRING << ") initialized" << '\n';
+
+#elif defined(HYPRE_RELEASE_VERSION)
+            amrex::Print() << "HYPRE (" << HYPRE_RELEASE_VERSION << ") initialized" << '\n';
+#endif
+        }
+    }
+#endif
+
+#ifdef AMREX_USE_PETSC
+    {
+        PetscBool petsc_is_initialized = PETSC_FALSE;
+        PetscInitialized(&petsc_is_initialized);
+        if (!petsc_is_initialized) {
+            PetscErrorCode ierr = PetscInitialize(&argc, &argv, nullptr, nullptr);
+            if (ierr != 0) {
+                amrex::Abort("PetscInitialize failed");
+            }
+            petsc_initialized_by_amrex = true;
+        }
     }
 #endif
 
@@ -756,7 +804,7 @@ amrex::Initialize (int& argc, char**& argv, bool build_parm_parse,
 
     BL_TINY_PROFILE_INITIALIZE();
 
-    AMReX::push(new AMReX()); // NOLINT(clang-analyzer-cplusplus.NewDeleteLeaks)
+    AMReX::push(std::make_unique<AMReX>());
     return AMReX::top(); // NOLINT
 }
 
@@ -780,6 +828,13 @@ amrex::Finalize (amrex::AMReX* pamrex)
 #endif
 
     AMReX::erase(pamrex);
+
+#ifdef AMREX_USE_PETSC
+    if (petsc_initialized_by_amrex) {
+        PetscFinalize();
+        petsc_initialized_by_amrex = false;
+    }
+#endif
 
 #ifdef AMREX_USE_HYPRE
     if (init_hypre) { HYPRE_Finalize(); }
@@ -932,7 +987,7 @@ amrex::command_argument_count ()
 std::string
 amrex::get_command_argument (int number)
 {
-    if (number < static_cast<int>(command_arguments.size())) {
+    if (number < std::ssize(command_arguments)) {
         return command_arguments[number];
     } else {
         return std::string();
@@ -963,6 +1018,12 @@ AMReX::push (AMReX* pamrex)
     } else if (r+1 != m_instance.end()) {
         std::rotate(r, r+1, m_instance.end());
     }
+}
+
+void
+AMReX::push (std::unique_ptr<AMReX> pamrex)
+{
+    m_instance.push_back(std::move(pamrex));
 }
 
 void

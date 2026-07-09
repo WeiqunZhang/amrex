@@ -159,12 +159,14 @@ amrex_eb2_build_types (Box const& tbx, Box const& bxg2,
     });
 }
 
+/// \cond DOXYGEN_IGNORE
 namespace detail {
     AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
     int num_cuts (Real a, Real b) noexcept {
         return (a >= 0.0_rt && b < 0.0_rt) || (b >= 0.0_rt && a < 0.0_rt);
     }
 }
+/// \endcond
 
 AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
 int check_mvmc (int i, int j, int k, Array4<Real const> const& fine)
@@ -274,6 +276,7 @@ int check_mvmc (int i, int j, int k, Array4<Real const> const& fine)
     return ierr;
 }
 
+/// \cond DOXYGEN_IGNORE
 namespace detail {
 AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
 Real coarsen_edge_cent (Real f1, Real f2)
@@ -302,6 +305,7 @@ Real coarsen_edge_cent (Real f1, Real f2)
     }
 }
 }
+/// \endcond
 
 AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
 int coarsen_from_fine (int i, int j, int k, Box const& bx, int ngrow,
@@ -477,10 +481,31 @@ int coarsen_from_fine (int i, int j, int k, Box const& bx, int ngrow,
                 +     fbn(ii+1,jj  ,kk+1,2)*fba(ii+1,jj  ,kk+1)
                 +     fbn(ii  ,jj+1,kk+1,2)*fba(ii  ,jj+1,kk+1)
                 +     fbn(ii+1,jj+1,kk+1,2)*fba(ii+1,jj+1,kk+1);
-            Real nfac = 1.0_rt / std::sqrt(nx*nx+ny*ny+nz*nz+1.e-30_rt);
-            cbn(i,j,k,0) = nx*nfac;
-            cbn(i,j,k,1) = ny*nfac;
-            cbn(i,j,k,2) = nz*nfac;
+            Real nxyz = std::sqrt(nx*nx + ny*ny + nz*nz);
+            constexpr Real tiny = Real(16) * std::numeric_limits<Real>::min();
+            if (nxyz > tiny) {
+                Real nfac = 1.0_rt / nxyz;
+                cbn(i,j,k,0) = nx * nfac;
+                cbn(i,j,k,1) = ny * nfac;
+                cbn(i,j,k,2) = nz * nfac;
+            } else {
+                Real absnx = std::abs(nx);
+                Real absny = std::abs(ny);
+                Real absnz = std::abs(nz);
+                if (absnx >= absny && absnx >= absnz) {
+                    cbn(i,j,k,0) = std::copysign(1.0_rt, nx);
+                    cbn(i,j,k,1) = 0.0_rt;
+                    cbn(i,j,k,2) = 0.0_rt;
+                } else if (absny >= absnz) {
+                    cbn(i,j,k,0) = 0.0_rt;
+                    cbn(i,j,k,1) = std::copysign(1.0_rt, ny);
+                    cbn(i,j,k,2) = 0.0_rt;
+                } else {
+                    cbn(i,j,k,0) = 0.0_rt;
+                    cbn(i,j,k,1) = 0.0_rt;
+                    cbn(i,j,k,2) = std::copysign(1.0_rt, nz);
+                }
+            }
             ierr = (nx == 0.0_rt && ny == 0.0_rt && nz == 0.0_rt)
                 // we must check the enclosing surface to make sure the coarse cell does not
                 // fully contains the geometry object.

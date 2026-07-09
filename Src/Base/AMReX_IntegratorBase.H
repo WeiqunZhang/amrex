@@ -4,24 +4,26 @@
 #include <AMReX_REAL.H>
 #include <AMReX_Vector.H>
 #include <AMReX_MultiFab.H>
+#include <AMReX_ParmParse.H>
 
 #if defined(AMREX_PARTICLES)
 #include <AMReX_Particles.H>
 #endif
 
+#include <concepts>
 #include <functional>
-#include <type_traits>
 
 namespace amrex {
 
-template<class T, typename Tv = void> struct IntegratorOps;
+template<class T> struct IntegratorOps;
 
 #if defined(AMREX_PARTICLES)
 template<class T>
-struct IntegratorOps<T, std::enable_if_t<std::is_base_of_v<amrex::ParticleContainerBase, T> > >
+requires (std::is_base_of_v<ParticleContainerBase, T>)
+struct IntegratorOps<T>
 {
 
-    static void CreateLike (amrex::Vector<std::unique_ptr<T> >& V, const T& Other)
+    static void CreateLike (amrex::Vector<std::unique_ptr<T> >& V, const T& Other, bool /* Grow */ = false)
     {
         // Emplace a new T in V with the same size as Other and get a reference
         V.emplace_back(std::make_unique<T>(Other.Geom(0), Other.ParticleDistributionMap(0), Other.ParticleBoxArray(0)));
@@ -84,7 +86,8 @@ struct IntegratorOps<T, std::enable_if_t<std::is_base_of_v<amrex::ParticleContai
 #endif
 
 template<class T>
-struct IntegratorOps<T, std::enable_if_t<std::is_same_v<amrex::Vector<amrex::MultiFab>, T> > >
+requires (std::same_as<T, Vector<MultiFab>>)
+struct IntegratorOps<T>
 {
 
     static void CreateLike (amrex::Vector<std::unique_ptr<T> >& V, const T& Other, bool Grow = false)
@@ -130,7 +133,8 @@ struct IntegratorOps<T, std::enable_if_t<std::is_same_v<amrex::Vector<amrex::Mul
 };
 
 template<class T>
-struct IntegratorOps<T, std::enable_if_t<std::is_same_v<amrex::MultiFab, T> > >
+requires (std::same_as<T, MultiFab>)
+struct IntegratorOps<T>
 {
 
     static void CreateLike (amrex::Vector<std::unique_ptr<T> >& V, const T& Other, bool Grow = false)
@@ -161,6 +165,19 @@ struct IntegratorOps<T, std::enable_if_t<std::is_same_v<amrex::MultiFab, T> > >
 template<class T>
 class IntegratorBase
 {
+private:
+  void initialize_base_parameters ()
+  {
+    amrex::ParmParse pp("integration");
+    pp.query("use_adaptive_time_step", use_adaptive_time_step);
+    pp.query("time_step", time_step);
+    pp.query("use_adaptive_fast_time_step", use_adaptive_fast_time_step);
+    pp.query("fast_time_step", fast_time_step);
+    pp.query("rel_tol", rel_tol);
+    pp.query("abs_tol", abs_tol);
+    pp.query("fast_rel_tol", fast_rel_tol);
+    pp.query("fast_abs_tol", fast_abs_tol);
+  }
 protected:
     /**
      * \brief Rhs is the right-hand-side function the integrator will use.
@@ -271,9 +288,13 @@ protected:
 
 
 public:
-    IntegratorBase () = default;
+    IntegratorBase () {
+      initialize_base_parameters();
+    }
 
-    IntegratorBase (const T& /* S_data */) {}
+    IntegratorBase (const T& /* S_data */) {
+      initialize_base_parameters();
+    }
 
     virtual ~IntegratorBase () = default;
 

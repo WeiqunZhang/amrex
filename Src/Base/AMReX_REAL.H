@@ -66,7 +66,10 @@ typedef double amrex_particle_real; // NOLINT(modernize-use-using)
 
 #ifdef __cplusplus
 namespace amrex {
-    /** Floating Point Type for Fields
+
+    /**
+     * \ingroup amrex_arithmetic_types
+     * \brief Floating Point Type for Fields
      *
      * This is a floating point type used by default for fields such as
      * FArrayBox and MultiFab classes. This can be changed at compile time to
@@ -75,7 +78,9 @@ namespace amrex {
      */
     using Real = amrex_real;
 
-    /** Floating Point Type for Particles
+    /**
+     * \ingroup amrex_arithmetic_types
+     * \brief Floating Point Type for Particles
      *
      * This is a floating point type used by default for ParticleContainer and
      * related particle classes. This can be changed at compile time to run
@@ -94,10 +99,10 @@ inline namespace literals {
       C++ user literals ``_rt`` &  ``_prt`` for short-hand notations
 
       Use this to properly add types to constant such as
-      ```C++
+      \code{.cpp}
       auto const mypi = 3.14_rt;
       auto const sphere_volume = 4_rt / 3_rt * pow(r, 3) * mypi;
-      ```
+      \endcode
     */
     constexpr Real
     operator""_rt( long double x )

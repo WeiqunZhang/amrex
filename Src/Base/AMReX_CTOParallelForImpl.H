@@ -6,7 +6,9 @@
 #include <AMReX_TypeList.H>
 
 #include <array>
+#include <concepts>
 #include <type_traits>
+#include <utility>
 
 /* This header is not for the users to include directly.  It's meant to be
  * included in AMReX_GpuLaunch.H, which has included the headers needed
@@ -22,6 +24,7 @@ struct CompileTimeOptions {
     using list_type = TypeList<std::integral_constant<int, ctr>...>;
 };
 
+/// \cond DOXYGEN_IGNORE
 namespace detail
 {
     template<class F, int... ctr>
@@ -72,7 +75,16 @@ namespace detail
         amrex::ignore_unused(found_option);
         AMREX_ASSERT(found_option);
     }
+
+    template <int Begin, int End, int... I>
+    constexpr auto MakeCTOImpl(std::integer_sequence<int, I...>)
+        -> CompileTimeOptions<Begin + I...>;
 }
+/// \endcond
+
+template <int Begin, int End>
+using CTOSeq = decltype(detail::MakeCTOImpl<Begin, End>(
+                            std::make_integer_sequence<int, End - Begin>{}));
 
 /**
  * \brief Compile time optimization of kernels with run time options.
@@ -84,84 +96,84 @@ namespace detail
  * discard unused code blocks for better run time performance.  In the
  * example below, the code will be expanded into 4*2=8 normal ParallelForRNGs
  * for all combinations of the run time parameters.
- \verbatim
-    int A_runtime_option = ...;
-    int B_runtime_option = ...;
-    enum A_options : int { A0, A1, A2, A3 };
-    enum B_options : int { B0, B1 };
-    AnyCTO(TypeList<CompileTimeOptions<A0,A1,A2,A3>,
-                    CompileTimeOptions<B0,B1>>{},
-        {A_runtime_option, B_runtime_option},
-        [&](auto cto_func){
-            ParallelForRNG(N, cto_func);
-        },
-        [=] AMREX_GPU_DEVICE (int i, const RandomEngine& engine,
-                              auto A_control, auto B_control)
-        {
-            ...
-            if constexpr (A_control.value == A0) {
-                ...
-            } else if constexpr (A_control.value == A1) {
-                ...
-            } else if constexpr (A_control.value == A2) {
-                ...
-            } else {
-                ...
-            }
-            if constexpr (A_control.value != A3 && B_control.value == B1) {
-                ...
-            }
-            ...
-        }
-    );
-
-    constexpr int nthreads_per_block = ...;
-    int nblocks = ...;
-    AnyCTO(TypeList<CompileTimeOptions<A0,A1,A2,A3>,
-                    CompileTimeOptions<B0,B1>>{},
-        {A_runtime_option, B_runtime_option},
-        [&](auto cto_func){
-            launch<nthreads_per_block>(nblocks, Gpu::gpuStream(), cto_func);
-        },
-        [=] AMREX_GPU_DEVICE (auto A_control, auto B_control){
-            ...
-        }
-    );
- \endverbatim
+ * \code{.cpp}
+ *     int A_runtime_option = ...;
+ *     int B_runtime_option = ...;
+ *     enum A_options : int { A0, A1, A2, A3 };
+ *     enum B_options : int { B0, B1 };
+ *     AnyCTO(TypeList<CompileTimeOptions<A0,A1,A2,A3>,
+ *                     CompileTimeOptions<B0,B1>>{},
+ *         {A_runtime_option, B_runtime_option},
+ *         [&](auto cto_func){
+ *             ParallelForRNG(N, cto_func);
+ *         },
+ *         [=] AMREX_GPU_DEVICE (int i, const RandomEngine& engine,
+ *                               auto A_control, auto B_control)
+ *         {
+ *             ...
+ *             if constexpr (A_control.value == A0) {
+ *                 ...
+ *             } else if constexpr (A_control.value == A1) {
+ *                 ...
+ *             } else if constexpr (A_control.value == A2) {
+ *                 ...
+ *             } else {
+ *                 ...
+ *             }
+ *             if constexpr (A_control.value != A3 && B_control.value == B1) {
+ *                 ...
+ *             }
+ *             ...
+ *         }
+ *     );
+ *
+ *     constexpr int nthreads_per_block = ...;
+ *     int nblocks = ...;
+ *     AnyCTO(TypeList<CompileTimeOptions<A0,A1,A2,A3>,
+ *                     CompileTimeOptions<B0,B1>>{},
+ *         {A_runtime_option, B_runtime_option},
+ *         [&](auto cto_func){
+ *             launch<nthreads_per_block>(nblocks, Gpu::gpuStream(), cto_func);
+ *         },
+ *         [=] AMREX_GPU_DEVICE (auto A_control, auto B_control){
+ *             ...
+ *         }
+ *     );
+ * \endcode
  * The static member function cto_func.GetOptions() can be used to obtain the runtime_options
  * passed into AnyCTO, but at compile time. This enables some advanced use cases,
  * such as changing the number of threads per block or the dimensionality of ParallelFor at runtime.
  * For the second example -> decltype(void(intvect.size())) is necessary to
  * disambiguate IntVectND<1> and int for the first argument of the kernel function.
- \verbatim
-    int nthreads_per_block = ...;
-    AnyCTO(TypeList<CompileTimeOptions<128,256,512,1024>>{},
-        {nthreads_per_block},
-        [&](auto cto_func){
-            constexpr std::array<int, 1> ctos = cto_func.GetOptions();
-            constexpr int c_nthreads_per_block = ctos[0];
-            ParallelFor<c_nthreads_per_block>(N, cto_func);
-        },
-        [=] AMREX_GPU_DEVICE (int i, auto){
-            ...
-        }
-    );
-
-    BoxND<6> box6D = ...;
-    int dims_needed = ...;
-    AnyCTO(TypeList<CompileTimeOptions<1,2,3,4,5,6>>{},
-        {dims_needed},
-        [&](auto cto_func){
-            constexpr std::array<int, 1> ctos = cto_func.GetOptions();
-            constexpr int c_dims_needed = ctos[0];
-            const auto box = BoxShrink<c_dims_needed>(box6D);
-            ParallelFor(box, cto_func);
-        },
-        [=] AMREX_GPU_DEVICE (auto intvect, auto) -> decltype(void(intvect.size())) {
-            ...
-        }
-    );
- \endverbatim
+ * \code{.cpp}
+ *     int nthreads_per_block = ...;
+ *     AnyCTO(TypeList<CompileTimeOptions<128,256,512,1024>>{},
+ *         {nthreads_per_block},
+ *         [&](auto cto_func){
+ *             constexpr std::array<int, 1> ctos = cto_func.GetOptions();
+ *             constexpr int c_nthreads_per_block = ctos[0];
+ *             ParallelFor<c_nthreads_per_block>(N, cto_func);
+ *         },
+ *         [=] AMREX_GPU_DEVICE (int i, auto){
+ *             ...
+ *         }
+ *     );
+ *
+ *     BoxND<6> box6D = ...;
+ *     int dims_needed = ...;
+ *     AnyCTO(TypeList<CompileTimeOptions<1,2,3,4,5,6>>{},
+ *         {dims_needed},
+ *         [&](auto cto_func){
+ *             constexpr std::array<int, 1> ctos = cto_func.GetOptions();
+ *             constexpr int c_dims_needed = ctos[0];
+ *             const auto box = BoxShrink<c_dims_needed>(box6D);
+ *             ParallelFor(box, cto_func);
+ *         },
+ *         [=] AMREX_GPU_DEVICE (auto intvect, auto) -> decltype(void(intvect.size())) {
+ *             ...
+ *         }
+ *     );
+ * \endcode
 
  * Note that due to a limitation of CUDA's extended device lambda, the
  * constexpr if block cannot be the one that captures a variable first.
@@ -186,9 +198,8 @@ void AnyCTO ([[maybe_unused]] TypeList<CTOs...> list_of_compile_time_options,
                            std::forward<Fs>(cto_functs)...);
 }
 
-template <int MT, typename T, class F, typename... CTOs>
-std::enable_if_t<std::is_integral_v<T>>
-ParallelFor (TypeList<CTOs...> ctos,
+template <int MT, std::integral T, class F, typename... CTOs>
+void ParallelFor (TypeList<CTOs...> ctos,
              std::array<int,sizeof...(CTOs)> const& runtime_options,
              T N, F&& f)
 {
@@ -213,9 +224,8 @@ void ParallelFor (TypeList<CTOs...> ctos,
     );
 }
 
-template <int MT, typename T, class F, int dim, typename... CTOs>
-std::enable_if_t<std::is_integral_v<T>>
-ParallelFor (TypeList<CTOs...> ctos,
+template <int MT, std::integral T, class F, int dim, typename... CTOs>
+void ParallelFor (TypeList<CTOs...> ctos,
              std::array<int,sizeof...(CTOs)> const& runtime_options,
              BoxND<dim> const& box, T ncomp, F&& f)
 {
@@ -235,32 +245,32 @@ ParallelFor (TypeList<CTOs...> ctos,
  * discard unused code blocks for better run time performance.  In the
  * example below, the code will be expanded into 4*2=8 normal ParallelFors
  * for all combinations of the run time parameters.
- \verbatim
-     int A_runtime_option = ...;
-     int B_runtime_option = ...;
-     enum A_options : int { A0, A1, A2, A3};
-     enum B_options : int { B0, B1 };
-     ParallelFor(TypeList<CompileTimeOptions<A0,A1,A2,A3>,
-                          CompileTimeOptions<B0,B1>>{},
-                 {A_runtime_option, B_runtime_option},
-                 N, [=] AMREX_GPU_DEVICE (int i, auto A_control, auto B_control)
-     {
-         ...
-         if constexpr (A_control.value == A0) {
-             ...
-         } else if constexpr (A_control.value == A1) {
-             ...
-         } else if constexpr (A_control.value == A2) {
-             ...
-         } else {
-             ...
-         }
-         if constexpr (A_control.value != A3 && B_control.value == B1) {
-             ...
-         }
-         ...
-     });
- \endverbatim
+ * \code{.cpp}
+ *     int A_runtime_option = ...;
+ *     int B_runtime_option = ...;
+ *     enum A_options : int { A0, A1, A2, A3};
+ *     enum B_options : int { B0, B1 };
+ *     ParallelFor(TypeList<CompileTimeOptions<A0,A1,A2,A3>,
+ *                          CompileTimeOptions<B0,B1>>{},
+ *                 {A_runtime_option, B_runtime_option},
+ *                 N, [=] AMREX_GPU_DEVICE (int i, auto A_control, auto B_control)
+ *     {
+ *         ...
+ *         if constexpr (A_control.value == A0) {
+ *             ...
+ *         } else if constexpr (A_control.value == A1) {
+ *             ...
+ *         } else if constexpr (A_control.value == A2) {
+ *             ...
+ *         } else {
+ *             ...
+ *         }
+ *         if constexpr (A_control.value != A3 && B_control.value == B1) {
+ *             ...
+ *         }
+ *         ...
+ *     });
+ * \endcode
  * Note that due to a limitation of CUDA's extended device lambda, the
  * constexpr if block cannot be the one that captures a variable first.
  * If nvcc complains about it, you will have to manually capture it outside
@@ -271,9 +281,8 @@ ParallelFor (TypeList<CTOs...> ctos,
  * \param N      an integer specifying the 1D for loop's range.
  * \param f      a callable object taking an integer and working on that iteration.
  */
-template <typename T, class F, typename... CTOs>
-std::enable_if_t<std::is_integral_v<T>>
-ParallelFor (TypeList<CTOs...> ctos,
+template <std::integral T, class F, typename... CTOs>
+void ParallelFor (TypeList<CTOs...> ctos,
              std::array<int,sizeof...(CTOs)> const& option,
              T N, F&& f)
 {
@@ -288,33 +297,33 @@ ParallelFor (TypeList<CTOs...> ctos,
  * discard unused code blocks for better run time performance.  In the
  * example below, the code will be expanded into 4*2=8 normal ParallelFors
  * for all combinations of the run time parameters.
- \verbatim
-     int A_runtime_option = ...;
-     int B_runtime_option = ...;
-     enum A_options : int { A0, A1, A2, A3};
-     enum B_options : int { B0, B1 };
-     ParallelFor(TypeList<CompileTimeOptions<A0,A1,A2,A3>,
-                          CompileTimeOptions<B0,B1>>{},
-                 {A_runtime_option, B_runtime_option},
-                 box, [=] AMREX_GPU_DEVICE (int i, int j, int k,
-                                            auto A_control, auto B_control)
-     {
-         ...
-         if constexpr (A_control.value == A0) {
-             ...
-         } else if constexpr (A_control.value == A1) {
-             ...
-         } else if constexpr (A_control.value == A2) {
-             ...
-         } else {
-             ...
-         }
-         if constexpr (A_control.value != A3 && B_control.value == B1) {
-             ...
-         }
-         ...
-     });
- \endverbatim
+ * \code{.cpp}
+ *     int A_runtime_option = ...;
+ *     int B_runtime_option = ...;
+ *     enum A_options : int { A0, A1, A2, A3};
+ *     enum B_options : int { B0, B1 };
+ *     ParallelFor(TypeList<CompileTimeOptions<A0,A1,A2,A3>,
+ *                          CompileTimeOptions<B0,B1>>{},
+ *                 {A_runtime_option, B_runtime_option},
+ *                 box, [=] AMREX_GPU_DEVICE (int i, int j, int k,
+ *                                            auto A_control, auto B_control)
+ *     {
+ *         ...
+ *         if constexpr (A_control.value == A0) {
+ *             ...
+ *         } else if constexpr (A_control.value == A1) {
+ *             ...
+ *         } else if constexpr (A_control.value == A2) {
+ *             ...
+ *         } else {
+ *             ...
+ *         }
+ *         if constexpr (A_control.value != A3 && B_control.value == B1) {
+ *             ...
+ *         }
+ *         ...
+ *     });
+ * \endcode
  * Note that due to a limitation of CUDA's extended device lambda, the
  * constexpr if block cannot be the one that captures a variable first.
  * If nvcc complains about it, you will have to manually capture it outside
@@ -341,33 +350,33 @@ void ParallelFor (TypeList<CTOs...> ctos,
  * discard unused code blocks for better run time performance.  In the
  * example below, the code will be expanded into 4*2=8 normal ParallelFors
  * for all combinations of the run time parameters.
- \verbatim
-     int A_runtime_option = ...;
-     int B_runtime_option = ...;
-     enum A_options : int { A0, A1, A2, A3};
-     enum B_options : int { B0, B1 };
-     ParallelFor(TypeList<CompileTimeOptions<A0,A1,A2,A3>,
-                          CompileTimeOptions<B0,B1>>{},
-                 {A_runtime_option, B_runtime_option},
-                 box, ncomp, [=] AMREX_GPU_DEVICE (int i, int j, int k, int n,
-                                                   auto A_control, auto B_control)
-     {
-         ...
-         if constexpr (A_control.value == A0) {
-             ...
-         } else if constexpr (A_control.value == A1) {
-             ...
-         } else if constexpr (A_control.value == A2) {
-             ...
-         } else {
-             ...
-         }
-         if constexpr (A_control.value != A3 && B_control.value == B1) {
-             ...
-         }
-         ...
-     });
- \endverbatim
+ * \code{.cpp}
+ *     int A_runtime_option = ...;
+ *     int B_runtime_option = ...;
+ *     enum A_options : int { A0, A1, A2, A3};
+ *     enum B_options : int { B0, B1 };
+ *     ParallelFor(TypeList<CompileTimeOptions<A0,A1,A2,A3>,
+ *                          CompileTimeOptions<B0,B1>>{},
+ *                 {A_runtime_option, B_runtime_option},
+ *                 box, ncomp, [=] AMREX_GPU_DEVICE (int i, int j, int k, int n,
+ *                                                   auto A_control, auto B_control)
+ *     {
+ *         ...
+ *         if constexpr (A_control.value == A0) {
+ *             ...
+ *         } else if constexpr (A_control.value == A1) {
+ *             ...
+ *         } else if constexpr (A_control.value == A2) {
+ *             ...
+ *         } else {
+ *             ...
+ *         }
+ *         if constexpr (A_control.value != A3 && B_control.value == B1) {
+ *             ...
+ *         }
+ *         ...
+ *     });
+ * \endcode
  * Note that due to a limitation of CUDA's extended device lambda, the
  * constexpr if block cannot be the one that captures a variable first.
  * If nvcc complains about it, you will have to manually capture it outside
@@ -379,9 +388,8 @@ void ParallelFor (TypeList<CTOs...> ctos,
  * \param ncomp  an integer specifying the range for iteration over components.
  * \param f      a callable object taking three integers and working on the given cell.
  */
-template <typename T, class F, int dim, typename... CTOs>
-std::enable_if_t<std::is_integral_v<T>>
-ParallelFor (TypeList<CTOs...> ctos,
+template <std::integral T, class F, int dim, typename... CTOs>
+void ParallelFor (TypeList<CTOs...> ctos,
              std::array<int,sizeof...(CTOs)> const& option,
              BoxND<dim> const& box, T ncomp, F&& f)
 {

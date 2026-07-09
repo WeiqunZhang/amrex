@@ -1,4 +1,3 @@
-
 #include <AMReX_MLEBABecLap.H>
 #include <AMReX_MLABecLaplacian.H>
 #include <AMReX_MultiFabUtil.H>
@@ -13,7 +12,7 @@
 #include <AMReX_HypreABecLap3.H>
 #endif
 
-#ifdef AMREX_USE_PETSC
+#if defined(AMREX_USE_PETSC) && (AMREX_SPACEDIM > 1)
 #include <petscksp.h>
 #include <AMReX_PETSc.H>
 #endif
@@ -30,10 +29,22 @@ MLEBABecLap::MLEBABecLap (const Vector<Geometry>& a_geom,
     define(a_geom, a_grids, a_dmap, a_info, a_factory, a_ncomp);
 }
 
+MLEBABecLap::MLEBABecLap (const Vector<Geometry>& a_geom,
+                          const Vector<BoxArray>& a_grids,
+                          const Vector<DistributionMapping>& a_dmap,
+                          const Vector<iMultiFab const*>& a_overset_mask,
+                          const LPInfo& a_info,
+                          const Vector<EBFArrayBoxFactory const*>& a_factory,
+                          const int a_ncomp)
+{
+    define(a_geom, a_grids, a_dmap, a_overset_mask, a_info, a_factory, a_ncomp);
+}
+
 std::unique_ptr<FabFactory<FArrayBox> >
 MLEBABecLap::makeFactory (int amrlev, int mglev) const
 {
-    return makeEBFabFactory(static_cast<EBFArrayBoxFactory const*>(Factory(0,0))->getEBIndexSpace(),
+    auto const* fact0 = Factory(amrlev,0) ? Factory(amrlev, 0) : Factory(0,0);
+    return makeEBFabFactory(static_cast<EBFArrayBoxFactory const*>(fact0)->getEBIndexSpace(),
                             m_geom[amrlev][mglev],
                             m_grids[amrlev][mglev],
                             m_dmap[amrlev][mglev],
@@ -58,18 +69,47 @@ MLEBABecLap::define (const Vector<Geometry>& a_geom,
     }
 
     MLCellABecLap::define(a_geom, a_grids, a_dmap, a_info, _factory);
+    define_ab_coeffs();
+}
 
+void
+MLEBABecLap::define (const Vector<Geometry>& a_geom,
+                     const Vector<BoxArray>& a_grids,
+                     const Vector<DistributionMapping>& a_dmap,
+                     const Vector<iMultiFab const*>& a_overset_mask,
+                     const LPInfo& a_info,
+                     const Vector<EBFArrayBoxFactory const*>& a_factory,
+                     int a_ncomp)
+{
+    BL_PROFILE("MLEBABecLap::define(overset)");
+
+    this->m_ncomp = a_ncomp;
+
+    Vector<FabFactory<FArrayBox> const*> _factory;
+    for (const auto *x : a_factory) {
+        _factory.push_back(static_cast<FabFactory<FArrayBox> const*>(x));
+    }
+
+    MLCellABecLap::define(a_geom, a_grids, a_dmap, a_overset_mask, a_info, _factory);
+    define_ab_coeffs();
+}
+
+void
+MLEBABecLap::define_ab_coeffs ()
+{
     m_a_coeffs.resize(m_num_amr_levels);
     m_b_coeffs.resize(m_num_amr_levels);
     m_cc_mask.resize(m_num_amr_levels);
     m_eb_phi.resize(m_num_amr_levels);
     m_eb_b_coeffs.resize(m_num_amr_levels);
+    m_eb_bc_tags.resize(m_num_amr_levels);
     for (int amrlev = 0; amrlev < m_num_amr_levels; ++amrlev)
     {
         m_a_coeffs[amrlev].resize(m_num_mg_levels[amrlev]);
         m_b_coeffs[amrlev].resize(m_num_mg_levels[amrlev]);
         m_cc_mask[amrlev].resize(m_num_mg_levels[amrlev]);
         m_eb_b_coeffs[amrlev].resize(m_num_mg_levels[amrlev]);
+        m_eb_bc_tags[amrlev].resize(m_num_mg_levels[amrlev]);
         for (int mglev = 0; mglev < m_num_mg_levels[amrlev]; ++mglev)
         {
             m_a_coeffs[amrlev][mglev].define(m_grids[amrlev][mglev],
@@ -179,7 +219,7 @@ MLEBABecLap::setBCoeffs (int amrlev, Vector<Real> const& beta)
     const int ncomp = getNComp();
     for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
         for (int icomp = 0; icomp < ncomp; ++icomp) {
-            m_b_coeffs[amrlev][0][idim].setVal(beta[icomp]);
+            m_b_coeffs[amrlev][0][idim].setVal(beta[icomp], icomp, 1, 0);
         }
     }
     m_needs_update = true;
@@ -657,6 +697,63 @@ MLEBABecLap::averageDownCoeffsSameAmrLevel (int amrlev, Vector<MultiFab>& a,
                                               ratio, 0);
         }
     }
+
+    for (int mglev = 1; mglev < nmglevs; ++mglev)
+    {
+        if (m_overset_mask[amrlev][mglev]) {
+            const Real fac = static_cast<Real>(1 << mglev); // 2**mglev
+            const Real osfac = Real(2.0)*fac/(fac+Real(1.0));
+            const int ncomp = getNComp();
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (Gpu::notInLaunchRegion())
+#endif
+            for (MFIter mfi(a[mglev],TilingIfNotGPU()); mfi.isValid(); ++mfi)
+            {
+                AMREX_D_TERM(Box const& xbx = mfi.nodaltilebox(0);,
+                             Box const& ybx = mfi.nodaltilebox(1);,
+                             Box const& zbx = mfi.nodaltilebox(2););
+                AMREX_D_TERM(auto const& bx = b[mglev][0].array(mfi);,
+                             auto const& by = b[mglev][1].array(mfi);,
+                             auto const& bz = b[mglev][2].array(mfi););
+                auto const& osm = m_overset_mask[amrlev][mglev]->const_array(mfi);
+#if defined(AMREX_USE_CUDA) && defined(_WIN32)
+                AMREX_GPU_LAUNCH_HOST_DEVICE_LAMBDA_RANGE
+                    (xbx, t_xbx,
+                     {
+                         overset_rescale_bcoef_x(t_xbx, bx, osm, ncomp, osfac);
+                     });
+#if (AMREX_SPACEDIM >= 2)
+                AMREX_GPU_LAUNCH_HOST_DEVICE_LAMBDA_RANGE
+                    (ybx, t_ybx,
+                     {
+                         overset_rescale_bcoef_y(t_ybx, by, osm, ncomp, osfac);
+                     });
+#endif
+#if (AMREX_SPACEDIM == 3)
+                AMREX_GPU_LAUNCH_HOST_DEVICE_LAMBDA_RANGE
+                    (zbx, t_zbx,
+                     {
+                         overset_rescale_bcoef_z(t_zbx, bz, osm, ncomp, osfac);
+                     });
+#endif
+#else
+                AMREX_LAUNCH_HOST_DEVICE_LAMBDA_DIM
+                    (xbx, t_xbx,
+                     {
+                         overset_rescale_bcoef_x(t_xbx, bx, osm, ncomp, osfac);
+                     },
+                     ybx, t_ybx,
+                     {
+                         overset_rescale_bcoef_y(t_ybx, by, osm, ncomp, osfac);
+                     },
+                     zbx, t_zbx,
+                     {
+                         overset_rescale_bcoef_z(t_zbx, bz, osm, ncomp, osfac);
+                     });
+#endif
+            }
+        }
+    }
 }
 
 void
@@ -702,13 +799,14 @@ MLEBABecLap::prepareForSolve ()
 
     m_is_singular.clear();
     m_is_singular.resize(m_num_amr_levels, false);
-    auto itlo = std::find(m_lobc[0].begin(), m_lobc[0].end(), BCType::Dirichlet); // NOLINT
-    auto ithi = std::find(m_hibc[0].begin(), m_hibc[0].end(), BCType::Dirichlet); // NOLINT
+    auto itlo = std::ranges::find(m_lobc[0], BCType::Dirichlet);
+    auto ithi = std::ranges::find(m_hibc[0], BCType::Dirichlet);
     if (itlo == m_lobc[0].end() && ithi == m_hibc[0].end() && !isEBDirichlet())
     {  // No Dirichlet
         for (int alev = 0; alev < m_num_amr_levels; ++alev)
         {
-            if (m_domain_covered[alev])
+            // For now this assumes that overset regions are treated as Dirichlet bc's
+            if (m_domain_covered[alev] && !m_overset_mask[alev][0])
             {
                 if (m_a_scalar == 0.0)
                 {
@@ -1049,10 +1147,18 @@ MLEBABecLap::applyBC (int amrlev, int mglev, MultiFab& in, BCMode bc_mode, State
 
     FArrayBox foofab(Box::TheUnitBox(),ncomp);
     const auto& foo = foofab.array();
-
+#ifdef AMREX_USE_GPU
+    bool skip_loop = false;
+    Vector<MLMGABCEBTag<RT>> ebtags;
+    bool run_on_gpu = Gpu::inLaunchRegion();
+    if (run_on_gpu && m_eb_bc_tags[amrlev][mglev].is_defined()) {
+        skip_loop = true;
+    }
+    if (!skip_loop) {
+    ebtags.reserve(in.local_size() * 2 * AMREX_SPACEDIM*ncomp);
+#endif
     MFItInfo mfi_info;
     if (Gpu::notInLaunchRegion()) { mfi_info.SetDynamic(true); }
-
 #ifdef AMREX_USE_OMP
 #pragma omp parallel if (Gpu::notInLaunchRegion())
 #endif
@@ -1060,6 +1166,9 @@ MLEBABecLap::applyBC (int amrlev, int mglev, MultiFab& in, BCMode bc_mode, State
     {
         const Box& vbx   = mfi.validbox();
         const auto& iofab = in.array(mfi);
+
+        const int local_index = mfi.LocalIndex();
+        amrex::ignore_unused(local_index);
 
         auto fabtyp = (flags) ? (*flags)[mfi].getType(vbx) : FabType::regular;
         if (fabtyp != FabType::covered)
@@ -1090,41 +1199,74 @@ MLEBABecLap::applyBC (int amrlev, int mglev, MultiFab& in, BCMode bc_mode, State
                     if (fabtyp == FabType::regular)
                     {
                         if (idim == 0) {
-                            AMREX_LAUNCH_HOST_DEVICE_LAMBDA (
-                            blo, tboxlo, {
-                            mllinop_apply_bc_x(0, tboxlo, blen, iofab, mlo,
-                                               bctlo, bcllo, bvlo,
-                                               imaxorder, dxi, flagbc, icomp);
-                            },
-                            bhi, tboxhi, {
-                            mllinop_apply_bc_x(1, tboxhi, blen, iofab, mhi,
-                                               bcthi, bclhi, bvhi,
-                                               imaxorder, dxi, flagbc, icomp);
-                            });
-                        } else if (idim == 1) {
-                            AMREX_LAUNCH_HOST_DEVICE_LAMBDA (
-                            blo, tboxlo, {
-                            mllinop_apply_bc_y(0, tboxlo, blen, iofab, mlo,
-                                               bctlo, bcllo, bvlo,
-                                               imaxorder, dyi, flagbc, icomp);
-                            },
-                            bhi, tboxhi, {
-                            mllinop_apply_bc_y(1, tboxhi, blen, iofab, mhi,
-                                               bcthi, bclhi, bvhi,
-                                               imaxorder, dyi, flagbc, icomp);
-                            });
-                        } else {
-                            AMREX_LAUNCH_HOST_DEVICE_LAMBDA (
-                            blo, tboxlo, {
-                            mllinop_apply_bc_z(0, tboxlo, blen, iofab, mlo,
-                                               bctlo, bcllo, bvlo,
-                                               imaxorder, dzi, flagbc, icomp);
-                            },
-                            bhi, tboxhi, {
-                            mllinop_apply_bc_z(1, tboxhi, blen, iofab, mhi,
-                                               bcthi, bclhi, bvhi,
-                                               imaxorder, dzi, flagbc, icomp);
-                            });
+#ifdef AMREX_USE_GPU
+                            if (run_on_gpu) {
+                                ebtags.emplace_back(MLMGABCEBTag<RT>{
+                                    mlo, foo,
+                                    bcllo, blo, bctlo, blen,
+                                    icomp, 0, 0, 0, local_index
+                                });
+                                ebtags.emplace_back(MLMGABCEBTag<RT>{
+                                    mhi, foo,
+                                    bclhi, bhi, bcthi, blen,
+                                    icomp, 0, 0,1, local_index
+                                });
+                            } else
+#endif
+                            {
+                                mllinop_apply_bc_x(0, blo, blen, iofab, mlo,
+                                                   bctlo, bcllo, bvlo,
+                                                   imaxorder, dxi, flagbc, icomp);
+                                mllinop_apply_bc_x(1, bhi, blen, iofab, mhi,
+                                                   bcthi, bclhi, bvhi,
+                                                   imaxorder, dxi, flagbc, icomp);
+                            }
+                       } else if (idim == 1) {
+#ifdef AMREX_USE_GPU
+                            if (run_on_gpu) {
+                                ebtags.emplace_back(MLMGABCEBTag<RT>{
+                                    mlo, foo,
+                                    bcllo, blo, bctlo, blen,
+                                    icomp,1, 0, 0, local_index
+                                });
+                                ebtags.emplace_back(MLMGABCEBTag<RT>{
+                                    mhi, foo,
+                                    bclhi, bhi, bcthi, blen,
+                                    icomp, 1, 0,1, local_index
+                                });
+                            } else
+#endif
+                            {
+                                mllinop_apply_bc_y(0, blo, blen, iofab, mlo,
+                                                   bctlo, bcllo, bvlo,
+                                                   imaxorder, dyi, flagbc, icomp);
+                                mllinop_apply_bc_y(1, bhi, blen, iofab, mhi,
+                                                   bcthi, bclhi, bvhi,
+                                                   imaxorder, dyi, flagbc, icomp);
+                            }
+                       } else {
+#ifdef AMREX_USE_GPU
+                            if (run_on_gpu) {
+                                ebtags.emplace_back(MLMGABCEBTag<RT>{
+                                    mlo, foo,
+                                    bcllo, blo, bctlo, blen,
+                                    icomp, 2, 0, 0, local_index
+                                });
+                                ebtags.emplace_back(MLMGABCEBTag<RT>{
+                                    mhi, foo,
+                                    bclhi, bhi, bcthi, blen,
+                                    icomp, 2, 0,1, local_index
+                                });
+                            } else
+#endif
+                            {
+                                mllinop_apply_bc_z(0, blo, blen, iofab, mlo,
+                                                   bctlo, bcllo, bvlo,
+                                                   imaxorder, dzi, flagbc, icomp);
+                                mllinop_apply_bc_z(1, bhi, blen, iofab, mhi,
+                                                   bcthi, bclhi, bvhi,
+                                                   imaxorder, dzi, flagbc, icomp);
+                            }
                         }
                     }
                     else // irregular
@@ -1132,47 +1274,147 @@ MLEBABecLap::applyBC (int amrlev, int mglev, MultiFab& in, BCMode bc_mode, State
                         const auto& ap = area[idim]->const_array(mfi);
                         const auto& mask = ccmask.const_array(mfi);
                         if (idim == 0) {
-                            AMREX_LAUNCH_HOST_DEVICE_LAMBDA (
-                            blo, tboxlo, {
-                            mlebabeclap_apply_bc_x(0, tboxlo, blen, iofab, mask, ap,
-                                                   bctlo, bcllo, bvlo,
-                                                   imaxorder, dxi, flagbc, icomp);
-                            },
-                            bhi, tboxhi, {
-                            mlebabeclap_apply_bc_x(1, tboxhi, blen, iofab, mask, ap,
-                                                   bcthi, bclhi, bvhi,
-                                                   imaxorder, dxi, flagbc, icomp);
-                            });
-                        } else if (idim == 1) {
-                            AMREX_LAUNCH_HOST_DEVICE_LAMBDA (
-                            blo, tboxlo, {
-                            mlebabeclap_apply_bc_y(0, tboxlo, blen, iofab, mask, ap,
-                                                   bctlo, bcllo, bvlo,
-                                                   imaxorder, dyi, flagbc, icomp);
-                            },
-                            bhi, tboxhi, {
-                            mlebabeclap_apply_bc_y(1, tboxhi, blen, iofab, mask, ap,
-                                                   bcthi, bclhi, bvhi,
-                                                   imaxorder, dyi, flagbc, icomp);
-                            });
-                        } else {
-                            AMREX_LAUNCH_HOST_DEVICE_LAMBDA (
-                            blo, tboxlo, {
-                            mlebabeclap_apply_bc_z(0, tboxlo, blen, iofab, mask, ap,
-                                                   bctlo, bcllo, bvlo,
-                                                   imaxorder, dzi, flagbc, icomp);
-                            },
-                            bhi, tboxhi, {
-                            mlebabeclap_apply_bc_z(1, tboxhi, blen, iofab, mask, ap,
-                                                   bcthi, bclhi, bvhi,
-                                                   imaxorder, dzi, flagbc, icomp);
-                            });
-                        }
+#ifdef AMREX_USE_GPU
+                            if (run_on_gpu) {
+                                ebtags.emplace_back(MLMGABCEBTag<RT>{
+                                    mask, ap,
+                                    bcllo, blo, bctlo, blen,
+                                    icomp, 0, 1, 0, local_index
+                                });
+                                ebtags.emplace_back(MLMGABCEBTag<RT>{
+                                    mask, ap,
+                                    bclhi, bhi, bcthi, blen,
+                                    icomp, 0, 1, 1, local_index
+                                });
+                            } else
+#endif
+                            {
+                                mlebabeclap_apply_bc_x(0, blo, blen, iofab, mask, ap,
+                                                       bctlo, bcllo, bvlo,
+                                                       imaxorder, dxi, flagbc, icomp);
+                                mlebabeclap_apply_bc_x(1, bhi, blen, iofab, mask, ap,
+                                                       bcthi, bclhi, bvhi,
+                                                       imaxorder, dxi, flagbc, icomp);
+                            }
+                       } else if (idim == 1) {
+#ifdef AMREX_USE_GPU
+                            if (run_on_gpu) {
+                                ebtags.emplace_back(MLMGABCEBTag<RT>{
+                                    mask, ap,
+                                    bcllo, blo, bctlo, blen,
+                                    icomp, 1, 1, 0, local_index
+                                });
+                                ebtags.emplace_back(MLMGABCEBTag<RT>{
+                                    mask, ap,
+                                    bclhi, bhi, bcthi, blen,
+                                    icomp, 1, 1, 1, local_index
+                                });
+                            } else
+#endif
+                            {
+                                mlebabeclap_apply_bc_y(0, blo, blen, iofab, mask, ap,
+                                                       bctlo, bcllo, bvlo,
+                                                       imaxorder, dyi, flagbc, icomp);
+                                mlebabeclap_apply_bc_y(1, bhi, blen, iofab, mask, ap,
+                                                       bcthi, bclhi, bvhi,
+                                                       imaxorder, dyi, flagbc, icomp);
+                            }
+                       } else {
+#ifdef AMREX_USE_GPU
+                            if (run_on_gpu) {
+                                ebtags.emplace_back(MLMGABCEBTag<RT>{
+                                    mask, ap,
+                                    bcllo, blo, bctlo, blen,
+                                    icomp, 2, 1, 0, local_index
+                                });
+                                ebtags.emplace_back(MLMGABCEBTag<RT>{
+                                    mask, ap,
+                                    bclhi, bhi, bcthi, blen,
+                                    icomp, 2, 1, 1, local_index
+                                });
+                            } else
+#endif
+                            {
+                                mlebabeclap_apply_bc_z(0, blo, blen, iofab, mask, ap,
+                                                       bctlo, bcllo, bvlo,
+                                                       imaxorder, dzi, flagbc, icomp);
+                                mlebabeclap_apply_bc_z(1, bhi, blen, iofab, mask, ap,
+                                                       bcthi, bclhi, bvhi,
+                                                       imaxorder, dzi, flagbc, icomp);
+                            }
+                       }
                     }
                 }
             }
         }
     }
+
+#ifdef AMREX_USE_GPU
+    }  // end of if (!skip_loop)
+#endif
+
+#ifdef AMREX_USE_GPU
+    if (!run_on_gpu) { return; }
+    if (!m_eb_bc_tags[amrlev][mglev].is_defined()) {
+        // Cache the ebtags for next time
+        m_eb_bc_tags[amrlev][mglev].define(ebtags);
+    }
+    MultiArray4<Real const> foo_ma;
+    Array<MultiArray4<Real const>, 2*AMREX_SPACEDIM> bndry_arrays;
+    for (OrientationIter oit; oit; ++oit) {
+        const Orientation ori = oit();
+        bndry_arrays[ori] = (bndry != nullptr) ?
+            bndry->bndryValues(ori).arrays() : foo_ma;
+    }
+    auto inma = in.arrays();
+    amrex::ParallelFor(
+        m_eb_bc_tags[amrlev][mglev], [=] AMREX_GPU_DEVICE (int i, int j, int k, MLMGABCEBTag<RT> const& tag) noexcept
+        {
+            if (tag.is_eb == 0) {
+                if (tag.dir == 0) {
+                    mllinop_apply_bc_x(tag.side, i, j, k, tag.blen, inma[tag.local_index],
+                        tag.mask, tag.bctype, tag.bcloc,
+                        bndry_arrays[Orientation(0, static_cast<Orientation::Side>(tag.side))][tag.local_index],
+                        imaxorder, dxi, flagbc, tag.comp);
+                } else if (tag.dir == 1) {
+                    mllinop_apply_bc_y(tag.side, i, j, k, tag.blen, inma[tag.local_index],
+                        tag.mask, tag.bctype, tag.bcloc,
+                        bndry_arrays[Orientation(1, static_cast<Orientation::Side>(tag.side))][tag.local_index],
+                        imaxorder, dyi, flagbc, tag.comp);
+                }
+#if (AMREX_SPACEDIM == 3)
+                else if (tag.dir == 2) {
+                    mllinop_apply_bc_z(tag.side, i, j, k, tag.blen, inma[tag.local_index],
+                        tag.mask, tag.bctype, tag.bcloc,
+                        bndry_arrays[Orientation(2, static_cast<Orientation::Side>(tag.side))][tag.local_index],
+                        imaxorder, dzi, flagbc,
+                        tag.comp);
+                }
+#endif
+            } else {
+                if (tag.dir == 0) {
+                    mlebabeclap_apply_bc_x(tag.side, i, j, k, tag.blen, inma[tag.local_index], tag.mask, tag.area,
+                        tag.bctype, tag.bcloc,
+                        bndry_arrays[Orientation(0, static_cast<Orientation::Side>(tag.side))][tag.local_index],
+                        imaxorder, dxi, flagbc, tag.comp);
+                } else if (tag.dir == 1) {
+                    mlebabeclap_apply_bc_y(tag.side, i, j, k, tag.blen, inma[tag.local_index], tag.mask, tag.area,
+                        tag.bctype, tag.bcloc,
+                        bndry_arrays[Orientation(1, static_cast<Orientation::Side>(tag.side))][tag.local_index],
+                        imaxorder, dyi, flagbc, tag.comp);
+                }
+#if (AMREX_SPACEDIM == 3)
+                else if (tag.dir == 2) {
+                    mlebabeclap_apply_bc_z(tag.side, i, j, k, tag.blen, inma[tag.local_index], tag.mask, tag.area,
+                        tag.bctype, tag.bcloc,
+                        bndry_arrays[Orientation(2, static_cast<Orientation::Side>(tag.side))][tag.local_index],
+                        imaxorder, dzi, flagbc, tag.comp);
+                }
+#endif
+            }
+        }
+    );
+#endif
 }
 
 void
@@ -1195,13 +1437,14 @@ MLEBABecLap::update ()
 
     m_is_singular.clear();
     m_is_singular.resize(m_num_amr_levels, false);
-    auto itlo = std::find(m_lobc[0].begin(), m_lobc[0].end(), BCType::Dirichlet); // NOLINT
-    auto ithi = std::find(m_hibc[0].begin(), m_hibc[0].end(), BCType::Dirichlet); // NOLINT
+    auto itlo = std::ranges::find(m_lobc[0], BCType::Dirichlet);
+    auto ithi = std::ranges::find(m_hibc[0], BCType::Dirichlet);
     if (itlo == m_lobc[0].end() && ithi == m_hibc[0].end() && !isEBDirichlet())
     {  // No Dirichlet
         for (int alev = 0; alev < m_num_amr_levels; ++alev)
         {
-            if (m_domain_covered[alev])
+            // For now this assumes that overset regions are treated as Dirichlet bc's
+            if (m_domain_covered[alev] && !m_overset_mask[alev][0])
             {
                 if (m_a_scalar == 0.0)
                 {
@@ -1312,7 +1555,7 @@ MLEBABecLap::makeHypre (Hypre::Interface hypre_interface) const
 }
 #endif
 
-#ifdef AMREX_USE_PETSC
+#if defined(AMREX_USE_PETSC) && (AMREX_SPACEDIM > 1)
 std::unique_ptr<PETScABecLap>
 MLEBABecLap::makePETSc () const
 {
