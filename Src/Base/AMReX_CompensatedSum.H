@@ -52,10 +52,10 @@ namespace amrex
  * \param[in] value Value to add to \p sum.
  */
 template <typename T, typename U>
-AMREX_GPU_HOST_DEVICE
+AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
 void compensatedAdd (T& sum, T& compensation, U value) noexcept
 {
-    T const y = static_cast<T>(value) - compensation;
+    T volatile y = static_cast<T>(value) - compensation;
     T volatile t = sum + y;
     T volatile c = t - sum;
     compensation = c - y;
