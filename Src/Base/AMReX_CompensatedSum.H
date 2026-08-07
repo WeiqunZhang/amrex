@@ -56,8 +56,9 @@ AMREX_GPU_HOST_DEVICE
 void compensatedAdd (T& sum, T& compensation, U value) noexcept
 {
     T const y = static_cast<T>(value) - compensation;
-    T const t = sum + y;
-    compensation = (t - sum) - y;
+    T volatile t = sum + y;
+    T volatile c = t - sum;
+    compensation = c - y;
     sum = t;
 }
 
