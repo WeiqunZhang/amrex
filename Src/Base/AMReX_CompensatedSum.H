@@ -39,16 +39,6 @@ namespace amrex
 // exists only to silence NVCC's front end complaining about the (correct,
 // but nvcc-unrecognized) GCC/MSVC/Intel pragmas when it parses this header
 // while selecting a host-side branch; it has no effect on codegen.
-#if defined(__CUDACC__)
-#pragma nv_diag_suppress 1675
-#endif
-
-#if defined(__INTEL_COMPILER) || defined(_MSC_VER)
-#pragma float_control(precise, on, push)
-#elif defined(__GNUC__) && !defined(__clang__) && !defined(__NVCOMPILER)
-#pragma GCC push_options
-#pragma GCC optimize ("no-fast-math")
-#endif
 
 /**
  * \brief Add a value to a running sum with Kahan compensation.
@@ -65,24 +55,11 @@ template <typename T, typename U>
 AMREX_GPU_HOST_DEVICE
 void compensatedAdd (T& sum, T& compensation, U value) noexcept
 {
-#if defined(__clang__)
-#pragma clang fp reassociate(off) contract(off)
-#endif
     T const y = static_cast<T>(value) - compensation;
     T const t = sum + y;
     compensation = (t - sum) - y;
     sum = t;
 }
-
-#if defined(__INTEL_COMPILER) || defined(_MSC_VER)
-#pragma float_control(pop)
-#elif defined(__GNUC__) && !defined(__clang__) && !defined(__NVCOMPILER)
-#pragma GCC pop_options
-#endif
-
-#if defined(__CUDACC__)
-#pragma nv_diag_default 1675
-#endif
 
 }
 
