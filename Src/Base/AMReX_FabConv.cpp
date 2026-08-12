@@ -1032,6 +1032,41 @@ RealDescriptor::convertToNativeFormat (Real*                 out,
     delete [] bufr;
 }
 
+#ifndef _WIN32
+void
+RealDescriptor::convertToNativeFormat (Real*                 out,
+                                       Long                  nitems,
+                                       amrex::FileStream&    is,
+                                       const RealDescriptor& id)
+{
+    auto buffSize = std::min(Long(readBufferSize), nitems);
+    std::unique_ptr<char[]> bufr(new char[buffSize * id.numBytes()]); // do NOT use make_unique
+    while (nitems > 0)
+    {
+        auto get = std::min(static_cast<Long>(readBufferSize), nitems);
+        is.read(bufr.get(), id.numBytes()*get);
+        PD_convert(out,
+                   bufr.get(),
+                   get,
+                   0,
+                   FPC::NativeRealDescriptor(),
+                   id,
+                   FPC::NativeLongDescriptor());
+
+        if(bAlwaysFixDenormals) {
+            PD_fixdenormals(out, get, FPC::NativeRealDescriptor().format(),
+                            FPC::NativeRealDescriptor().order());
+        }
+        nitems -= get;
+        out    += get;
+    }
+
+    if(is.fail()) {
+        amrex::Error("convert(Real*,Long,FileStream&,RealDescriptor&) failed");
+    }
+}
+#endif
+
 //
 // Convert nitems Reals in native format to RealDescriptor format.
 //
@@ -1094,6 +1129,32 @@ RealDescriptor::convertFromNativeFormat (std::ostream&         os,
   }
 }
 
+#ifndef _WIN32
+void
+RealDescriptor::convertFromNativeFormat (amrex::FileStream&    os,
+                                         Long                  nitems,
+                                         const Real*           in,
+                                         const RealDescriptor& od)
+{
+    auto buffSize = std::min(Long(writeBufferSize), nitems);
+    std::unique_ptr<char[]> bufr(new char[buffSize * od.numBytes()]); // do NOT use make_unique
+    while (nitems > 0)
+    {
+        auto put = std::min(static_cast<Long>(writeBufferSize), nitems);
+        PD_convert(bufr.get(),
+                   in,
+                   put,
+                   0,
+                   od,
+                   FPC::NativeRealDescriptor(),
+                   FPC::NativeLongDescriptor());
+        os.write(bufr.get(), od.numBytes()*put);
+        nitems -= put;
+        in     += put;
+    }
+}
+#endif
+
 //
 // Convert nitems floats in native format to RealDescriptor format
 // and write them to the ostream.
@@ -1135,6 +1196,32 @@ RealDescriptor::convertFromNativeFloatFormat (std::ostream&         os,
     delete [] bufr;
   }
 }
+
+#ifndef _WIN32
+void
+RealDescriptor::convertFromNativeFloatFormat (amrex::FileStream&    os,
+                                              Long                  nitems,
+                                              const float*          in,
+                                              const RealDescriptor& od)
+{
+    auto buffSize = std::min(Long(writeBufferSize), nitems);
+    std::unique_ptr<char[]> bufr(new char[buffSize * od.numBytes()]); // do NOT use make_unique
+    while (nitems > 0)
+    {
+        auto put = std::min(static_cast<Long>(writeBufferSize), nitems);
+        PD_convert(bufr.get(),
+                   in,
+                   put,
+                   0,
+                   od,
+                   FPC::Native32RealDescriptor(),
+                   FPC::NativeLongDescriptor());
+        os.write(bufr.get(), od.numBytes()*put);
+        nitems -= put;
+        in     += put;
+    }
+}
+#endif
 
 //
 // Convert nitems doubles in native format to RealDescriptor format
@@ -1178,6 +1265,32 @@ RealDescriptor::convertFromNativeDoubleFormat (std::ostream&         os,
   }
 }
 
+#ifndef _WIN32
+void
+RealDescriptor::convertFromNativeDoubleFormat (amrex::FileStream&    os,
+                                               Long                  nitems,
+                                               const double*         in,
+                                               const RealDescriptor& od)
+{
+    auto buffSize = std::min(Long(writeBufferSize), nitems);
+    std::unique_ptr<char[]> bufr(new char[buffSize * od.numBytes()]); // do NOT use make_unique
+    while (nitems > 0)
+    {
+        auto put = std::min(static_cast<Long>(writeBufferSize), nitems);
+        PD_convert(bufr.get(),
+                   in,
+                   put,
+                   0,
+                   od,
+                   FPC::Native64RealDescriptor(),
+                   FPC::NativeLongDescriptor());
+        os.write(bufr.get(), od.numBytes()*put);
+        nitems -= put;
+        in     += put;
+    }
+}
+#endif
+
 //
 // Read nitems from istream in RealDescriptor format to native float format.
 //
@@ -1220,6 +1333,41 @@ RealDescriptor::convertToNativeFloatFormat (float*                out,
     delete [] bufr;
 }
 
+#ifndef _WIN32
+void
+RealDescriptor::convertToNativeFloatFormat (float*                out,
+                                            Long                  nitems,
+                                            amrex::FileStream&    is,
+                                            const RealDescriptor& id)
+{
+    auto buffSize = std::min(Long(readBufferSize), nitems);
+    std::unique_ptr<char[]> bufr(new char[buffSize * id.numBytes()]); // do NOT use make_unique
+    while (nitems > 0)
+    {
+        auto get = std::min(static_cast<Long>(readBufferSize), nitems);
+        is.read(bufr.get(), id.numBytes()*get);
+        PD_convert(out,
+                   bufr.get(),
+                   get,
+                   0,
+                   FPC::Native32RealDescriptor(),
+                   id,
+                   FPC::NativeLongDescriptor());
+
+        if(bAlwaysFixDenormals) {
+            PD_fixdenormals(out, get, FPC::Native32RealDescriptor().format(),
+                            FPC::Native32RealDescriptor().order());
+        }
+        nitems -= get;
+        out    += get;
+    }
+
+    if(is.fail()) {
+        amrex::Error("convert(Real*,Long,FileStream&,RealDescriptor&) failed");
+    }
+}
+#endif
+
 //
 // Read nitems from istream in RealDescriptor format to native double format.
 //
@@ -1261,5 +1409,40 @@ RealDescriptor::convertToNativeDoubleFormat (double*               out,
 
     delete [] bufr;
 }
+
+#ifndef _WIN32
+void
+RealDescriptor::convertToNativeDoubleFormat (double*               out,
+                                             Long                  nitems,
+                                             amrex::FileStream&    is,
+                                             const RealDescriptor& id)
+{
+    auto buffSize = std::min(Long(readBufferSize), nitems);
+    std::unique_ptr<char[]> bufr(new char[buffSize * id.numBytes()]); // do NOT use make_unique
+    while (nitems > 0)
+    {
+        auto get = std::min(static_cast<Long>(readBufferSize), nitems);
+        is.read(bufr.get(), id.numBytes()*get);
+        PD_convert(out,
+                   bufr.get(),
+                   get,
+                   0,
+                   FPC::Native64RealDescriptor(),
+                   id,
+                   FPC::NativeLongDescriptor());
+
+        if(bAlwaysFixDenormals) {
+            PD_fixdenormals(out, get, FPC::Native64RealDescriptor().format(),
+                            FPC::Native64RealDescriptor().order());
+        }
+        nitems -= get;
+        out    += get;
+    }
+
+    if(is.fail()) {
+        amrex::Error("convert(Real*,Long,FileStream&,RealDescriptor&) failed");
+    }
+}
+#endif
 
 }

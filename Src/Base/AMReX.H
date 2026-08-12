@@ -268,13 +268,15 @@ namespace amrex
      * \brief Host-side error sink invoked by GPU-friendly overloads.
      *
      * The helper either dispatches to the registered error handler, throws
-     * RuntimeError (when `system::throw_exception` is true), or prints the
-     * message and aborts. Device wrappers call this once they return to the host.
+     * RuntimeError (when \c system::throw_exception and \p can_throw are true),
+     * or prints the message and aborts. Device wrappers call this once they
+     * return to the host.
      *
      * \param type Short label describing the failure class (e.g., "Error").
      * \param msg  Null-terminated string explaining the failure (may be nullptr).
+     * \param can_throw Whether to throw RuntimeError when \c system::throw_exception is true.
      */
-    void Error_host (const char* type, const char* msg);
+    void Error_host (const char* type, const char* msg, bool can_throw = true);
 
     //! \copydoc amrex::Error(const std::string&)
     AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE

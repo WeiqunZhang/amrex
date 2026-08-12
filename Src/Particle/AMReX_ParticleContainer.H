@@ -765,7 +765,8 @@ public:
     * \param size The number of elements to write
     * \param os The ostream into which to write the data
     */
-    void WriteParticleRealData (void* data, size_t size, std::ostream& os) const;
+    template <typename OS>
+    void WriteParticleRealData (void* data, size_t size, OS& os) const;
 
     /**
     * \brief Read a contiguous chunk of real particle data from an istream.
@@ -774,7 +775,8 @@ public:
     * \param size The number of elements to read
     * \param is The istream from which to read the data
     */
-    void ReadParticleRealData (void* data, size_t size, std::istream& is);
+    template <typename IS>
+    void ReadParticleRealData (void* data, size_t size, IS& is);
 
     /**
      * \brief Writes a particle checkpoint to file, suitable for restarting.
@@ -1500,8 +1502,9 @@ protected:
 public:
     using FlagsVector = PODVector<int, Allocator<int>>;
 
+    template <typename OS>
     void
-    WriteParticles (int level, std::ofstream& ofs, int fnum,
+    WriteParticles (int level, OS& ofs, int fnum,
                     Vector<int>& which, Vector<int>& count, Vector<Long>& where,
                     const Vector<int>& write_real_comp, const Vector<int>& write_int_comp,
                     const Vector<std::map<std::pair<int, int>,FlagsVector>>& particle_io_flags, bool is_checkpoint) const;

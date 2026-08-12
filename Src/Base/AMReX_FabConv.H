@@ -8,6 +8,7 @@
 #include <AMReX_BLassert.H>
 #include <AMReX_REAL.H>
 #include <AMReX_INT.H>
+#include <AMReX_FileStream.H>
 
 #include <iosfwd>
 
@@ -182,6 +183,12 @@ public:
                                        Long                  nitems,
                                        std::istream&         is,
                                        const RealDescriptor& id);
+#ifndef _WIN32
+    static void convertToNativeFormat (Real*                 out,
+                                       Long                  nitems,
+                                       amrex::FileStream&    is,
+                                       const RealDescriptor& id);
+#endif
 
     /**
     * \brief Convert nitems Reals in native format to RealDescriptor format
@@ -191,6 +198,12 @@ public:
                                          Long                  nitems,
                                          const Real*           in,
                                          const RealDescriptor& od);
+#ifndef _WIN32
+    static void convertFromNativeFormat (amrex::FileStream&    os,
+                                         Long                  nitems,
+                                         const Real*           in,
+                                         const RealDescriptor& od);
+#endif
     /**
     * \brief Convert nitems Reals in native format to RealDescriptor format.
     * The out array is assumed to be large enough to hold the
@@ -209,6 +222,12 @@ public:
                                               Long                  nitems,
                                               const float*          in,
                                               const RealDescriptor& od);
+#ifndef _WIN32
+    static void convertFromNativeFloatFormat (amrex::FileStream&    os,
+                                              Long                  nitems,
+                                              const float*          in,
+                                              const RealDescriptor& od);
+#endif
 
     /**
     * \brief Convert nitems doubles in native format to RealDescriptor format
@@ -218,6 +237,12 @@ public:
                                                Long                  nitems,
                                                const double*         in,
                                                const RealDescriptor& od);
+#ifndef _WIN32
+    static void convertFromNativeDoubleFormat (amrex::FileStream&    os,
+                                               Long                  nitems,
+                                               const double*         in,
+                                               const RealDescriptor& od);
+#endif
 
     /**
     * \brief Read nitems from istream in RealDescriptor format and
@@ -228,6 +253,12 @@ public:
                                             Long                  nitems,
                                             std::istream&         is,
                                             const RealDescriptor& id);
+#ifndef _WIN32
+    static void convertToNativeFloatFormat (float*                out,
+                                            Long                  nitems,
+                                            amrex::FileStream&    is,
+                                            const RealDescriptor& id);
+#endif
 
     /**
     * \brief Read nitems from istream in RealDescriptor format and
@@ -238,6 +269,12 @@ public:
                                              Long                  nitems,
                                              std::istream&         is,
                                              const RealDescriptor& id);
+#ifndef _WIN32
+    static void convertToNativeDoubleFormat (double*               out,
+                                             Long                  nitems,
+                                             amrex::FileStream&    is,
+                                             const RealDescriptor& id);
+#endif
 
 private:
 
