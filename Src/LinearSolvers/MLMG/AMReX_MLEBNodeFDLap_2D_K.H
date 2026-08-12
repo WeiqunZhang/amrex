@@ -534,7 +534,7 @@ void mlebndfdlap_sig_gsrb_rz (int i, int j, int k, Array4<Real> const& x,
 
 template <typename F>
 AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
-void mlebndfdlap_sig_adotx_eb_doit (int i, int j, int k, Array4<Real> const& y,
+void mlebndfdlap_sig_adotx_eb_doit (bool nodal_pml_sigma, int n_cell, int n_cell_pml, int i, int j, int k, Array4<Real> const& y,
                                     Array4<Real const> const& x, Array4<Real const> const& levset,
                                     Array4<int const> const& dmsk,
                                     Array4<Real const> const& ecx, Array4<Real const> const& ecy,
@@ -547,8 +547,87 @@ void mlebndfdlap_sig_adotx_eb_doit (int i, int j, int k, Array4<Real> const& y,
         Real tmp, sigma;
         Real hp, hm, scale, out;
 
+        auto get_sigma = [&] (Real d, int big) {
+            constexpr int m = 0;
+            d /= n_cell_pml; // normalized to (0,1)
+            Real r = 1.0;
+            if constexpr (m == 0) {
+                r = 0.07;
+            } else if constexpr (m == 1) {
+                r = std::exp(-d*4);
+            } else if constexpr (m == 2) {
+                Real b = 0.005;
+                Real a = 1.0 - b;
+                r = a*amrex::Math::powi<2>(d) + b;
+            } else if constexpr (m == 3) {
+                r = 0.07 * std::exp(-d*5);
+            }
+            return big ? Real(1)/r : r;
+        };
+
+        int pml_lo = n_cell_pml; // nodal index
+        int pml_hi = n_cell + n_cell_pml;
+        pml_lo -= 1;
+        pml_hi += 1;
+
+        bool pml_node_x = false;
+        bool pml_node_y = false;
+        if (nodal_pml_sigma) {
+            if (i <= pml_lo && j >= pml_lo && j <= pml_hi) {
+                pml_node_x = true;
+            } else if (i >= pml_hi && j >= pml_lo && j <= pml_hi) {
+                pml_node_x = true;
+            } else if (j <= pml_lo && i >= pml_lo && i <= pml_hi) {
+                pml_node_y = true;
+            } else if (j >= pml_hi && i >= pml_lo && i <= pml_hi) {
+                pml_node_y = true;
+            }
+            if (i == pml_lo && j == pml_lo ||
+                i == pml_lo && j == pml_hi ||
+                i == pml_hi && j == pml_lo ||
+                i == pml_hi && j == pml_hi) {
+                pml_node_x = false;
+                pml_node_y = false;
+            }
+        }
+
         sigma = (sig(i,j-1,k)*vfrc(i,j-1,k) + sig(i,j,k)*vfrc(i,j,k))
             /  (vfrc(i,j-1,k)              + vfrc(i,j,k));
+
+        // i is cell center, j is nodal
+        Real xx = i + 0.5;
+        Real yy = Real(j);
+        if (nodal_pml_sigma) {
+            if (pml_node_x) {
+                sigma = get_sigma(0,0);
+            } else if (pml_node_y) {
+                sigma = get_sigma(0,1);
+            }
+        } else {
+            if (i < pml_lo && j >= pml_lo && j <= pml_hi)
+            {
+                Real d = Real(pml_lo) - xx;
+                sigma = get_sigma(d, 0);
+                if (j == pml_lo || j == pml_hi) { sigma *= Real(1.0); }
+            }
+            else if (i >= pml_hi && j >= pml_lo && j <= pml_hi)
+            {
+                Real d = xx - Real(pml_hi);
+                sigma = get_sigma(d, 0);
+                if (j == pml_lo || j == pml_hi) { sigma *= Real(1.0); }
+            }
+            else if (i >= pml_lo && i < pml_hi && j < pml_lo)
+            {
+                Real d = Real(pml_lo) - yy;
+                sigma = get_sigma(d, 1);
+            }
+            else if (i >= pml_lo && i < pml_hi && j > pml_hi)
+            {
+                Real d = yy - Real(pml_hi);
+                sigma = get_sigma(d, 1);
+            }
+        }
+
         hp = (ecx(i,j,k) == Real(1.0)) ? Real(1.0) : (Real(1.0)+Real(2.)*ecx(i,j,k));
         if (levset(i+1,j,k) < Real(0.0)) {
             tmp = sigma*(x(i+1,j,k) - x(i,j,k));
@@ -558,6 +637,39 @@ void mlebndfdlap_sig_adotx_eb_doit (int i, int j, int k, Array4<Real> const& y,
 
         sigma = (sig(i-1,j-1,k)*vfrc(i-1,j-1,k) + sig(i-1,j,k)*vfrc(i-1,j,k))
             /  (vfrc(i-1,j-1,k)                + vfrc(i-1,j,k));
+
+        xx = (i-1) + 0.5;
+        if (nodal_pml_sigma) {
+            if (pml_node_x) {
+                sigma = get_sigma(0,0);
+            } else if (pml_node_y) {
+                sigma = get_sigma(0,1);
+            }
+        } else {
+            if (i-1 < pml_lo && j >= pml_lo && j <= pml_hi)
+            {
+                Real d = Real(pml_lo) - xx;
+                sigma = get_sigma(d, 0);
+                if (j == pml_lo || j == pml_hi) { sigma *= Real(1.0); }
+            }
+            else if (i-1 >= pml_hi && j >= pml_lo && j <= pml_hi)
+            {
+                Real d = xx - Real(pml_hi);
+                sigma = get_sigma(d, 0);
+                if (j == pml_lo || j == pml_hi) { sigma *= Real(1.0); }
+            }
+            else if (i-1 >= pml_lo && i-1 < pml_hi && j < pml_lo)
+            {
+                Real d = Real(pml_lo) - yy;
+                sigma = get_sigma(d, 1);
+            }
+            else if (i-1 >= pml_lo && i-1 < pml_hi && j > pml_hi)
+            {
+                Real d = yy - Real(pml_hi);
+                sigma = get_sigma(d, 1);
+            }
+        }
+
         hm = (ecx(i-1,j,k) == Real(1.0)) ? Real(1.0) : (Real(1.0)-Real(2.)*ecx(i-1,j,k));
         if (levset(i-1,j,k) < Real(0.0)) {
             tmp += sigma*(x(i-1,j,k) - x(i,j,k));
@@ -570,6 +682,41 @@ void mlebndfdlap_sig_adotx_eb_doit (int i, int j, int k, Array4<Real> const& y,
 
         sigma = (sig(i-1,j,k)*vfrc(i-1,j,k) + sig(i,j,k)*vfrc(i,j,k))
             /  (vfrc(i-1,j,k)              + vfrc(i,j,k));
+
+        // i is nodal, j is cell center
+        xx = Real(i);
+        yy = j + 0.5;
+        if (nodal_pml_sigma) {
+            if (pml_node_x) {
+                sigma = get_sigma(0,1);
+            } else if (pml_node_y) {
+                sigma = get_sigma(0,0);
+            }
+        } else {
+            if (j < pml_lo && i >= pml_lo && i <= pml_hi)
+            {
+                Real d = Real(pml_lo) - yy;
+                sigma = get_sigma(d, 0);
+                if (i == pml_lo || i == pml_hi) { sigma *= Real(1.0); }
+            }
+            else if (j >= pml_hi && i >= pml_lo && i <= pml_hi)
+            {
+                Real d = yy - Real(pml_hi);
+                sigma = get_sigma(d, 0);
+                if (i == pml_lo || i == pml_hi) { sigma *= Real(1.0); }
+            }
+            else if (j >= pml_lo && j < pml_hi && i < pml_lo)
+            {
+                Real d = Real(pml_lo) - xx;
+                sigma = get_sigma(d, 1);
+            }
+            else if (j >= pml_lo && j < pml_hi && i > pml_hi)
+            {
+                Real d = xx - Real(pml_hi);
+                sigma = get_sigma(d, 1);
+            }
+        }
+
         hp = (ecy(i,j,k) == Real(1.0)) ? Real(1.0) : (Real(1.0)+Real(2.)*ecy(i,j,k));
         if (levset(i,j+1,k) < Real(0.0)) {
             tmp = sigma*(x(i,j+1,k) - x(i,j,k));
@@ -579,6 +726,39 @@ void mlebndfdlap_sig_adotx_eb_doit (int i, int j, int k, Array4<Real> const& y,
 
         sigma = (sig(i-1,j-1,k)*vfrc(i-1,j-1,k) + sig(i,j-1,k)*vfrc(i,j-1,k))
             /  (vfrc(i-1,j-1,k)                + vfrc(i,j-1,k));
+
+        yy = (j-1) + 0.5;
+        if (nodal_pml_sigma) {
+            if (pml_node_x) {
+                sigma = get_sigma(0,1);
+            } else if (pml_node_y) {
+                sigma = get_sigma(0,0);
+            }
+        } else {
+            if (j-1 < pml_lo && i >= pml_lo && i <= pml_hi)
+            {
+                Real d = Real(pml_lo) - yy;
+                sigma = get_sigma(d, 0);
+                if (i == pml_lo || i == pml_hi) { sigma *= Real(1.0); }
+            }
+            else if (j-1 >= pml_hi && i >= pml_lo && i <= pml_hi)
+            {
+                Real d = yy - Real(pml_hi);
+                sigma = get_sigma(d, 0);
+                if (i == pml_lo || i == pml_hi) { sigma *= Real(1.0); }
+            }
+            else if (j-1 >= pml_lo && j-1 < pml_hi && i < pml_lo)
+            {
+                Real d = Real(pml_lo) - xx;
+                sigma = get_sigma(d, 1);
+            }
+            else if (j-1 >= pml_lo && j-1 < pml_hi && i > pml_hi)
+            {
+                Real d = xx - Real(pml_hi);
+                sigma = get_sigma(d, 1);
+            }
+        }
+
         hm = (ecy(i,j-1,k) == Real(1.0)) ? Real(1.0) : (Real(1.0)-Real(2.)*ecy(i,j-1,k));
         if (levset(i,j-1,k) < Real(0.0)) {
             tmp += sigma*(x(i,j-1,k) - x(i,j,k));
@@ -594,27 +774,27 @@ void mlebndfdlap_sig_adotx_eb_doit (int i, int j, int k, Array4<Real> const& y,
 }
 
 AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
-void mlebndfdlap_sig_adotx_eb (int i, int j, int k, Array4<Real> const& y,
+void mlebndfdlap_sig_adotx_eb (bool nodal_pml_sigma, int n_cell, int n_cell_pml, int i, int j, int k, Array4<Real> const& y,
                                Array4<Real const> const& x, Array4<Real const> const& levset,
                                Array4<int const> const& dmsk,
                                Array4<Real const> const& ecx, Array4<Real const> const& ecy,
                                Array4<Real const> const& sig, Array4<Real const> const& vfrc,
                                Real xeb, Real bx, Real by) noexcept
 {
-    mlebndfdlap_sig_adotx_eb_doit(i, j, k, y, x, levset, dmsk, ecx, ecy, sig, vfrc,
+    mlebndfdlap_sig_adotx_eb_doit(nodal_pml_sigma,n_cell, n_cell_pml, i, j, k, y, x, levset, dmsk, ecx, ecy, sig, vfrc,
                                   [=] (int, int, int) -> Real { return xeb; },
                                   bx, by);
 }
 
 AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
-void mlebndfdlap_sig_adotx_eb (int i, int j, int k, Array4<Real> const& y,
+void mlebndfdlap_sig_adotx_eb (bool nodal_pml_sigma, int n_cell, int n_cell_pml, int i, int j, int k, Array4<Real> const& y,
                                Array4<Real const> const& x, Array4<Real const> const& levset,
                                Array4<int const> const& dmsk,
                                Array4<Real const> const& ecx, Array4<Real const> const& ecy,
                                Array4<Real const> const& sig, Array4<Real const> const& vfrc,
                                Array4<Real const> const& xeb, Real bx, Real by) noexcept
 {
-    mlebndfdlap_sig_adotx_eb_doit(i, j, k, y, x, levset, dmsk, ecx, ecy, sig, vfrc,
+    mlebndfdlap_sig_adotx_eb_doit(nodal_pml_sigma,n_cell, n_cell_pml, i, j, k, y, x, levset, dmsk, ecx, ecy, sig, vfrc,
                                   [=] (int i1, int i2, int i3) -> Real {
                                       return xeb(i1,i2,i3); },
                                   bx, by);
