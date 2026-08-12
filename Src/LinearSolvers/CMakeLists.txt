@@ -33,6 +33,8 @@ foreach(D IN LISTS AMReX_SPACEDIM)
        MLMG/AMReX_MLPoisson.H
        MLMG/AMReX_MLPoisson_K.H
        MLMG/AMReX_MLPoisson_${D}D_K.H
+       AMReX_AMG.H
+       AMReX_BiCGStab.H
        AMReX_GMRES.H
        AMReX_GMRES_MLMG.H
        AMReX_GMRES_MV.H
