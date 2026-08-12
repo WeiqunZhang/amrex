@@ -18,6 +18,7 @@
 #endif
 
 #include <fstream>
+#include <numeric>
 #include <string>
 #include <type_traits>
 #include <unordered_map>
@@ -192,9 +193,9 @@ public:
     //! Number of nonzeros stored locally.
     [[nodiscard]] Long numLocalNonZeros () const { return m_nnz; }
 
-    //! Inclusive global index begin.
+    //! Inclusive global index begin on this process.
     [[nodiscard]] Long globalRowBegin () const { return m_row_begin; }
-    //! Exclusive global index end.
+    //! Exclusive global index end on this process.
     [[nodiscard]] Long globalRowEnd () const { return m_row_end; }
 
     //! Don't use this beyond initial setup.
@@ -242,7 +243,8 @@ public:
      * \endcode
 
      * and is responsible for setting the global column indices and values
-     * for the row specified by the global row index.
+     * for the row specified by the global row index. The two pointers point
+     * to the beginning of the specified row.
      *
      * This function is intended to be used after
      * \ref define(AlgPartition,int), when the storage has been allocated. It
@@ -262,11 +264,11 @@ public:
     //! used after the user sets the matrix manually or with `setVal`.
     void sortCSR ();
 
-    /**
-     * \brief Return (and cache) the diagonal entries of a square matrix.
-     *
-     * The diagonal is formed lazily and reused on subsequent calls.
-     */
+    //! Set column partition. This is usually not needed to be called by the
+    //! user.
+    void setColumnPartition (AlgPartition const& col_partition);
+
+    //! Return diagonal elements in a square matrix.
     [[nodiscard]] AlgVector<T,AllocT> const& diagonalVector () const;
 
     /**
@@ -292,7 +294,11 @@ public:
     void SpMV(AlgVector<U,N>& y, SpMatrix<U,M> const& A, AlgVector<U,N> const& x);
 
     template <typename U, template<typename> class M> friend
-    SpMatrix<U,M> transpose (SpMatrix<U,M> const& A, AlgPartition col_partition);
+    SpMatrix<U,M> transpose (SpMatrix<U,M> const& A, AlgPartition const& col_partition);
+
+    template <typename U, template<typename> class M> friend
+    SpMatrix<U,M> SpGEMM (SpMatrix<U,M> const& A, SpMatrix<U,M> const& B,
+                          AlgPartition const& col_partition);
 
     template <typename U> friend class AMG;
 
@@ -326,6 +332,9 @@ public:
     //! Complete transpose communication, writing the assembled matrix into \p AT.
     void finishComm_tr (SpMatrix<T,Allocator>& AT);
 
+    void startComm_mm (SpMatrix<T,Allocator>& B, AlgPartition const& col_partition);
+    void finishComm_mm (SpMatrix<T,Allocator>& A, SpMatrix<T,Allocator>& B);
+
 private:
 
     void set_num_neighbors ();
@@ -345,6 +354,10 @@ private:
 
 #ifdef AMREX_USE_MPI
     csr_type m_csr_remote;
+
+    // The `row_offset` in m_csr_remote does not contain empty rows. The
+    // full list of row offsets is available in m_remote_row_offset.
+    container_type<Long> m_remote_row_offset;
 
     // It should be noted that m_csr and m_csr_remote may have different
     // number of rows, because some rows may be purely local and they do not
@@ -374,7 +387,16 @@ private:
     // The size of outer vector is # of procs. The indices are global.
     Vector<Vector<Long>> m_remote_cols_vv;
 
-    int m_num_neighbors = -1; // No. of other processes involved in communication
+    // No. of other processes involved in communication.
+    //
+    // For matrix-vector multiplication, this is the number of processes
+    // that require this process' data in the vector. This variable is
+    // stored in the matrix and it's set by calling its member function
+    // set_num_neighbors(). However, the data here are the vector's data.
+    //
+    // For matrix transpose, this is the number of processes that will send
+    // us their transposed data.
+    int m_num_neighbors = -1;
 
 public: // NOLINT  Private functions, but public for cuda
 
@@ -426,7 +448,12 @@ public: // NOLINT  Private functions, but public for cuda
     void prepare_comm_mv (AlgPartition const& col_partition);
     void pack_buffer_mv (AlgVector<T,AllocT> const& v);
     void unpack_buffer_mv (AlgVector<T,AllocT>& v);
+    void comm_tr_recv_wait();
+    void comm_tr_clear();
     void unpack_buffer_tr (CommTR const& ctr, AlgPartition const& col_partition);
+    void unpack_buffer_mm (CommTR const& ctr);
+    void expand_remote_row_offset ();
+    CsrView<T const> remote_full_const_view () const;
 
 #endif
 };
@@ -824,6 +851,17 @@ SpMatrix<T,Allocator>::sortCSR ()
 }
 
 template <typename T, template<typename> class Allocator>
+void
+SpMatrix<T,Allocator>::setColumnPartition (AlgPartition const& col_partition)
+{
+#ifdef AMREX_USE_MPI
+    split_csr(col_partition);
+#else
+    amrex::ignore_unused(col_partition);
+#endif
+}
+
+template <typename T, template<typename> class Allocator>
 template <typename I>
 void
 SpMatrix<T,Allocator>::define_and_filter_doit (T const* mat, Long const* col_index,
@@ -1059,7 +1097,7 @@ template <typename T, template<typename> class Allocator>
 void SpMatrix<T,Allocator>::startComm_mv (AlgVector<T,AllocT> const& x)
 {
 #ifndef AMREX_USE_MPI
-    amrex::ignore_unused(x);
+    amrex::ignore_unused(this, x);
 #else
     if (this->partition().numActiveProcs() <= 1) { return; }
 
@@ -1354,15 +1392,32 @@ void SpMatrix<T,Allocator>::finishComm_tr (SpMatrix<T,Allocator>& AT)
 #ifdef AMREX_USE_MPI
     if (this->partition().numActiveProcs() <= 1) { return; }
 
+    this->comm_tr_recv_wait();
+
+    AT.unpack_buffer_tr(m_comm_tr, this->m_partition);
+
+    this->comm_tr_clear();
+#else
+    amrex::ignore_unused(AT);
+#endif
+}
+
+#ifdef AMREX_USE_MPI
+
+template <typename T, template<typename> class Allocator>
+void SpMatrix<T,Allocator>::comm_tr_recv_wait ()
+{
     if (! m_comm_tr.recv_reqs.empty()) {
         Vector<MPI_Status> mpi_statuses(m_comm_tr.recv_reqs.size());
         BL_MPI_REQUIRE(MPI_Waitall(int(m_comm_tr.recv_reqs.size()),
                                    m_comm_tr.recv_reqs.data(),
                                    mpi_statuses.data()));
     }
+}
 
-    AT.unpack_buffer_tr(m_comm_tr, this->m_partition);
-
+template <typename T, template<typename> class Allocator>
+void SpMatrix<T,Allocator>::comm_tr_clear ()
+{
     if (! m_comm_tr.send_reqs.empty()) {
         Vector<MPI_Status> mpi_statuses(m_comm_tr.send_reqs.size());
         BL_MPI_REQUIRE(MPI_Waitall(int(m_comm_tr.send_reqs.size()),
@@ -1382,8 +1437,34 @@ void SpMatrix<T,Allocator>::finishComm_tr (SpMatrix<T,Allocator>& AT)
         The_Pinned_Arena()->free(m_comm_tr.recv_buffer_idx_map);
     }
     m_comm_tr = CommTR{};
+}
+
+#endif
+
+template <typename T, template<typename> class Allocator>
+void SpMatrix<T,Allocator>::startComm_mm (SpMatrix<T,Allocator>& B,
+                                          AlgPartition const& col_partition)
+{
+    this->setColumnPartition(B.partition());
+    B.setColumnPartition(col_partition);
+
+#ifdef AMREX_USE_MPI
+    this->startComm_tr(col_partition);
+#endif
+}
+
+template <typename T, template<typename> class Allocator>
+void SpMatrix<T,Allocator>::finishComm_mm (SpMatrix<T,Allocator>& A,
+                                           SpMatrix<T,Allocator>& B)
+{
+#ifndef AMREX_USE_MPI
+    amrex::ignore_unused(this, A, B);
 #else
-    amrex::ignore_unused(AT);
+    A.comm_tr_recv_wait();
+
+    B.unpack_buffer_mm(A.m_comm_tr);
+
+    A.comm_tr_clear();
 #endif
 }
 
@@ -1484,7 +1565,8 @@ void SpMatrix<T,Allocator>::split_csr (AlgPartition const& col_partition)
         m_csr.col_index.swap(new_col);
 
         // In the remote part, it's expected that some rows don't have
-        // nonzeros. So we trim them off.
+        // nonzeros. So we trim them off, and also save a full copy of the
+        // row offsets.
         {
             Long old_size = m_csr_remote.row_offset.size();
             m_ri_ltor.resize(old_size-1);
@@ -1555,7 +1637,8 @@ void SpMatrix<T,Allocator>::split_csr (AlgPartition const& col_partition)
             m_ri_rtol.shrink_to_fit();
             trimmed_row_offset.shrink_to_fit();
 #endif
-            m_csr_remote.row_offset.swap(trimmed_row_offset);
+            m_remote_row_offset = std::move(trimmed_row_offset);
+            std::swap(m_csr_remote.row_offset, m_remote_row_offset);
         }
 
     } else if (col_begin > 0) {
@@ -1847,9 +1930,9 @@ void SpMatrix<T,Allocator>::unpack_buffer_tr (CommTR const& ctr,
         }
     }
 
-    csrr.row_offset[0] = 0;
-    std::partial_sum(row_nnz.begin(), row_nnz.end(), csrr.row_offset.begin()+1);
-    AMREX_ASSERT(csrr.nnz == csrr.row_offset.back());
+    std::exclusive_scan(row_nnz.begin(), row_nnz.end(), csrr.row_offset.begin(),
+                        Long(0));
+    csrr.row_offset.back() = csrr.nnz;
 
     auto rowpos = csrr.row_offset; // make a copy to keep track of offset
 
@@ -1877,7 +1960,6 @@ void SpMatrix<T,Allocator>::unpack_buffer_tr (CommTR const& ctr,
                         sizeof(T)   *nvals);
             std::memcpy(csrr.col_index.data()+os_dst, col_index+os_src,
                         sizeof(Long)*nvals);
-
             rowpos[p] += nvals;
         }
     }
@@ -1901,6 +1983,143 @@ void SpMatrix<T,Allocator>::unpack_buffer_tr (CommTR const& ctr,
     amrex::duplicateCSR(Gpu::hostToDevice, m_csr_remote, csrr);
     Gpu::streamSynchronize();
 #endif
+}
+
+template <typename T, template<typename> class Allocator>
+void SpMatrix<T,Allocator>::unpack_buffer_mm (CommTR const& ctr)
+{
+    auto ctr_nnz = ctr.total_counts_recv[0];
+    if (ctr_nnz > 0) {
+#ifdef AMREX_USE_GPU
+        CSR<T,Gpu::PinnedVector> csrr;
+#else
+        csr_type csrr;
+#endif
+
+        auto ctr_nb = int(ctr.recv_from.size()); // # of blocked CSRs to be merged
+        csrr.mat.resize(ctr_nnz);
+        csrr.col_index.resize(ctr_nnz);
+        csrr.row_offset.resize(m_csr.nrows()+1);
+        csrr.nnz = ctr_nnz;
+
+        // Count nnz per row
+        Vector<int> row_nnz(m_csr.nrows(), 0);
+        for (int i = 0; i < ctr_nb; ++i) {
+            auto nrow_i = ctr.recv_counts[i][1];
+            Long const* row_offset = ctr.recv_buffer_row_offset
+                +                    ctr.recv_buffer_offset[i][2];
+            Long const* idx_map    = ctr.recv_buffer_idx_map
+                +                    ctr.recv_buffer_offset[i][3];
+            AMREX_ASSERT((row_offset[nrow_i] - row_offset[0]) == ctr.recv_counts[i][0]);
+            for (int lr = 0; lr < nrow_i; ++lr) {
+                Long const row = idx_map[lr] - m_row_begin;
+                row_nnz[gr-m_row_begin] += int(row_offset[lr+1] - row_offset[lr]);
+            }
+        }
+
+        std::exclusive_scan(row_nnz.begin(), row_nnz.end(), csrr.row_offset.begin(),
+                            Long(0));
+        csrr.row_offset.back() = csrr.nnz;
+
+        auto rowpos = csrr.row_offset; // make a copy to keep track of offset
+        for (int i = 0; i < ctr_nb; ++i) {
+            auto nrow_i = ctr.recv_counts[i][1];
+            T    const* mat        = ctr.recv_buffer_mat
+                +                    ctr.recv_buffer_offset[i][0];
+            Long const* col_index  = ctr.recv_buffer_col_index
+                +                    ctr.recv_buffer_offset[i][1];
+            Long const* row_offset = ctr.recv_buffer_row_offset
+                +                    ctr.recv_buffer_offset[i][2];
+            Long const* idx_map    = ctr.recv_buffer_idx_map
+                +                    ctr.recv_buffer_offset[i][3];
+            for (int lr = 0; lr < nrow_i; ++lr) {
+                Long const row = idx_map[lr] - m_row_begin;
+                auto os_src = row_offset[lr] - row_offset[0];
+                auto nvals = row_offset[lr+1] = row_offset[lr];
+                auto os_dst = rowpos[p];
+                std::memcpy(csrr.      mat.data()+os_dst,       mat+os_src,
+                            sizeof(T)   *nvals);
+                std::memcpy(csrr.col_index.data()+os_dst, col_index+os_src,
+                            sizeof(Long)*nvals);
+                rowpos[row] += nvals;
+            }
+        }
+
+        // We now have a CSR that has the same number of rows as the
+        // diagonal part of the matrix B. It has the global column index.
+
+        // Next we need to do csrr^T * B. But before we do that we create a
+        // column index map and convert the column index in csrr from global
+        // to local.
+
+        // Transpose csrr
+
+        // cssr^T * B0
+
+        // cssr^T * B1
+
+        // We need to send them back
+
+        // actually we should try to fuse cssr^t ang block merging together.
+    }
+}
+
+template <typename T, template<typename> class Allocator>
+void SpMatrix<T,Allocator>::expand_remote_row_offset ()
+{
+    if (! m_remote_row_offset.empty()) { return; }
+
+    auto nrows = m_csr.nrows();
+    m_remote_row_offset.resize(nrows+1);
+    auto* pro_full = m_remote_row_offset.data();
+    auto const* pro_comp = m_csr_remote.row_offset.data();
+    auto const* ri_ltor = m_ri_ltor.data();
+    auto nnz_r = m_csr_remote.nnz;
+    if (nnz_r < Long(std::numeric_limits<int>::max())) {
+        Scan::PrefixSum<int>(nrows,
+                             [=] AMREX_GPU_DEVICE (Long i) -> int {
+                                 Long rrow = ri_ltor[i];
+                                 if (rrow == -1) {
+                                     return int(0);
+                                 } else {
+                                     return int(pro_comp[rrow+1]-pro_comp[rrow]);
+                                 }},
+                             [=] AMREX_GPU_DEVICE (Long i, int x) {
+                                 if (i == 0) {
+                                     pro_full[0] = 0;
+                                 }
+                                 pro_full[i+1] = x;
+                             },
+                             Scan::Type::inclusive, Scan::noRetSum);
+    } else {
+        Scan::PrefixSum<Long>(nrows,
+                              [=] AMREX_GPU_DEVICE (Long i) -> Long {
+                                  Long rrow = ri_ltor[i];
+                                  if (rrow == -1) {
+                                      return Long(0);
+                                  } else {
+                                      return pro_comp[rrow+1]-pro_comp[rrow];
+                                  }},
+                              [=] AMREX_GPU_DEVICE (Long i, Long x) {
+                                  if (i == 0) {
+                                      pro_full[0] = 0;
+                                  }
+                                  pro_full[i+1] = x;
+                              },
+                              Scan::Type::inclusive, Scan::noRetSum);
+    }
+}
+
+template <typename T, template<typename> class Allocator>
+CsrView<T const> SpMatrix<T,Allocator>::remote_full_const_view () const
+{
+    if (m_remote_row_offset.empty()) {
+        const_cast<SpMatrix<T,Allocator>*>(this)->expand_remote_row_offset();
+    }
+    auto csr_view = m_csr_remote.const_view();
+    csr_view.row_offset = m_remote_row_offset.data();
+    csr_view.nrows = m_csr.nrows();
+    return csr_view;
 }
 
 #endif
