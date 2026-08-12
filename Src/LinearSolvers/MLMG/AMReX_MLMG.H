@@ -1752,6 +1752,16 @@ MLMGT<MF>::mgVcycle (int amrlev, int mglev_top)
 {
     BL_PROFILE("MLMG::mgVcycle()");
 
+    auto amrex_smooth_wrapper = [] (MLMGT<MF>* mlmg, int alev, int mglev, MF& sol, const MF& rhs,
+                                    bool skip_fillboundary, int niter)
+    {
+        mlmg->linop.smooth(alev, mglev, sol, rhs, skip_fillboundary, niter);
+    };
+    using SmoothFunc = void (*)(MLMGT<MF>*, int, int, MF&, const MF&, bool, int);
+
+    auto raptor_smooth_wrapper = __raptor_truncate_op_func
+        (static_cast<SmoothFunc>(amrex_smooth_wrapper), 64, 0, 32);
+
     const int mglev_bottom = linop.NMGLevels(amrlev) - 1;
 
     for (int mglev = mglev_top; mglev < mglev_bottom; ++mglev)
@@ -1767,7 +1777,8 @@ MLMGT<MF>::mgVcycle (int amrlev, int mglev_top)
 
         setVal(cor[amrlev][mglev], RT(0.0));
         bool skip_fillboundary = true;
-        linop.smooth(amrlev, mglev, cor[amrlev][mglev], res[amrlev][mglev], skip_fillboundary, nu1);
+        // linop.smooth(amrlev, mglev, cor[amrlev][mglev], res[amrlev][mglev], skip_fillboundary, nu1);
+        raptor_smooth_wrapper(this, amrlev, mglev, cor[amrlev][mglev], res[amrlev][mglev], skip_fillboundary, nu1);
 
         // rescor = res - L(cor)
         computeResOfCorrection(amrlev, mglev);

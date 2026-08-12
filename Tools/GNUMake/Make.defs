@@ -17,6 +17,12 @@ endif
 
 include $(AMREX_HOME)/Tools/GNUMake/Make.machines
 
+ifeq ($(USE_RAPTOR),TRUE)
+  override COMP = llvm
+  override BL_NO_FORT = TRUE
+  DEFINES += -DAMREX_USE_RAPTOR
+endif
+
 ifdef USE_GPU
   USE_GPU := $(strip $(USE_GPU))
 else
@@ -509,7 +515,12 @@ endif
 
 lowercase_comp = $(shell echo $(COMP) | tr A-Z a-z)
 
-ifeq ($(lowercase_comp),$(filter $(lowercase_comp),gcc gnu g++))
+ifeq ($(USE_RAPTOR),TRUE)
+  AMREX_FCOMP ?= flang
+  AMREX_CCOMP ?= clang
+  $(info Loading $(AMREX_HOME)/Tools/GNUMake/comps/raptor.mak...)
+  include        $(AMREX_HOME)/Tools/GNUMake/comps/raptor.mak
+else ifeq ($(lowercase_comp),$(filter $(lowercase_comp),gcc gnu g++))
   lowercase_comp = gnu
   AMREX_FCOMP ?= gnu
   AMREX_CCOMP ?= gnu
@@ -587,6 +598,12 @@ else ifeq ($(lowercase_comp),hip)
   AMREX_CCOMP ?= hip
   $(info Loading $(AMREX_HOME)/Tools/GNUMake/comps/hip.mak...)
   include        $(AMREX_HOME)/Tools/GNUMake/comps/hip.mak
+else ifeq ($(lowercase_comp),raptor)
+  lowercase_comp = raptor
+  AMREX_FCOMP ?= flang
+  AMREX_CCOMP ?= clang
+  $(info Loading $(AMREX_HOME)/Tools/GNUMake/comps/raptor.mak...)
+  include        $(AMREX_HOME)/Tools/GNUMake/comps/raptor.mak
 else
   $(error Unknown compiler $(COMP). Supported compilers are gnu, intel, intel-llvm, intel-classic, sycl, cray, pgi, nvhpc, ibm, llvm, nag, and nec)
 endif
@@ -981,7 +998,11 @@ LDFLAGS	+= -L. $(addprefix -L, $(LIBRARY_LOCATIONS))
 
 machineSuffix	= $(lowercase_comp)$(archSuffix)$(PrecisionSuffix)$(DebugSuffix)$(ProfSuffix)$(MProfSuffix)$(MPISuffix)$(UPCXXSuffix)$(OMPSuffix)$(ACCSuffix)$(GPUSuffix)$(CUPTISuffix)$(USERSuffix)
 
-optionsSuffix	= $(DIM)d.$(machineSuffix)
+ifeq ($(USE_RAPTOR),TRUE)
+  optionsSuffix	= $(DIM)d.raptor.$(machineSuffix)
+else
+  optionsSuffix	= $(DIM)d.$(machineSuffix)
+endif
 
 executable	= $(addsuffix $(optionsSuffix).ex, $(EBASE))
 

@@ -277,4 +277,9 @@
 
 #endif /* !BL_LANG_FORT */
 
+#if defined(AMREX_USE_RAPTOR) && defined(__cplusplus)
+template <typename fty> fty *__raptor_truncate_op_func(fty *, int, int, int);
+template <typename fty> fty *__raptor_truncate_op_func(fty *, int, int, int, int);
+#endif
+
 #endif
