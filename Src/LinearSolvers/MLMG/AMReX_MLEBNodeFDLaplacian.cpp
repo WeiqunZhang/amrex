@@ -2,7 +2,9 @@
 #include <AMReX_MLEBNodeFDLap_K.H>
 #include <AMReX_MLNodeLinOp_K.H>
 #include <AMReX_MLNodeTensorLap_K.H>
+#include <AMReX_MLMG.H>
 #include <AMReX_MultiFabUtil.H>
+#include <AMReX_SingleBoxCGSolver.H>
 
 #ifdef AMREX_USE_EB
 #include <AMReX_EB2.H>
@@ -859,6 +861,486 @@ MLEBNodeFDLaplacian::update_sigma ()
                 mlndlap_fillbc_cc<Real>(mfi.validbox(),sfab,domain,lobc,hibc);
             }
         }
+    }
+}
+
+namespace {
+    struct LPBase
+    {
+        AMREX_GPU_DEVICE AMREX_FORCE_INLINE
+        Real xdoty (IntVect const& iv, int, Real vx, Real vy) const
+        {
+            return dotmsk(iv)*vx*vy;
+        }
+
+        AMREX_GPU_DEVICE AMREX_FORCE_INLINE
+        void normalize (IntVect const&, int, Real&) const {}
+
+        AMREX_GPU_DEVICE AMREX_FORCE_INLINE
+        void getNeighbors (IntVect const& iv, int idim,
+                           IntVect& ivm, IntVect& ivp) const
+        {
+            ivm = iv;
+            ivp = iv;
+
+            // There is only a single Box. Thus a box boundary node is
+            // either Dirichlet (including domain Dirichlet boundary or
+            // coarse/fine Dirichlet boundary) or on the periodic or Neumann
+            // domain boundary. Because this is called on non-Dirichlet
+            // nodes only, if a boundary node (e.g., iv[0] == dlo[0]) gets
+            // here, it's either periodic or Neumann.
+
+            if (iv[idim] == dlo[idim]) {
+                ivm[idim] = is_periodic[idim] ? dhi[idim]-1 : iv[idim]+1;
+            } else {
+                --ivm[idim];
+            }
+
+            if (iv[idim] == dhi[idim]) {
+                ivp[idim] = is_periodic[idim] ? dlo[idim]+1 : iv[idim]-1;
+            } else {
+                ++ivp[idim];
+            }
+        }
+
+        Array4<Real const> dotmsk;
+        Array4<int const> dirmsk;
+        GpuArray<Real,AMREX_SPACEDIM> beta;
+        IntVect dlo, dhi;
+        GpuArray<bool,AMREX_SPACEDIM> is_periodic;
+    };
+
+    struct LP
+        : public LPBase
+    {
+        LP (LPBase const& a_lpbase)
+            : LPBase(a_lpbase)
+            {}
+
+        AMREX_GPU_DEVICE AMREX_FORCE_INLINE
+        Real apply (IntVect const& iv, int, Array4<Real> const& xa, int n) const
+        {
+            Real y = 0;
+            if (!dirmsk(iv)) {
+                for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
+                    IntVect ivm, ivp;
+                    getNeighbors(iv, idim, ivm, ivp);
+
+                    y += beta[idim] *
+                        (xa(ivm,n) + xa(ivp,n) - Real(2.0)*xa(iv,n));
+                }
+            }
+            return y;
+        }
+    };
+
+    struct LPSigma
+        : public LPBase
+    {
+        LPSigma (LPBase const& a_lpbase, Array4<Real const> const& a_sigma)
+            : LPBase(a_lpbase), sigma(a_sigma)
+            {}
+
+        AMREX_GPU_DEVICE AMREX_FORCE_INLINE
+        Real apply (IntVect const& iv, int, Array4<Real> const& xa, int n) const
+        {
+            Real y = 0;
+            if (!dirmsk(iv)) {
+                constexpr int nsig = 1 << (AMREX_SPACEDIM-1);
+                constexpr Real fac = Real(1.0) / Real(nsig);
+                Real const xcenter = xa(iv,n);
+
+                for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
+                    IntVect ivm, ivp;
+                    getNeighbors(iv, idim, ivm, ivp);
+
+                    Real sigm = 0;
+                    Real sigp = 0;
+                    for (int isig = 0; isig < nsig; ++isig) {
+                        IntVect ism = iv;
+                        IntVect isp = iv;
+                        --ism[idim];
+
+                        int ibit = 0;
+                        for (int jdim = 0; jdim < AMREX_SPACEDIM; ++jdim) {
+                            if (jdim != idim) {
+                                int const offset = ((isig >> ibit) & 1) - 1;
+                                ism[jdim] += offset;
+                                isp[jdim] += offset;
+                                ++ibit;
+                            }
+                        }
+
+                        sigm += sigma(ism);
+                        sigp += sigma(isp);
+                    }
+
+                    y += beta[idim] * fac *
+                        (sigm*(xa(ivm,n)-xcenter) + sigp*(xa(ivp,n)-xcenter));
+                }
+            }
+            return y;
+        }
+
+        Array4<Real const> sigma;
+    };
+
+#if (AMREX_SPACEDIM == 2)
+    struct LPRZ
+        : public LPBase
+    {
+        LPRZ (LPBase const& a_lpbase, Real a_sigr, Real a_dr, Real a_dz,
+              Real a_rlo, Real a_alpha, Array4<Real const> const& a_sigma,
+              Array4<Real const> const& a_vfrac, Array4<Real const> const& a_levset,
+              GpuArray<Array4<Real const>,AMREX_SPACEDIM> const& a_edgecent,
+              bool a_has_sigma, bool a_use_eb)
+            : LPBase(a_lpbase), sigr(a_sigr), dr(a_dr), dz(a_dz), rlo(a_rlo),
+              alpha(a_alpha), sigma(a_sigma), vfrac(a_vfrac), levset(a_levset),
+              edgecent(a_edgecent), has_sigma(a_has_sigma), use_eb(a_use_eb)
+            {}
+
+        AMREX_GPU_DEVICE AMREX_FORCE_INLINE
+        Real radialEdgeSigma (IntVect const& edge) const
+        {
+            if (!has_sigma) {
+                return sigr;
+            }
+
+            IntVect cellm = edge;
+            --cellm[1];
+            if (use_eb) {
+                Real const vfm = vfrac(cellm);
+                Real const vfp = vfrac(edge);
+                return (sigma(cellm)*vfm + sigma(edge)*vfp) / (vfm+vfp);
+            } else {
+                return Real(0.5)*(sigma(cellm)+sigma(edge));
+            }
+        }
+
+        AMREX_GPU_DEVICE AMREX_FORCE_INLINE
+        Real axialEdgeSigma (IntVect const& edge, Real r) const
+        {
+            if (!has_sigma) {
+                return Real(1.0);
+            }
+
+            IntVect cellm = edge;
+            --cellm[0];
+            Real const rp = r + Real(0.5)*dr;
+            Real const rm = amrex::Math::abs(r-Real(0.5)*dr);
+            if (use_eb) {
+                Real const wm = vfrac(cellm)*rm;
+                Real const wp = vfrac(edge)*rp;
+                return (sigma(cellm)*wm + sigma(edge)*wp) / (wm+wp);
+            } else {
+                return (sigma(cellm)*rm + sigma(edge)*rp) / (rm+rp);
+            }
+        }
+
+        AMREX_GPU_DEVICE AMREX_FORCE_INLINE
+        Real apply (IntVect const& iv, int, Array4<Real> const& xa, int n) const
+        {
+            Real const r = rlo + Real(iv[0])*dr;
+            if (dirmsk(iv) || (r == Real(0.0) && alpha != Real(0.0))) {
+                return Real(0.0);
+            }
+
+            IntVect ivxm, ivxp, ivym, ivyp;
+            getNeighbors(iv, 0, ivxm, ivxp);
+            getNeighbors(iv, 1, ivym, ivyp);
+
+            Real const xcenter = xa(iv,n);
+            Real out;
+            Real scale = Real(1.0);
+
+            if (r == Real(0.0)) {
+                Real const sigp = radialEdgeSigma(iv);
+                if (use_eb && levset(ivxp) >= Real(0.0)) {
+                    Real const hp = (edgecent[0](iv) == Real(1.0))
+                        ? Real(1.0) : Real(1.0)+Real(2.0)*edgecent[0](iv);
+                    out = -Real(4.0)*sigp*xcenter/(dr*dr*hp*hp);
+                    scale = hp;
+                } else {
+                    out = Real(4.0)*sigp*(xa(ivxp,n)-xcenter)/(dr*dr);
+                }
+            } else {
+                Real hp = Real(1.0);
+                Real hm = Real(1.0);
+                if (use_eb) {
+                    hp = (edgecent[0](iv) == Real(1.0))
+                        ? Real(1.0) : Real(1.0)+Real(2.0)*edgecent[0](iv);
+                    IntVect edgem = iv;
+                    --edgem[0];
+                    hm = (edgecent[0](edgem) == Real(1.0))
+                        ? Real(1.0) : Real(1.0)-Real(2.0)*edgecent[0](edgem);
+                }
+
+                Real const sigp = radialEdgeSigma(iv);
+                IntVect edgem = iv;
+                --edgem[0];
+                Real const sigm = radialEdgeSigma(edgem);
+                Real tmp = sigp*(xa(ivxp,n)-xcenter)*(r+Real(0.5)*dr);
+                if (use_eb && levset(ivxp) >= Real(0.0)) {
+                    tmp = -sigp*xcenter/hp*(r+Real(0.5)*hp*dr);
+                }
+                if (use_eb && levset(ivxm) >= Real(0.0)) {
+                    tmp -= sigm*xcenter/hm*(r-Real(0.5)*hm*dr);
+                } else {
+                    tmp += sigm*(xa(ivxm,n)-xcenter)*(r-Real(0.5)*dr);
+                }
+                out = tmp*Real(2.0)/((hp+hm)*r*dr*dr);
+                scale = amrex::min(hm,hp);
+            }
+
+            Real hp = Real(1.0);
+            Real hm = Real(1.0);
+            if (use_eb) {
+                hp = (edgecent[1](iv) == Real(1.0))
+                    ? Real(1.0) : Real(1.0)+Real(2.0)*edgecent[1](iv);
+                IntVect edgem = iv;
+                --edgem[1];
+                hm = (edgecent[1](edgem) == Real(1.0))
+                    ? Real(1.0) : Real(1.0)-Real(2.0)*edgecent[1](edgem);
+            }
+
+            Real const sigp = axialEdgeSigma(iv,r);
+            IntVect edgem = iv;
+            --edgem[1];
+            Real const sigm = axialEdgeSigma(edgem,r);
+            Real tmp = sigp*(xa(ivyp,n)-xcenter);
+            if (use_eb && levset(ivyp) >= Real(0.0)) {
+                tmp = -sigp*xcenter/hp;
+            }
+            if (use_eb && levset(ivym) >= Real(0.0)) {
+                tmp -= sigm*xcenter/hm;
+            } else {
+                tmp += sigm*(xa(ivym,n)-xcenter);
+            }
+            out += tmp*Real(2.0)/((hp+hm)*dz*dz);
+            scale = amrex::min(scale,hm,hp);
+
+            if (r != Real(0.0)) {
+                out -= alpha*xcenter/(r*r);
+            }
+            return out*scale;
+        }
+
+        Real sigr;
+        Real dr;
+        Real dz;
+        Real rlo;
+        Real alpha;
+        Array4<Real const> sigma;
+        Array4<Real const> vfrac;
+        Array4<Real const> levset;
+        GpuArray<Array4<Real const>,AMREX_SPACEDIM> edgecent;
+        bool has_sigma;
+        bool use_eb;
+    };
+#endif
+
+#ifdef AMREX_USE_EB
+    struct LPEB
+        : public LPBase
+    {
+        LPEB (LPBase const& a_lpbase, Array4<Real const> const& a_levset,
+              GpuArray<Array4<Real const>,AMREX_SPACEDIM> const& a_edgecent,
+              Array4<Real const> const& a_sigma, Array4<Real const> const& a_vfrac,
+              bool a_has_sigma)
+            : LPBase(a_lpbase), levset(a_levset), edgecent(a_edgecent),
+              sigma(a_sigma), vfrac(a_vfrac), has_sigma(a_has_sigma)
+            {}
+
+        AMREX_GPU_DEVICE AMREX_FORCE_INLINE
+        Real edgeSigma (IntVect const& edge, int idim) const
+        {
+            if (!has_sigma) {
+                return Real(1.0);
+            }
+
+            constexpr int nsig = 1 << (AMREX_SPACEDIM-1);
+            Real sigsum = 0;
+            Real vfsum = 0;
+            for (int isig = 0; isig < nsig; ++isig) {
+                IntVect cell = edge;
+                int ibit = 0;
+                for (int jdim = 0; jdim < AMREX_SPACEDIM; ++jdim) {
+                    if (jdim != idim) {
+                        cell[jdim] += ((isig >> ibit) & 1) - 1;
+                        ++ibit;
+                    }
+                }
+                Real const vf = vfrac(cell);
+                sigsum += sigma(cell)*vf;
+                vfsum += vf;
+            }
+            return sigsum/vfsum;
+        }
+
+        AMREX_GPU_DEVICE AMREX_FORCE_INLINE
+        Real apply (IntVect const& iv, int, Array4<Real> const& xa, int n) const
+        {
+            Real y = 0;
+            if (!dirmsk(iv)) {
+                Real const xcenter = xa(iv,n);
+                Real scale = Real(1.0);
+
+                for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
+                    IntVect ivm, ivp;
+                    getNeighbors(iv, idim, ivm, ivp);
+
+                    IntVect edgem = iv;
+                    --edgem[idim];
+
+                    Real const hp = (edgecent[idim](iv) == Real(1.0))
+                        ? Real(1.0) : Real(1.0)+Real(2.0)*edgecent[idim](iv);
+                    Real const hm = (edgecent[idim](edgem) == Real(1.0))
+                        ? Real(1.0) : Real(1.0)-Real(2.0)*edgecent[idim](edgem);
+
+                    Real const sigp = edgeSigma(iv, idim);
+                    Real const sigm = edgeSigma(edgem, idim);
+                    Real tmp = (levset(ivp) < Real(0.0))
+                        ? sigp*(xa(ivp,n)-xcenter)
+                        : -sigp*xcenter/hp;
+                    tmp += (levset(ivm) < Real(0.0))
+                        ? sigm*(xa(ivm,n)-xcenter)
+                        : -sigm*xcenter/hm;
+
+                    y += beta[idim]*tmp*Real(2.0)/(hp+hm);
+                    scale = amrex::min(scale, hm, hp);
+                }
+
+                y *= scale;
+            }
+            return y;
+        }
+
+        Array4<Real const> levset;
+        GpuArray<Array4<Real const>,AMREX_SPACEDIM> edgecent;
+        Array4<Real const> sigma;
+        Array4<Real const> vfrac;
+        bool has_sigma;
+    };
+#endif
+}
+
+void
+MLEBNodeFDLaplacian::customBottomSolve (MLMGT<MultiFab>* mlmg, MultiFab& x, const MultiFab& b,
+                                        Real eps_rel, Real eps_abs, int maxiter)
+{
+    amrex::ignore_unused(eps_rel, eps_abs, maxiter);
+
+#if defined(AMREX_USE_CUDA) || defined(AMREX_USE_HIP)
+    constexpr Long old_solver_min_points = Long(97)*97*97;
+    bool use_custom_solver = (x.size() == 1) &&
+        (x.boxArray()[0].numPts() < old_solver_min_points);
+    if (use_custom_solver)
+    {
+        int const amrlev = 0;
+        int const mglev = NMGLevels(0) - 1;
+
+#ifdef AMREX_USE_EB
+        auto const* eb_factory = dynamic_cast<EBFArrayBoxFactory const*>
+            (m_factory[amrlev][mglev].get());
+        bool const use_eb = eb_factory && !eb_factory->isAllRegular();
+#endif
+
+        int ret;
+        if (ParallelDescriptor::MyProc() == x.DistributionMap()[0])
+        {
+            auto const& geom = m_geom[amrlev][mglev];
+            const auto dxinv = geom.InvCellSizeArray();
+#if (AMREX_SPACEDIM == 2)
+            const auto sig0 = m_sigma[0];
+            const auto dx0 = geom.CellSize(0);
+            const auto dx1 = geom.CellSize(1)/std::sqrt(m_sigma[1]);
+            const auto xlo = geom.ProbLo(0);
+            const auto alpha = m_rz_alpha;
+#endif
+            AMREX_D_TERM(const Real bx = m_sigma[0]*dxinv[0]*dxinv[0];,
+                         const Real by = m_sigma[1]*dxinv[1]*dxinv[1];,
+                         const Real bz = m_sigma[2]*dxinv[2]*dxinv[2];)
+
+            auto const& dotmsk = m_bottom_dot_mask[0].const_array();
+            auto const& dirmsk = (*m_dirichlet_mask[amrlev][mglev])[0].const_array();
+            Box box = x.boxArray()[0];
+            Box dbox = amrex::convert(geom.Domain(),IntVect(1));
+            LPBase lpbase{dotmsk,dirmsk,
+                          GpuArray<Real,AMREX_SPACEDIM>{AMREX_D_DECL(bx,by,bz)},
+                          dbox.smallEnd(),dbox.bigEnd(),
+                          GpuArray<bool,AMREX_SPACEDIM>{AMREX_D_DECL(geom.isPeriodic(0),
+                                                                     geom.isPeriodic(1),
+                                                                     geom.isPeriodic(2))}};
+#if (AMREX_SPACEDIM == 2)
+            if (m_rz) {
+                Array4<Real const> sigma;
+                if (m_has_sigma_mf) {
+                    sigma = (*m_sigma_mf[amrlev][mglev])[0].const_array();
+                }
+#ifdef AMREX_USE_EB
+                if (use_eb) {
+                    auto const& edgecent = eb_factory->getEdgeCent();
+                    AMREX_ALWAYS_ASSERT(edgecent[0] && edgecent[0]->ok(0));
+                    GpuArray<Array4<Real const>,AMREX_SPACEDIM> const ec
+                        {(*edgecent[0])[0].const_array(), (*edgecent[1])[0].const_array()};
+                    auto const& levset = eb_factory->getLevelSet()[0].const_array();
+                    Array4<Real const> vfrac;
+                    if (m_has_sigma_mf) {
+                        vfrac = eb_factory->getVolFrac()[0].const_array();
+                    }
+                    LPRZ lp(lpbase, sig0, dx0, dx1, xlo, alpha, sigma, vfrac,
+                            levset, ec, m_has_sigma_mf, true);
+                    ret = bicgstab_solve(box, x[0], b[0], lp, eps_rel, eps_abs, maxiter);
+                } else
+#endif
+                {
+                    LPRZ lp(lpbase, sig0, dx0, dx1, xlo, alpha, sigma, {}, {}, {},
+                            m_has_sigma_mf, false);
+                    ret = bicgstab_solve(box, x[0], b[0], lp, eps_rel, eps_abs, maxiter);
+                }
+            } else
+#endif
+#ifdef AMREX_USE_EB
+            if (use_eb) {
+                auto const& edgecent = eb_factory->getEdgeCent();
+                AMREX_ALWAYS_ASSERT(edgecent[0] && edgecent[0]->ok(0));
+                GpuArray<Array4<Real const>,AMREX_SPACEDIM> const ec
+                    {AMREX_D_DECL((*edgecent[0])[0].const_array(),
+                                  (*edgecent[1])[0].const_array(),
+                                  (*edgecent[2])[0].const_array())};
+                auto const& levset = eb_factory->getLevelSet()[0].const_array();
+                if (m_has_sigma_mf) {
+                    auto const& sigma = (*m_sigma_mf[amrlev][mglev])[0].const_array();
+                    auto const& vfrac = eb_factory->getVolFrac()[0].const_array();
+                    LPEB lp(lpbase, levset, ec, sigma, vfrac, true);
+                    ret = bicgstab_solve(box, x[0], b[0], lp, eps_rel, eps_abs, maxiter);
+                } else {
+                    LPEB lp(lpbase, levset, ec, {}, {}, false);
+                    ret = bicgstab_solve(box, x[0], b[0], lp, eps_rel, eps_abs, maxiter);
+                }
+            } else
+#endif
+            if (m_has_sigma_mf) {
+                auto const& sigma = (*m_sigma_mf[amrlev][mglev])[0].const_array();
+                LPSigma lp(lpbase, sigma);
+                ret = bicgstab_solve(box, x[0], b[0], lp, eps_rel, eps_abs, maxiter);
+            } else {
+                LP lp(lpbase);
+                ret = bicgstab_solve(box, x[0], b[0], lp, eps_rel, eps_abs, maxiter);
+            }
+        }
+
+        if (ParallelContext::NProcsSub() > 1) {
+            int root = ParallelContext::global_to_local_rank(x.DistributionMap()[0]);
+            ParallelDescriptor::Bcast(&ret, 1, root, ParallelContext::CommunicatorSub());
+        }
+
+        mlmg->postCG(ret);
+    } else
+#endif
+    {
+        int ret = mlmg->bottomSolveWithCG(x, b, MLCGSolverT<MultiFab>::Type::BiCGStab);
+        mlmg->postCG(ret);
     }
 }
 
