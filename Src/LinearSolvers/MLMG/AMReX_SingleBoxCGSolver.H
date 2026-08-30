@@ -64,8 +64,6 @@ int bicgstab_solve (Box const& box, BaseFab<T>& x, BaseFab<T> const& b, LP const
         auto* scalar = scalar_buf.data();
         auto* active = retd+1;
         auto const npts = indexer.numPts();
-        constexpr std::uint64_t split_apply_min_points = std::uint64_t(64)*64*64;
-        bool const use_split_apply = npts >= split_apply_min_points;
 
         // Initialize r and rh, and write one rnorm contribution per block.
         amrex::launch<MT>(nblocks, Gpu::gpuStream(), [=] AMREX_GPU_DEVICE ()
@@ -169,61 +167,26 @@ int bicgstab_solve (Box const& box, BaseFab<T>& x, BaseFab<T> const& b, LP const
                 }
             });
 
-            if (use_split_apply) {
-                // v = A p.
-                amrex::launch<MT>(nblocks, Gpu::gpuStream(), [=] AMREX_GPU_DEVICE ()
-                {
-                    if (*active == 0) { return; }
-                    auto const ipt = std::uint64_t(blockIdx.x)*blockDim.x + threadIdx.x;
-                    if (ipt < npts) {
-                        auto const cell = indexer.intVect(ipt);
-                        for (int n = 0; n < ncomp; ++n) {
-                            a(cell,i_v*ncomp+n) = lp.apply(cell, n, a, i_p*ncomp+n);
-                            lp.normalize(cell, n, a(cell,i_v*ncomp+n));
-                        }
+            // v = A p and rhTv = dot(rh,v).
+            amrex::launch<MT>(nblocks, Gpu::gpuStream(), [=] AMREX_GPU_DEVICE ()
+            {
+                if (*active == 0) { return; }
+                auto const ipt = std::uint64_t(blockIdx.x)*blockDim.x + threadIdx.x;
+                T rhTv = 0;
+                if (ipt < npts) {
+                    auto const cell = indexer.intVect(ipt);
+                    for (int n = 0; n < ncomp; ++n) {
+                        a(cell,i_v*ncomp+n) = lp.apply(cell, n, a, i_p*ncomp+n);
+                        lp.normalize(cell, n, a(cell,i_v*ncomp+n));
+                        rhTv += lp.xdoty(cell, n, a(cell,i_rh*ncomp+n),
+                                        a(cell,i_v*ncomp+n));
                     }
-                });
-
-                // rhTv = dot(rh,v).
-                amrex::launch<MT>(nblocks, Gpu::gpuStream(), [=] AMREX_GPU_DEVICE ()
-                {
-                    if (*active == 0) { return; }
-                    auto const ipt = std::uint64_t(blockIdx.x)*blockDim.x + threadIdx.x;
-                    T rhTv = 0;
-                    if (ipt < npts) {
-                        auto const cell = indexer.intVect(ipt);
-                        for (int n = 0; n < ncomp; ++n) {
-                            rhTv += lp.xdoty(cell, n, a(cell,i_rh*ncomp+n),
-                                            a(cell,i_v*ncomp+n));
-                        }
-                    }
-                    rhTv = Gpu::blockReduceSum<MT>(rhTv);
-                    if (threadIdx.x == 0) {
-                        reduce[blockIdx.x] = rhTv;
-                    }
-                });
-            } else {
-                // v = A p and rhTv = dot(rh,v).
-                amrex::launch<MT>(nblocks, Gpu::gpuStream(), [=] AMREX_GPU_DEVICE ()
-                {
-                    if (*active == 0) { return; }
-                    auto const ipt = std::uint64_t(blockIdx.x)*blockDim.x + threadIdx.x;
-                    T rhTv = 0;
-                    if (ipt < npts) {
-                        auto const cell = indexer.intVect(ipt);
-                        for (int n = 0; n < ncomp; ++n) {
-                            a(cell,i_v*ncomp+n) = lp.apply(cell, n, a, i_p*ncomp+n);
-                            lp.normalize(cell, n, a(cell,i_v*ncomp+n));
-                            rhTv += lp.xdoty(cell, n, a(cell,i_rh*ncomp+n),
-                                            a(cell,i_v*ncomp+n));
-                        }
-                    }
-                    rhTv = Gpu::blockReduceSum<MT>(rhTv);
-                    if (threadIdx.x == 0) {
-                        reduce[blockIdx.x] = rhTv;
-                    }
-                });
-            }
+                }
+                rhTv = Gpu::blockReduceSum<MT>(rhTv);
+                if (threadIdx.x == 0) {
+                    reduce[blockIdx.x] = rhTv;
+                }
+            });
 
             amrex::launch<MT>(1, Gpu::gpuStream(), [=] AMREX_GPU_DEVICE ()
             {
@@ -279,71 +242,31 @@ int bicgstab_solve (Box const& box, BaseFab<T>& x, BaseFab<T> const& b, LP const
                 }
             });
 
-            if (use_split_apply) {
-                // t = A r.
-                amrex::launch<MT>(nblocks, Gpu::gpuStream(), [=] AMREX_GPU_DEVICE ()
-                {
-                    if (*active == 0) { return; }
-                    auto const ipt = std::uint64_t(blockIdx.x)*blockDim.x + threadIdx.x;
-                    if (ipt < npts) {
-                        auto const cell = indexer.intVect(ipt);
-                        for (int n = 0; n < ncomp; ++n) {
-                            a(cell,i_t*ncomp+n) = lp.apply(cell, n, a, i_r*ncomp+n);
-                            lp.normalize(cell, n, a(cell,i_t*ncomp+n));
-                        }
+            // t = A r, t0 = dot(t,t), and t1 = dot(t,r).
+            amrex::launch<MT>(nblocks, Gpu::gpuStream(), [=] AMREX_GPU_DEVICE ()
+            {
+                if (*active == 0) { return; }
+                auto const ipt = std::uint64_t(blockIdx.x)*blockDim.x + threadIdx.x;
+                T t0 = 0;
+                T t1 = 0;
+                if (ipt < npts) {
+                    auto const cell = indexer.intVect(ipt);
+                    for (int n = 0; n < ncomp; ++n) {
+                        a(cell,i_t*ncomp+n) = lp.apply(cell, n, a, i_r*ncomp+n);
+                        lp.normalize(cell, n, a(cell,i_t*ncomp+n));
+                        t0 += lp.xdoty(cell, n, a(cell,i_t*ncomp+n),
+                                      a(cell,i_t*ncomp+n));
+                        t1 += lp.xdoty(cell, n, a(cell,i_t*ncomp+n),
+                                      a(cell,i_r*ncomp+n));
                     }
-                });
-
-                // t0 = dot(t,t) and t1 = dot(t,r).
-                amrex::launch<MT>(nblocks, Gpu::gpuStream(), [=] AMREX_GPU_DEVICE ()
-                {
-                    if (*active == 0) { return; }
-                    auto const ipt = std::uint64_t(blockIdx.x)*blockDim.x + threadIdx.x;
-                    T t0 = 0;
-                    T t1 = 0;
-                    if (ipt < npts) {
-                        auto const cell = indexer.intVect(ipt);
-                        for (int n = 0; n < ncomp; ++n) {
-                            t0 += lp.xdoty(cell, n, a(cell,i_t*ncomp+n),
-                                          a(cell,i_t*ncomp+n));
-                            t1 += lp.xdoty(cell, n, a(cell,i_t*ncomp+n),
-                                          a(cell,i_r*ncomp+n));
-                        }
-                    }
-                    t0 = Gpu::blockReduceSum<MT>(t0);
-                    t1 = Gpu::blockReduceSum<MT>(t1);
-                    if (threadIdx.x == 0) {
-                        reduce[blockIdx.x] = t0;
-                        reduce[nblocks+blockIdx.x] = t1;
-                    }
-                });
-            } else {
-                // t = A r, t0 = dot(t,t), and t1 = dot(t,r).
-                amrex::launch<MT>(nblocks, Gpu::gpuStream(), [=] AMREX_GPU_DEVICE ()
-                {
-                    if (*active == 0) { return; }
-                    auto const ipt = std::uint64_t(blockIdx.x)*blockDim.x + threadIdx.x;
-                    T t0 = 0;
-                    T t1 = 0;
-                    if (ipt < npts) {
-                        auto const cell = indexer.intVect(ipt);
-                        for (int n = 0; n < ncomp; ++n) {
-                            a(cell,i_t*ncomp+n) = lp.apply(cell, n, a, i_r*ncomp+n);
-                            lp.normalize(cell, n, a(cell,i_t*ncomp+n));
-                            t0 += lp.xdoty(cell, n, a(cell,i_t*ncomp+n),
-                                          a(cell,i_t*ncomp+n));
-                            t1 += lp.xdoty(cell, n, a(cell,i_t*ncomp+n),
-                                          a(cell,i_r*ncomp+n));
-                        }
-                    }
-                    t0 = Gpu::blockReduceSum<MT>(t0);
-                    t1 = Gpu::blockReduceSum<MT>(t1);
-                    if (threadIdx.x == 0) {
-                        reduce[blockIdx.x] = t0;
-                        reduce[nblocks+blockIdx.x] = t1;
-                    }
-                });
-            }
+                }
+                t0 = Gpu::blockReduceSum<MT>(t0);
+                t1 = Gpu::blockReduceSum<MT>(t1);
+                if (threadIdx.x == 0) {
+                    reduce[blockIdx.x] = t0;
+                    reduce[nblocks+blockIdx.x] = t1;
+                }
+            });
 
             amrex::launch<MT>(1, Gpu::gpuStream(), [=] AMREX_GPU_DEVICE ()
             {
