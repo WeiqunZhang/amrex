@@ -52,6 +52,9 @@ void unscaleEBRHS (MultiFab& rhs, EBFArrayBoxFactory const& factory)
                               edgecent[2]->const_array(mfi))};
             amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
             {
+#if (AMREX_SPACEDIM == 2)
+                amrex::ignore_unused(k);
+#endif
                 IntVect const iv{AMREX_D_DECL(i,j,k)};
                 Real scale = 1.0_rt;
                 for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
