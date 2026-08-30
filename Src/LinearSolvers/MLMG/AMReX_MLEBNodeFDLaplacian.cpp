@@ -1357,9 +1357,7 @@ MLEBNodeFDLaplacian::customBottomSolve (MLMGT<MultiFab>* mlmg, MultiFab& x, cons
     amrex::ignore_unused(eps_rel, eps_abs, maxiter);
 
 #if defined(AMREX_USE_CUDA) || defined(AMREX_USE_HIP)
-    constexpr Long old_solver_min_points = Long(97)*97*97;
-    bool use_custom_solver = (x.size() == 1) &&
-        (x.boxArray()[0].numPts() < old_solver_min_points);
+    bool use_custom_solver = (x.size() == 1);
     if (use_custom_solver)
     {
         int const amrlev = 0;
