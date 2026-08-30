@@ -39,7 +39,9 @@ private:
     bool agglomeration = true;
     bool consolidation = true;
     bool semicoarsening = false;
+#if (AMREX_SPACEDIM == 2)
     bool rz = false;
+#endif
     int max_coarsening_level = 30;
     int max_semicoarsening_level = 0;
 

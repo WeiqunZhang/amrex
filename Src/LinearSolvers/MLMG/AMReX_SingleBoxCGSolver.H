@@ -15,7 +15,7 @@ namespace amrex
  * \param box region for solve
  * \param x solution with initial value already set to zero
  * \param b RHS
- * \param LP operator
+ * \param lp operator
  * \param eps_rel relative tolerance
  * \param eps_abs absolute tolerance
  * \param maxiter max iteration
@@ -64,13 +64,13 @@ int bicgstab_solve (Box const& box, BaseFab<T>& x, BaseFab<T> const& b, LP const
         auto* scalar = scalar_buf.data();
         auto* active = retd+1;
         auto const npts = indexer.numPts();
-        constexpr Long split_apply_min_points = Long(64)*64*64;
+        constexpr std::uint64_t split_apply_min_points = std::uint64_t(64)*64*64;
         bool const use_split_apply = npts >= split_apply_min_points;
 
         // Initialize r and rh, and write one rnorm contribution per block.
         amrex::launch<MT>(nblocks, Gpu::gpuStream(), [=] AMREX_GPU_DEVICE ()
         {
-            auto const ipt = Long(blockIdx.x)*Long(blockDim.x) + Long(threadIdx.x);
+            auto const ipt = std::uint64_t(blockIdx.x)*blockDim.x + threadIdx.x;
             T rnorm = 0;
             if (ipt < npts) {
                 auto const cell = indexer.intVect(ipt);
@@ -114,7 +114,7 @@ int bicgstab_solve (Box const& box, BaseFab<T>& x, BaseFab<T> const& b, LP const
             amrex::launch<MT>(nblocks, Gpu::gpuStream(), [=] AMREX_GPU_DEVICE ()
             {
                 if (*active == 0) { return; }
-                auto const ipt = Long(blockIdx.x)*Long(blockDim.x) + Long(threadIdx.x);
+                auto const ipt = std::uint64_t(blockIdx.x)*blockDim.x + threadIdx.x;
                 T rho = 0;
                 if (ipt < npts) {
                     auto const cell = indexer.intVect(ipt);
@@ -154,7 +154,7 @@ int bicgstab_solve (Box const& box, BaseFab<T>& x, BaseFab<T> const& b, LP const
             amrex::launch<MT>(nblocks, Gpu::gpuStream(), [=] AMREX_GPU_DEVICE ()
             {
                 if (*active == 0) { return; }
-                auto const ipt = Long(blockIdx.x)*Long(blockDim.x) + Long(threadIdx.x);
+                auto const ipt = std::uint64_t(blockIdx.x)*blockDim.x + threadIdx.x;
                 if (ipt < npts) {
                     auto const cell = indexer.intVect(ipt);
                     for (int n = 0; n < ncomp; ++n) {
@@ -174,7 +174,7 @@ int bicgstab_solve (Box const& box, BaseFab<T>& x, BaseFab<T> const& b, LP const
                 amrex::launch<MT>(nblocks, Gpu::gpuStream(), [=] AMREX_GPU_DEVICE ()
                 {
                     if (*active == 0) { return; }
-                    auto const ipt = Long(blockIdx.x)*Long(blockDim.x) + Long(threadIdx.x);
+                    auto const ipt = std::uint64_t(blockIdx.x)*blockDim.x + threadIdx.x;
                     if (ipt < npts) {
                         auto const cell = indexer.intVect(ipt);
                         for (int n = 0; n < ncomp; ++n) {
@@ -188,7 +188,7 @@ int bicgstab_solve (Box const& box, BaseFab<T>& x, BaseFab<T> const& b, LP const
                 amrex::launch<MT>(nblocks, Gpu::gpuStream(), [=] AMREX_GPU_DEVICE ()
                 {
                     if (*active == 0) { return; }
-                    auto const ipt = Long(blockIdx.x)*Long(blockDim.x) + Long(threadIdx.x);
+                    auto const ipt = std::uint64_t(blockIdx.x)*blockDim.x + threadIdx.x;
                     T rhTv = 0;
                     if (ipt < npts) {
                         auto const cell = indexer.intVect(ipt);
@@ -207,7 +207,7 @@ int bicgstab_solve (Box const& box, BaseFab<T>& x, BaseFab<T> const& b, LP const
                 amrex::launch<MT>(nblocks, Gpu::gpuStream(), [=] AMREX_GPU_DEVICE ()
                 {
                     if (*active == 0) { return; }
-                    auto const ipt = Long(blockIdx.x)*Long(blockDim.x) + Long(threadIdx.x);
+                    auto const ipt = std::uint64_t(blockIdx.x)*blockDim.x + threadIdx.x;
                     T rhTv = 0;
                     if (ipt < npts) {
                         auto const cell = indexer.intVect(ipt);
@@ -247,7 +247,7 @@ int bicgstab_solve (Box const& box, BaseFab<T>& x, BaseFab<T> const& b, LP const
             amrex::launch<MT>(nblocks, Gpu::gpuStream(), [=] AMREX_GPU_DEVICE ()
             {
                 if (*active == 0) { return; }
-                auto const ipt = Long(blockIdx.x)*Long(blockDim.x) + Long(threadIdx.x);
+                auto const ipt = std::uint64_t(blockIdx.x)*blockDim.x + threadIdx.x;
                 T rnorm = 0;
                 if (ipt < npts) {
                     auto const cell = indexer.intVect(ipt);
@@ -284,7 +284,7 @@ int bicgstab_solve (Box const& box, BaseFab<T>& x, BaseFab<T> const& b, LP const
                 amrex::launch<MT>(nblocks, Gpu::gpuStream(), [=] AMREX_GPU_DEVICE ()
                 {
                     if (*active == 0) { return; }
-                    auto const ipt = Long(blockIdx.x)*Long(blockDim.x) + Long(threadIdx.x);
+                    auto const ipt = std::uint64_t(blockIdx.x)*blockDim.x + threadIdx.x;
                     if (ipt < npts) {
                         auto const cell = indexer.intVect(ipt);
                         for (int n = 0; n < ncomp; ++n) {
@@ -298,7 +298,7 @@ int bicgstab_solve (Box const& box, BaseFab<T>& x, BaseFab<T> const& b, LP const
                 amrex::launch<MT>(nblocks, Gpu::gpuStream(), [=] AMREX_GPU_DEVICE ()
                 {
                     if (*active == 0) { return; }
-                    auto const ipt = Long(blockIdx.x)*Long(blockDim.x) + Long(threadIdx.x);
+                    auto const ipt = std::uint64_t(blockIdx.x)*blockDim.x + threadIdx.x;
                     T t0 = 0;
                     T t1 = 0;
                     if (ipt < npts) {
@@ -322,7 +322,7 @@ int bicgstab_solve (Box const& box, BaseFab<T>& x, BaseFab<T> const& b, LP const
                 amrex::launch<MT>(nblocks, Gpu::gpuStream(), [=] AMREX_GPU_DEVICE ()
                 {
                     if (*active == 0) { return; }
-                    auto const ipt = Long(blockIdx.x)*Long(blockDim.x) + Long(threadIdx.x);
+                    auto const ipt = std::uint64_t(blockIdx.x)*blockDim.x + threadIdx.x;
                     T t0 = 0;
                     T t1 = 0;
                     if (ipt < npts) {
@@ -370,7 +370,7 @@ int bicgstab_solve (Box const& box, BaseFab<T>& x, BaseFab<T> const& b, LP const
             amrex::launch<MT>(nblocks, Gpu::gpuStream(), [=] AMREX_GPU_DEVICE ()
             {
                 if (*active == 0) { return; }
-                auto const ipt = Long(blockIdx.x)*Long(blockDim.x) + Long(threadIdx.x);
+                auto const ipt = std::uint64_t(blockIdx.x)*blockDim.x + threadIdx.x;
                 T rnorm = 0;
                 if (ipt < npts) {
                     auto const cell = indexer.intVect(ipt);
@@ -437,7 +437,7 @@ int bicgstab_solve (Box const& box, BaseFab<T>& x, BaseFab<T> const& b, LP const
         amrex::launch<MT>(nblocks, Gpu::gpuStream(), [=] AMREX_GPU_DEVICE ()
         {
             if (*active == 0) {
-                auto const ipt = Long(blockIdx.x)*Long(blockDim.x) + Long(threadIdx.x);
+                auto const ipt = std::uint64_t(blockIdx.x)*blockDim.x + threadIdx.x;
                 if (ipt < npts) {
                     auto const cell = indexer.intVect(ipt);
                     for (int n = 0; n < ncomp; ++n) {

@@ -876,7 +876,7 @@ namespace {
         AMREX_GPU_DEVICE AMREX_FORCE_INLINE
         void normalize (IntVect const&, int, Real&) const {}
 
-        AMREX_GPU_DEVICE AMREX_FORCE_INLINE
+        [[nodiscard]] AMREX_GPU_DEVICE AMREX_FORCE_INLINE
         int lowerNeighbor (int i, int idim) const
         {
             // There is only a single Box. Thus a box boundary node is
@@ -890,7 +890,7 @@ namespace {
                 : i-1;
         }
 
-        AMREX_GPU_DEVICE AMREX_FORCE_INLINE
+        [[nodiscard]] AMREX_GPU_DEVICE AMREX_FORCE_INLINE
         int upperNeighbor (int i, int idim) const
         {
             return (i == dhi[idim])
@@ -912,7 +912,7 @@ namespace {
             : LPBase(a_lpbase)
             {}
 
-        AMREX_GPU_DEVICE AMREX_FORCE_INLINE
+        [[nodiscard]] AMREX_GPU_DEVICE AMREX_FORCE_INLINE
         Real apply (IntVect const& iv, int, Array4<Real> const& xa, int n) const
         {
             int const i = iv[0];
@@ -949,7 +949,7 @@ namespace {
             : LPBase(a_lpbase), sigma(a_sigma)
             {}
 
-        AMREX_GPU_DEVICE AMREX_FORCE_INLINE
+        [[nodiscard]] AMREX_GPU_DEVICE AMREX_FORCE_INLINE
         Real apply (IntVect const& iv, int, Array4<Real> const& xa, int n) const
         {
             int const i = iv[0];
@@ -1006,14 +1006,14 @@ namespace {
 #if (AMREX_SPACEDIM == 2)
     struct RZConstSigma
     {
-        AMREX_GPU_DEVICE AMREX_FORCE_INLINE
+        [[nodiscard]] AMREX_GPU_DEVICE AMREX_FORCE_INLINE
         Real radialEdgeSigma (int, int, int, Real) const
         {
             return sigr;
         }
 
-        AMREX_GPU_DEVICE AMREX_FORCE_INLINE
-        Real axialEdgeSigma (int, int, int, Real) const
+        [[nodiscard]] AMREX_GPU_DEVICE AMREX_FORCE_INLINE
+        static Real axialEdgeSigma (int, int, int, Real)
         {
             return Real(1.0);
         }
@@ -1023,13 +1023,13 @@ namespace {
 
     struct RZVarSigma
     {
-        AMREX_GPU_DEVICE AMREX_FORCE_INLINE
+        [[nodiscard]] AMREX_GPU_DEVICE AMREX_FORCE_INLINE
         Real radialEdgeSigma (int i, int j, int k, Real) const
         {
             return Real(0.5)*(sigma(i,j-1,k)+sigma(i,j,k));
         }
 
-        AMREX_GPU_DEVICE AMREX_FORCE_INLINE
+        [[nodiscard]] AMREX_GPU_DEVICE AMREX_FORCE_INLINE
         Real axialEdgeSigma (int i, int j, int k, Real r) const
         {
             Real const rp = r + Real(0.5)*dr;
@@ -1044,7 +1044,7 @@ namespace {
 #ifdef AMREX_USE_EB
     struct RZVarSigmaEB
     {
-        AMREX_GPU_DEVICE AMREX_FORCE_INLINE
+        [[nodiscard]] AMREX_GPU_DEVICE AMREX_FORCE_INLINE
         Real radialEdgeSigma (int i, int j, int k, Real) const
         {
             Real const vfm = vfrac(i,j-1,k);
@@ -1052,7 +1052,7 @@ namespace {
             return (sigma(i,j-1,k)*vfm + sigma(i,j,k)*vfp) / (vfm+vfp);
         }
 
-        AMREX_GPU_DEVICE AMREX_FORCE_INLINE
+        [[nodiscard]] AMREX_GPU_DEVICE AMREX_FORCE_INLINE
         Real axialEdgeSigma (int i, int j, int k, Real r) const
         {
             Real const rp = r + Real(0.5)*dr;
@@ -1091,7 +1091,7 @@ namespace {
               dr(a_dr), dz(a_dz), rlo(a_rlo), alpha(a_alpha)
             {}
 
-        AMREX_GPU_DEVICE AMREX_FORCE_INLINE
+        [[nodiscard]] AMREX_GPU_DEVICE AMREX_FORCE_INLINE
         Real apply (IntVect const& iv, int, Array4<Real> const& xa, int n) const
         {
             int const i = iv[0];
@@ -1191,21 +1191,21 @@ namespace {
 #ifdef AMREX_USE_EB
     struct EBConstSigma
     {
-        AMREX_GPU_DEVICE AMREX_FORCE_INLINE
-        Real edgeSigmaX (int, int, int) const
+        [[nodiscard]] AMREX_GPU_DEVICE AMREX_FORCE_INLINE
+        static Real edgeSigmaX (int, int, int)
         {
             return Real(1.0);
         }
 
-        AMREX_GPU_DEVICE AMREX_FORCE_INLINE
-        Real edgeSigmaY (int, int, int) const
+        [[nodiscard]] AMREX_GPU_DEVICE AMREX_FORCE_INLINE
+        static Real edgeSigmaY (int, int, int)
         {
             return Real(1.0);
         }
 
 #if (AMREX_SPACEDIM == 3)
-        AMREX_GPU_DEVICE AMREX_FORCE_INLINE
-        Real edgeSigmaZ (int, int, int) const
+        [[nodiscard]] AMREX_GPU_DEVICE AMREX_FORCE_INLINE
+        static Real edgeSigmaZ (int, int, int)
         {
             return Real(1.0);
         }
@@ -1214,7 +1214,7 @@ namespace {
 
     struct EBVarSigma
     {
-        AMREX_GPU_DEVICE AMREX_FORCE_INLINE
+        [[nodiscard]] AMREX_GPU_DEVICE AMREX_FORCE_INLINE
         Real edgeSigmaX (int i, int j, int k) const
         {
 #if (AMREX_SPACEDIM == 2)
@@ -1232,7 +1232,7 @@ namespace {
 #endif
         }
 
-        AMREX_GPU_DEVICE AMREX_FORCE_INLINE
+        [[nodiscard]] AMREX_GPU_DEVICE AMREX_FORCE_INLINE
         Real edgeSigmaY (int i, int j, int k) const
         {
 #if (AMREX_SPACEDIM == 2)
@@ -1251,7 +1251,7 @@ namespace {
         }
 
 #if (AMREX_SPACEDIM == 3)
-        AMREX_GPU_DEVICE AMREX_FORCE_INLINE
+        [[nodiscard]] AMREX_GPU_DEVICE AMREX_FORCE_INLINE
         Real edgeSigmaZ (int i, int j, int k) const
         {
             Real const vf0 = vfrac(i-1,j-1,k);
@@ -1279,7 +1279,7 @@ namespace {
               levset(a_levset), edgecent(a_edgecent)
             {}
 
-        AMREX_GPU_DEVICE AMREX_FORCE_INLINE
+        [[nodiscard]] AMREX_GPU_DEVICE AMREX_FORCE_INLINE
         Real apply (IntVect const& iv, int, Array4<Real> const& xa, int n) const
         {
             int const i = iv[0];
