@@ -212,7 +212,7 @@ public:
     [[nodiscard]] bool supportCustomBottomSolver () const override { return true; }
 
     void customBottomSolve (MLMGT<MultiFab>* mlmg, MultiFab& x, const MultiFab& b,
-                            Real eps_rel, Real eps_abs, int maxiter);
+                            Real eps_rel, Real eps_abs, int maxiter) override;
 
 private:
     GpuArray<Real,AMREX_SPACEDIM> m_sigma{{AMREX_D_DECL(1_rt,1_rt,1_rt)}};
