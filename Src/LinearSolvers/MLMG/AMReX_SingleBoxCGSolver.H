@@ -167,6 +167,9 @@ int bicgstab_solve (Box const& box, BaseFab<T>& x, BaseFab<T> const& b, LP const
                 }
             });
 
+            // Keep applying the operator separate from the reduction. Fusing them
+            // increases register pressure for complex operators such as EB with
+            // variable coefficients.
             // v = A p.
             amrex::launch<MT>(nblocks, Gpu::gpuStream(), [=] AMREX_GPU_DEVICE ()
             {
@@ -254,6 +257,8 @@ int bicgstab_solve (Box const& box, BaseFab<T>& x, BaseFab<T> const& b, LP const
                 }
             });
 
+            // Keep applying the operator separate from the reduction for the same
+            // register-pressure reason as above.
             // t = A r.
             amrex::launch<MT>(nblocks, Gpu::gpuStream(), [=] AMREX_GPU_DEVICE ()
             {
