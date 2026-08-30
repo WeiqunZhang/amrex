@@ -167,7 +167,21 @@ int bicgstab_solve (Box const& box, BaseFab<T>& x, BaseFab<T> const& b, LP const
                 }
             });
 
-            // v = A p and rhTv = dot(rh,v).
+            // v = A p.
+            amrex::launch<MT>(nblocks, Gpu::gpuStream(), [=] AMREX_GPU_DEVICE ()
+            {
+                if (*active == 0) { return; }
+                auto const ipt = Long(blockIdx.x)*Long(blockDim.x) + Long(threadIdx.x);
+                if (ipt < npts) {
+                    auto const cell = indexer.intVect(ipt);
+                    for (int n = 0; n < ncomp; ++n) {
+                        a(cell,i_v*ncomp+n) = lp.apply(cell, n, a, i_p*ncomp+n);
+                        lp.normalize(cell, n, a(cell,i_v*ncomp+n));
+                    }
+                }
+            });
+
+            // rhTv = dot(rh,v).
             amrex::launch<MT>(nblocks, Gpu::gpuStream(), [=] AMREX_GPU_DEVICE ()
             {
                 if (*active == 0) { return; }
@@ -176,8 +190,6 @@ int bicgstab_solve (Box const& box, BaseFab<T>& x, BaseFab<T> const& b, LP const
                 if (ipt < npts) {
                     auto const cell = indexer.intVect(ipt);
                     for (int n = 0; n < ncomp; ++n) {
-                        a(cell,i_v*ncomp+n) = lp.apply(cell, n, a, i_p*ncomp+n);
-                        lp.normalize(cell, n, a(cell,i_v*ncomp+n));
                         rhTv += lp.xdoty(cell, n, a(cell,i_rh*ncomp+n),
                                         a(cell,i_v*ncomp+n));
                     }
@@ -242,7 +254,21 @@ int bicgstab_solve (Box const& box, BaseFab<T>& x, BaseFab<T> const& b, LP const
                 }
             });
 
-            // t = A r, t0 = dot(t,t), and t1 = dot(t,r).
+            // t = A r.
+            amrex::launch<MT>(nblocks, Gpu::gpuStream(), [=] AMREX_GPU_DEVICE ()
+            {
+                if (*active == 0) { return; }
+                auto const ipt = Long(blockIdx.x)*Long(blockDim.x) + Long(threadIdx.x);
+                if (ipt < npts) {
+                    auto const cell = indexer.intVect(ipt);
+                    for (int n = 0; n < ncomp; ++n) {
+                        a(cell,i_t*ncomp+n) = lp.apply(cell, n, a, i_r*ncomp+n);
+                        lp.normalize(cell, n, a(cell,i_t*ncomp+n));
+                    }
+                }
+            });
+
+            // t0 = dot(t,t) and t1 = dot(t,r).
             amrex::launch<MT>(nblocks, Gpu::gpuStream(), [=] AMREX_GPU_DEVICE ()
             {
                 if (*active == 0) { return; }
@@ -252,8 +278,6 @@ int bicgstab_solve (Box const& box, BaseFab<T>& x, BaseFab<T> const& b, LP const
                 if (ipt < npts) {
                     auto const cell = indexer.intVect(ipt);
                     for (int n = 0; n < ncomp; ++n) {
-                        a(cell,i_t*ncomp+n) = lp.apply(cell, n, a, i_r*ncomp+n);
-                        lp.normalize(cell, n, a(cell,i_t*ncomp+n));
                         t0 += lp.xdoty(cell, n, a(cell,i_t*ncomp+n),
                                       a(cell,i_t*ncomp+n));
                         t1 += lp.xdoty(cell, n, a(cell,i_t*ncomp+n),
