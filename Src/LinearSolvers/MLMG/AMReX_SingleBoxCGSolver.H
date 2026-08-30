@@ -15,13 +15,16 @@ namespace amrex
  * \param box region for solve
  * \param x solution with initial value already set to zero
  * \param b RHS
- * \param lp operator
+ * \param dot dot-product operator
+ * \param normalize normalization operator
+ * \param apply matrix operator
  * \param eps_rel relative tolerance
  * \param eps_abs absolute tolerance
  * \param maxiter max iteration
  */
-template <typename T, class LP>
-int bicgstab_solve (Box const& box, BaseFab<T>& x, BaseFab<T> const& b, LP const& lp,
+template <typename T, class DOT, class NORMALIZE, class APPLY>
+int bicgstab_solve (Box const& box, BaseFab<T>& x, BaseFab<T> const& b,
+                    DOT const& dot, NORMALIZE const& normalize, APPLY const& apply,
                     T eps_rel, T eps_abs, int maxiter)
 {
     const int ncomp = x.nComp();
@@ -77,7 +80,7 @@ int bicgstab_solve (Box const& box, BaseFab<T>& x, BaseFab<T> const& b, LP const
                     a(cell,i_r *ncomp+n) = v;
                     a(cell,i_rh*ncomp+n) = v;
                     rnorm = std::max(rnorm, std::abs(v));
-                    lp.normalize(cell, n, a(cell,i_r*ncomp+n));
+                    normalize(cell, n, a(cell,i_r*ncomp+n));
                 }
             }
             rnorm = Gpu::blockReduceMax<MT>(rnorm);
@@ -117,8 +120,8 @@ int bicgstab_solve (Box const& box, BaseFab<T>& x, BaseFab<T> const& b, LP const
                 if (ipt < npts) {
                     auto const cell = indexer.intVect(ipt);
                     for (int n = 0; n < ncomp; ++n) {
-                        rho += lp.xdoty(cell, n, a(cell,i_rh*ncomp+n),
-                                       a(cell,i_r*ncomp+n));
+                        rho += dot(cell, n, a(cell,i_rh*ncomp+n),
+                                   a(cell,i_r*ncomp+n));
                     }
                 }
                 rho = Gpu::blockReduceSum<MT>(rho);
@@ -148,7 +151,7 @@ int bicgstab_solve (Box const& box, BaseFab<T>& x, BaseFab<T> const& b, LP const
             });
 
             // Update p.  This is separate from applying the operator so that
-            // all p values are globally visible before lp.apply reads them.
+            // all p values are globally visible before apply reads them.
             amrex::launch<MT>(nblocks, Gpu::gpuStream(), [=] AMREX_GPU_DEVICE ()
             {
                 if (*active == 0) { return; }
@@ -167,7 +170,21 @@ int bicgstab_solve (Box const& box, BaseFab<T>& x, BaseFab<T> const& b, LP const
                 }
             });
 
-            // v = A p and rhTv = dot(rh,v).
+            // v = A p.
+            amrex::launch<MT>(nblocks, Gpu::gpuStream(), [=] AMREX_GPU_DEVICE ()
+            {
+                if (*active == 0) { return; }
+                auto const ipt = std::uint64_t(blockIdx.x)*blockDim.x + threadIdx.x;
+                if (ipt < npts) {
+                    auto const cell = indexer.intVect(ipt);
+                    for (int n = 0; n < ncomp; ++n) {
+                        a(cell,i_v*ncomp+n) = apply(cell, n, a, i_p*ncomp+n);
+                        normalize(cell, n, a(cell,i_v*ncomp+n));
+                    }
+                }
+            });
+
+            // rhTv = dot(rh,v).
             amrex::launch<MT>(nblocks, Gpu::gpuStream(), [=] AMREX_GPU_DEVICE ()
             {
                 if (*active == 0) { return; }
@@ -176,10 +193,8 @@ int bicgstab_solve (Box const& box, BaseFab<T>& x, BaseFab<T> const& b, LP const
                 if (ipt < npts) {
                     auto const cell = indexer.intVect(ipt);
                     for (int n = 0; n < ncomp; ++n) {
-                        a(cell,i_v*ncomp+n) = lp.apply(cell, n, a, i_p*ncomp+n);
-                        lp.normalize(cell, n, a(cell,i_v*ncomp+n));
-                        rhTv += lp.xdoty(cell, n, a(cell,i_rh*ncomp+n),
-                                        a(cell,i_v*ncomp+n));
+                        rhTv += dot(cell, n, a(cell,i_rh*ncomp+n),
+                                    a(cell,i_v*ncomp+n));
                     }
                 }
                 rhTv = Gpu::blockReduceSum<MT>(rhTv);
@@ -242,7 +257,21 @@ int bicgstab_solve (Box const& box, BaseFab<T>& x, BaseFab<T> const& b, LP const
                 }
             });
 
-            // t = A r, t0 = dot(t,t), and t1 = dot(t,r).
+            // t = A r.
+            amrex::launch<MT>(nblocks, Gpu::gpuStream(), [=] AMREX_GPU_DEVICE ()
+            {
+                if (*active == 0) { return; }
+                auto const ipt = std::uint64_t(blockIdx.x)*blockDim.x + threadIdx.x;
+                if (ipt < npts) {
+                    auto const cell = indexer.intVect(ipt);
+                    for (int n = 0; n < ncomp; ++n) {
+                        a(cell,i_t*ncomp+n) = apply(cell, n, a, i_r*ncomp+n);
+                        normalize(cell, n, a(cell,i_t*ncomp+n));
+                    }
+                }
+            });
+
+            // t0 = dot(t,t) and t1 = dot(t,r).
             amrex::launch<MT>(nblocks, Gpu::gpuStream(), [=] AMREX_GPU_DEVICE ()
             {
                 if (*active == 0) { return; }
@@ -252,12 +281,10 @@ int bicgstab_solve (Box const& box, BaseFab<T>& x, BaseFab<T> const& b, LP const
                 if (ipt < npts) {
                     auto const cell = indexer.intVect(ipt);
                     for (int n = 0; n < ncomp; ++n) {
-                        a(cell,i_t*ncomp+n) = lp.apply(cell, n, a, i_r*ncomp+n);
-                        lp.normalize(cell, n, a(cell,i_t*ncomp+n));
-                        t0 += lp.xdoty(cell, n, a(cell,i_t*ncomp+n),
-                                      a(cell,i_t*ncomp+n));
-                        t1 += lp.xdoty(cell, n, a(cell,i_t*ncomp+n),
-                                      a(cell,i_r*ncomp+n));
+                        t0 += dot(cell, n, a(cell,i_t*ncomp+n),
+                                  a(cell,i_t*ncomp+n));
+                        t1 += dot(cell, n, a(cell,i_t*ncomp+n),
+                                  a(cell,i_r*ncomp+n));
                     }
                 }
                 t0 = Gpu::blockReduceSum<MT>(t0);
@@ -384,7 +411,7 @@ int bicgstab_solve (Box const& box, BaseFab<T>& x, BaseFab<T> const& b, LP const
                     a(cell,i_r *ncomp+n) = v;
                     a(cell,i_rh*ncomp+n) = v;
                     rnorm = std::max(rnorm, std::abs(v));
-                    lp.normalize(cell, n, a(cell,i_r*ncomp+n));
+                    normalize(cell, n, a(cell,i_r*ncomp+n));
                 }
             }
 
@@ -408,7 +435,7 @@ int bicgstab_solve (Box const& box, BaseFab<T>& x, BaseFab<T> const& b, LP const
                 for (auto ipt = threadIdx.x; ipt < npts; ipt += blockDim.x) {
                     auto cell = indexer.intVect(ipt);
                     for (int n = 0; n < ncomp; ++n) {
-                        rho += lp.xdoty(cell, n, a(cell,i_rh*ncomp+n), a(cell,i_r*ncomp+n));
+                        rho += dot(cell, n, a(cell,i_rh*ncomp+n), a(cell,i_r*ncomp+n));
                     }
                 }
                 rho = Gpu::blockReduceSum<MT>(rho);
@@ -440,15 +467,15 @@ int bicgstab_solve (Box const& box, BaseFab<T>& x, BaseFab<T> const& b, LP const
                     }
                 }
 
-                __syncthreads(); // needed for lp.apply
+                __syncthreads(); // needed for apply
 
                 Real rhTv = 0;
                 for (auto ipt = threadIdx.x; ipt < npts; ipt += blockDim.x) {
                     auto cell = indexer.intVect(ipt);
                     for (int n = 0; n < ncomp; ++n) {
-                        a(cell,i_v*ncomp+n) = lp.apply(cell, n, a, i_p*ncomp+n);
-                        lp.normalize(cell, n, a(cell,i_v*ncomp+n));
-                        rhTv += lp.xdoty(cell, n, a(cell,i_rh*ncomp+n), a(cell,i_v*ncomp+n));
+                        a(cell,i_v*ncomp+n) = apply(cell, n, a, i_p*ncomp+n);
+                        normalize(cell, n, a(cell,i_v*ncomp+n));
+                        rhTv += dot(cell, n, a(cell,i_rh*ncomp+n), a(cell,i_v*ncomp+n));
                     }
                 }
                 rhTv = Gpu::blockReduceSum<MT>(rhTv);
@@ -485,10 +512,10 @@ int bicgstab_solve (Box const& box, BaseFab<T>& x, BaseFab<T> const& b, LP const
                 for (auto ipt = threadIdx.x; ipt < npts; ipt += blockDim.x) {
                     auto cell = indexer.intVect(ipt);
                     for (int n = 0; n < ncomp; ++n) {
-                        a(cell,i_t*ncomp+n) = lp.apply(cell, n, a, i_r*ncomp+n);
-                        lp.normalize(cell, n, a(cell,i_t*ncomp+n));
-                        t0 += lp.xdoty(cell, n, a(cell,i_t*ncomp+n), a(cell,i_t*ncomp+n));
-                        t1 += lp.xdoty(cell, n, a(cell,i_t*ncomp+n), a(cell,i_r*ncomp+n));
+                        a(cell,i_t*ncomp+n) = apply(cell, n, a, i_r*ncomp+n);
+                        normalize(cell, n, a(cell,i_t*ncomp+n));
+                        t0 += dot(cell, n, a(cell,i_t*ncomp+n), a(cell,i_t*ncomp+n));
+                        t1 += dot(cell, n, a(cell,i_t*ncomp+n), a(cell,i_r*ncomp+n));
                     }
                 }
                 t0 = Gpu::blockReduceSum<MT>(t0);

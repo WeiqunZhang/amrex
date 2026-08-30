@@ -865,17 +865,25 @@ MLEBNodeFDLaplacian::update_sigma ()
 }
 
 namespace {
-    struct LPBase
+    struct LPDot
     {
         [[nodiscard]] AMREX_GPU_DEVICE AMREX_FORCE_INLINE
-        Real xdoty (IntVect const& iv, int, Real vx, Real vy) const
+        Real operator() (IntVect const& iv, int, Real vx, Real vy) const
         {
             return dotmsk(iv)*vx*vy;
         }
 
-        AMREX_GPU_DEVICE AMREX_FORCE_INLINE
-        void normalize (IntVect const&, int, Real&) const {}
+        Array4<Real const> dotmsk;
+    };
 
+    struct LPNormalize
+    {
+        AMREX_GPU_DEVICE AMREX_FORCE_INLINE
+        void operator() (IntVect const&, int, Real&) const {}
+    };
+
+    struct LPBase
+    {
         [[nodiscard]] AMREX_GPU_DEVICE AMREX_FORCE_INLINE
         int lowerNeighbor (int i, int idim) const
         {
@@ -898,7 +906,6 @@ namespace {
                 : i+1;
         }
 
-        Array4<Real const> dotmsk;
         Array4<int const> dirmsk;
         GpuArray<Real,AMREX_SPACEDIM> beta;
         GpuArray<int,AMREX_SPACEDIM> dlo, dhi;
@@ -913,7 +920,7 @@ namespace {
             {}
 
         [[nodiscard]] AMREX_GPU_DEVICE AMREX_FORCE_INLINE
-        Real apply (IntVect const& iv, int, Array4<Real> const& xa, int n) const
+        Real operator() (IntVect const& iv, int, Array4<Real> const& xa, int n) const
         {
             int const i = iv[0];
             int const j = iv[1];
@@ -950,7 +957,7 @@ namespace {
             {}
 
         [[nodiscard]] AMREX_GPU_DEVICE AMREX_FORCE_INLINE
-        Real apply (IntVect const& iv, int, Array4<Real> const& xa, int n) const
+        Real operator() (IntVect const& iv, int, Array4<Real> const& xa, int n) const
         {
             int const i = iv[0];
             int const j = iv[1];
@@ -1092,7 +1099,7 @@ namespace {
             {}
 
         [[nodiscard]] AMREX_GPU_DEVICE AMREX_FORCE_INLINE
-        Real apply (IntVect const& iv, int, Array4<Real> const& xa, int n) const
+        Real operator() (IntVect const& iv, int, Array4<Real> const& xa, int n) const
         {
             int const i = iv[0];
             int const j = iv[1];
@@ -1280,7 +1287,7 @@ namespace {
             {}
 
         [[nodiscard]] AMREX_GPU_DEVICE AMREX_FORCE_INLINE
-        Real apply (IntVect const& iv, int, Array4<Real> const& xa, int n) const
+        Real operator() (IntVect const& iv, int, Array4<Real> const& xa, int n) const
         {
             int const i = iv[0];
             int const j = iv[1];
@@ -1389,7 +1396,9 @@ MLEBNodeFDLaplacian::customBottomSolve (MLMGT<MultiFab>* mlmg, MultiFab& x, cons
             auto const& dirmsk = (*m_dirichlet_mask[amrlev][mglev])[0].const_array();
             Box box = x.boxArray()[0];
             Box dbox = amrex::convert(geom.Domain(),IntVect(1));
-            LPBase lpbase{dotmsk,dirmsk,
+            LPDot const dot{dotmsk};
+            LPNormalize const normalize{};
+            LPBase lpbase{dirmsk,
                           GpuArray<Real,AMREX_SPACEDIM>{AMREX_D_DECL(bx,by,bz)},
                           GpuArray<int,AMREX_SPACEDIM>
                               {AMREX_D_DECL(dbox.smallEnd(0),
@@ -1417,13 +1426,13 @@ MLEBNodeFDLaplacian::customBottomSolve (MLMGT<MultiFab>* mlmg, MultiFab& x, cons
                         LPRZ<true,RZVarSigmaEB> lp
                             (lpbase, RZVarSigmaEB{sigma,vfrac,dx0},
                              RZEBData<true>{levset,ec}, dx0, dx1, xlo, alpha);
-                        ret = bicgstab_solve(box, x[0], b[0], lp,
+                        ret = bicgstab_solve(box, x[0], b[0], dot, normalize, lp,
                                              eps_rel, eps_abs, maxiter);
                     } else {
                         LPRZ<true,RZConstSigma> lp
                             (lpbase, RZConstSigma{sig0}, RZEBData<true>{levset,ec},
                              dx0, dx1, xlo, alpha);
-                        ret = bicgstab_solve(box, x[0], b[0], lp,
+                        ret = bicgstab_solve(box, x[0], b[0], dot, normalize, lp,
                                              eps_rel, eps_abs, maxiter);
                     }
                 } else
@@ -1434,13 +1443,13 @@ MLEBNodeFDLaplacian::customBottomSolve (MLMGT<MultiFab>* mlmg, MultiFab& x, cons
                         LPRZ<false,RZVarSigma> lp
                             (lpbase, RZVarSigma{sigma,dx0}, RZEBData<false>{},
                              dx0, dx1, xlo, alpha);
-                        ret = bicgstab_solve(box, x[0], b[0], lp,
+                        ret = bicgstab_solve(box, x[0], b[0], dot, normalize, lp,
                                              eps_rel, eps_abs, maxiter);
                     } else {
                         LPRZ<false,RZConstSigma> lp
                             (lpbase, RZConstSigma{sig0}, RZEBData<false>{},
                              dx0, dx1, xlo, alpha);
-                        ret = bicgstab_solve(box, x[0], b[0], lp,
+                        ret = bicgstab_solve(box, x[0], b[0], dot, normalize, lp,
                                              eps_rel, eps_abs, maxiter);
                     }
                 }
@@ -1459,20 +1468,24 @@ MLEBNodeFDLaplacian::customBottomSolve (MLMGT<MultiFab>* mlmg, MultiFab& x, cons
                     auto const& sigma = (*m_sigma_mf[amrlev][mglev])[0].const_array();
                     auto const& vfrac = eb_factory->getVolFrac()[0].const_array();
                     LPEB<EBVarSigma> lp(lpbase, levset, ec, EBVarSigma{sigma,vfrac});
-                    ret = bicgstab_solve(box, x[0], b[0], lp, eps_rel, eps_abs, maxiter);
+                    ret = bicgstab_solve(box, x[0], b[0], dot, normalize, lp,
+                                         eps_rel, eps_abs, maxiter);
                 } else {
                     LPEB<EBConstSigma> lp(lpbase, levset, ec, EBConstSigma{});
-                    ret = bicgstab_solve(box, x[0], b[0], lp, eps_rel, eps_abs, maxiter);
+                    ret = bicgstab_solve(box, x[0], b[0], dot, normalize, lp,
+                                         eps_rel, eps_abs, maxiter);
                 }
             } else
 #endif
             if (m_has_sigma_mf) {
                 auto const& sigma = (*m_sigma_mf[amrlev][mglev])[0].const_array();
                 LPSigma lp(lpbase, sigma);
-                ret = bicgstab_solve(box, x[0], b[0], lp, eps_rel, eps_abs, maxiter);
+                ret = bicgstab_solve(box, x[0], b[0], dot, normalize, lp,
+                                     eps_rel, eps_abs, maxiter);
             } else {
                 LP lp(lpbase);
-                ret = bicgstab_solve(box, x[0], b[0], lp, eps_rel, eps_abs, maxiter);
+                ret = bicgstab_solve(box, x[0], b[0], dot, normalize, lp,
+                                     eps_rel, eps_abs, maxiter);
             }
         }
 
