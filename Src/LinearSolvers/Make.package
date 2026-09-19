@@ -1,5 +1,9 @@
-CEXE_headers += AMReX_GMRES.H AMReX_GMRES_MLMG.H
 
+CEXE_headers += AMReX_AMG.H
+
+CEXE_headers += AMReX_BiCGStab.H
+
+CEXE_headers += AMReX_GMRES.H AMReX_GMRES_MLMG.H
 CEXE_headers += AMReX_GMRES_MV.H
 
 CEXE_headers += AMReX_Smoother_MV.H
