@@ -635,9 +635,9 @@ amrex_calc_alpha_stencil(amrex::Real q_hat, amrex::Real q_max,
 
     auto alpha_temp = 0.0_rt;
 #ifdef AMREX_USE_FLOAT
-    auto sml  = 1.0e-5_rt;
+    auto sml  = amrex::Real(1.e-5);
 #else
-    auto sml  = 1.0e-13_rt;
+    auto sml  = amrex::Real(1.e-13);
 #endif
 
     if ((q_hat-state) > sml) {
