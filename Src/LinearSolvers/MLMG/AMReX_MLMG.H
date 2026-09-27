@@ -344,6 +344,9 @@ public:
     //! Select how AMR level 0 is solved. See MultigridType.
     void setMultigridType (MultigridType t) noexcept { multigrid_type = t; }
     [[nodiscard]] MultigridType getMultigridType () const noexcept { return multigrid_type; }
+    //! Whether the last solve used AlgMG on AMR level 0 (always in the
+    //! algebraic type, after the switch in the hybrid type).
+    [[nodiscard]] bool usedAlgMG () const noexcept { return m_algmg_active; }
 
     /**
      * \brief Adjust the AlgMG solvers MLMG builds (level 0 and bottom).
@@ -2582,6 +2585,9 @@ MLMGT<MF>::algmgLevel0Solve ()
         configureAlgMG(*m_algmg_level0, linop.isSingular(0));
     }
     m_algmg_level0->solve(cor[0][0], res[0][0], bottom_reltol, bottom_maxiter);
+
+    // Known overset cells must not receive a correction.
+    linop.applyOverset(0, cor[0][0]);
 
     if (linop.isSingular(0) && linop.getEnforceSingularSolvable()) {
         makeSolvable(0, 0, cor[0][0]);

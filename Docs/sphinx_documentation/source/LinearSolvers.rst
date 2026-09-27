@@ -408,6 +408,10 @@ Available choices of the bottom solver are
 
 - :cpp:`MLMG::BottomSolver::petsc`: Currently for cell-centered only.
 
+- :cpp:`MLMG::BottomSolver::algmg`: AMReX's own algebraic multigrid
+  (see :ref:`sec:linearsolver:algmg`), available in every build for the
+  operators that hypre supports.
+
 - :cpp:`MLMG::BottomSolver::custom`: A solver provided by the linear operator
   itself, for operators that ship one.  :cpp:`MLEBNodeFDLaplacian` is currently
   the only such operator, and it uses this by default.  Its custom solver is a
@@ -417,6 +421,50 @@ Available choices of the bottom solver are
 
 The :cpp:`LPInfo` class can be used to control the agglomeration and
 consolidation strategy for multigrid coarsening.
+
+Multigrid Type
+--------------
+
+By default, the coarsest AMR level is solved with geometric multigrid
+V-cycles down to the bottom solver.  For problems where geometric
+coarsening converges slowly or not at all, such as strongly varying or
+anisotropic coefficients, :cpp:`MLMG::setMultigridType` selects how that
+level is solved:
+
+- :cpp:`MultigridType::geometric`: the default described above.
+
+- :cpp:`MultigridType::algebraic`: AlgMG (:ref:`sec:linearsolver:algmg`)
+  solves the whole coarsest AMR level in every MLMG iteration, using the
+  bottom solver's tolerance, iteration limit and verbosity.  The
+  geometric levels of that AMR level are then unused, so
+  :cpp:`LPInfo::setMaxCoarseningLevel(0)` avoids building them.
+
+- :cpp:`MultigridType::hybrid`: geometric multigrid first.  If the residual
+  stalls, grows or becomes NaN, MLMG switches to the algebraic solver and
+  restarts from the best iterate it has seen.  The switch is reported at
+  verbosity 1.  :cpp:`MLMG::setHybridStallCriterion(window, rate)` (defaults
+  4 and 0.8) declares a stall when the residual has not dropped by
+  ``rate`` per iteration on average over the last ``window`` iterations,
+  and :cpp:`MLMG::setHybridDivergenceFactor` (default 10) declares
+  divergence when the residual exceeds that multiple of the best residual.
+  After the switch, the algebraic phase gets its own :cpp:`setMaxIter`
+  budget.
+
+Finer AMR levels always use the geometric cycles.  The algebraic types
+support the same operators as the hypre bottom solver, for single
+component :cpp:`MultiFab` problems.  :cpp:`MLMG::setAlgMGOptions` takes a
+callback that receives the :cpp:`AlgMG` solver so that its settings, such
+as the Krylov acceleration (BiCGStab by default when driven by MLMG), can be
+changed.  The type can also be read from an inputs file:
+
+.. highlight:: c++
+
+::
+
+    MultigridType mg_type = MultigridType::geometric;
+    ParmParse pp("mlmg");
+    pp.query_enum_case_insensitive("multigrid_type", mg_type); // geometric, algebraic, hybrid
+    mlmg.setMultigridType(mg_type);
 
 - :cpp:`LPInfo::setAgglomeration(bool)` (by default true) can be used
   to copy the current level of multigrid data to fewer, larger
@@ -1121,6 +1169,8 @@ their scaling on first use, so the first application, and
 The algebraic multigrid solver :cpp:`AlgMG<T>` in ``AMReX_AlgMG.H`` is
 described below.
 
+.. _sec:linearsolver:algmg:
+
 Algebraic Multigrid
 -------------------
 
@@ -1148,6 +1198,10 @@ is also available on its own as :cpp:`precond(x, b)` for use in other
 solvers. The setup is done on the first call to :cpp:`solve`. Parameters are
 set per solver object, so several solvers with different settings can
 coexist. The solver runs on CPUs and GPUs with any number of MPI processes.
+:cpp:`MLMG` can use it on the coarsest AMR level or as its bottom solver
+(see :ref:`sec:linearsolver:pars`). The
+enumerations below are ``AMREX_ENUM`` types, so they can be read from an
+inputs file with :cpp:`ParmParse::query_enum_case_insensitive`.
 The following can be tuned:
 
 - :cpp:`setInterpType`: extended+i (``mm_ext_i``, the default), extended

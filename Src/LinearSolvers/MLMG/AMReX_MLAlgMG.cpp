@@ -4,7 +4,7 @@
 #include <AMReX_SpMatrix.H>
 #include <AMReX_MLNodeLinOp.H>
 #include <AMReX_Habec_K.H>
-#ifdef AMREX_USE_EB
+#if defined(AMREX_USE_EB) && (AMREX_SPACEDIM > 1)
 #include <AMReX_EBFabFactory.H>
 #include <AMReX_EBMultiFabUtil.H>
 #endif
@@ -75,7 +75,9 @@ struct MLAlgMG::Impl
     // cell-centered
     MultiFab m_diaginv;                  // row scaling applied by the kernels
     iMultiFab const* m_overset_mask = nullptr;
+#if defined(AMREX_USE_EB) && (AMREX_SPACEDIM > 1)
     FabArray<EBCellFlagFab> const* m_flags = nullptr;
+#endif
 
     AlgPartition m_part;
     SpMatrix<Real> m_A;
@@ -112,7 +114,7 @@ MLAlgMG::solve (MultiFab& soln, MultiFab const& rhs, Real reltol, int maxiter)
 MLAlgMG::Impl::Impl (int mglev, BoxArray const& grids, DistributionMapping const& dmap,
                      Geometry const& geom, iMultiFab const& owner_mask,
                      iMultiFab const& dirichlet_mask, MLNodeLinOp const& linop)
-    : m_mglev(mglev), m_nodal(true), m_nodelinop(&linop), m_geom(geom)
+    : m_mglev(mglev), m_nodelinop(&linop), m_geom(geom)
 {
     BL_PROFILE("MLAlgMG::Impl(nodal)");
 
@@ -124,7 +126,6 @@ MLAlgMG::Impl::Impl (int mglev, BoxArray const& grids, DistributionMapping const
     m_tmp.define(nba, dmap, 1, 0);
 
     // Local ids: owned, non-Dirichlet nodes in lexicographic order per box.
-    m_nrows_proc = 0;
 #ifdef AMREX_USE_GPU
     if (Gpu::inLaunchRegion()) {
         for (MFIter mfi(m_lid); mfi.isValid(); ++mfi) {
@@ -284,7 +285,7 @@ MLAlgMG::Impl::Impl (int mglev, BoxArray const& grids, DistributionMapping const
     m_row_begin.define(grids, dmap);
     m_diaginv.define(grids, dmap, 1, 0, MFInfo(), factory);
 
-#ifdef AMREX_USE_EB
+#if defined(AMREX_USE_EB) && (AMREX_SPACEDIM > 1)
     auto const* ebfactory = dynamic_cast<EBFArrayBoxFactory const*>(&factory);
     AMREX_ALWAYS_ASSERT_WITH_MESSAGE(overset_mask == nullptr || ebfactory == nullptr,
                                      "MLAlgMG: cannot have both EB and overset");
@@ -294,12 +295,11 @@ MLAlgMG::Impl::Impl (int mglev, BoxArray const& grids, DistributionMapping const
     // Rows: every cell of every box, except boxes that are fully covered.
     // Ghost cells outside the domain and cells of covered boxes get
     // lowest(), which the kernels read as "no row".
-    m_nrows_proc = 0;
     for (MFIter mfi(m_gid); mfi.isValid(); ++mfi) {
         const Box& bx = mfi.validbox();
         const Box& gbx = amrex::grow(bx,1);
         auto const& gid = m_gid.array(mfi);
-#ifdef AMREX_USE_EB
+#if defined(AMREX_USE_EB) && (AMREX_SPACEDIM > 1)
         auto fabtyp = m_flags ? (*m_flags)[mfi].getType(bx) : FabType::regular;
 #else
         auto fabtyp = FabType::regular;
@@ -377,9 +377,9 @@ MLAlgMG::Impl::assembleCell (FabFactory<FArrayBox> const& factory, iMultiFab con
     amrex::ignore_unused(factory, eb_bcoef);
 
     constexpr int reg_stencil = 2*AMREX_SPACEDIM+1;
-    constexpr int eb_stencil = AMREX_D_TERM(3,*3,*3);
 
-#ifdef AMREX_USE_EB
+#if defined(AMREX_USE_EB) && (AMREX_SPACEDIM > 1)
+    constexpr int eb_stencil = AMREX_D_TERM(3,*3,*3);
     auto const* ebfactory = dynamic_cast<EBFArrayBoxFactory const*>(&factory);
     const MultiFab* vfrac = ebfactory ? &(ebfactory->getVolFrac()) : nullptr;
     auto area = ebfactory ? ebfactory->getAreaFrac()
@@ -398,7 +398,7 @@ MLAlgMG::Impl::assembleCell (FabFactory<FArrayBox> const& factory, iMultiFab con
     for (MFIter mfi(m_gid); mfi.isValid(); ++mfi) {
         entry_begin[mfi] = nentries;
         int ss = reg_stencil;
-#ifdef AMREX_USE_EB
+#if defined(AMREX_USE_EB) && (AMREX_SPACEDIM > 1)
         if (m_flags && (*m_flags)[mfi].getType(mfi.validbox()) == FabType::singlevalued) {
             ss = eb_stencil;
         }
@@ -461,7 +461,7 @@ MLAlgMG::Impl::assembleCell (FabFactory<FArrayBox> const& factory, iMultiFab con
                 habec_cols(sten, i, j, k, cid_a);
             });
         }
-#ifdef AMREX_USE_EB
+#if defined(AMREX_USE_EB) && (AMREX_SPACEDIM > 1)
         else
         {
             auto const& flag_a = m_flags->const_array(mfi);
@@ -528,14 +528,14 @@ MLAlgMG::Impl::loadRHS (MultiFab const& rhs)
             auto const& rhs_a = rhs.const_array(mfi);
             auto const& dinv = m_diaginv.const_array(mfi);
             auto osm = m_overset_mask ? m_overset_mask->const_array(mfi) : Array4<int const>();
-#ifdef AMREX_USE_EB
+#if defined(AMREX_USE_EB) && (AMREX_SPACEDIM > 1)
             auto flag = (m_flags && (*m_flags)[mfi].getType(bx) == FabType::singlevalued)
                 ? m_flags->const_array(mfi) : Array4<EBCellFlag const>();
 #endif
             AMREX_HOST_DEVICE_PARALLEL_FOR_3D(bx, i, j, k,
             {
                 bool norow = (osm && osm(i,j,k) == 0);
-#ifdef AMREX_USE_EB
+#if defined(AMREX_USE_EB) && (AMREX_SPACEDIM > 1)
                 norow = norow || (flag && flag(i,j,k).isCovered());
 #endif
                 bp[bx.index(IntVect{AMREX_D_DECL(i,j,k)})] =

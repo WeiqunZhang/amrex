@@ -20,6 +20,18 @@ MyTest::MyTest ()
     initData();
 }
 
+bool
+MyTest::setMultigridType (std::string const& name)
+{
+    multigrid_type = amrex::getEnumCaseInsensitive<MultigridType>(name);
+    if (prob_type == 4 && multigrid_type != MultigridType::geometric) {
+        amrex::Print() << "\nMultigrid type " << name << " skipped: MLNodeABecLaplacian\n";
+        return false;
+    }
+    amrex::Print() << "\nMultigrid type: " << name << "\n";
+    return true;
+}
+
 void
 MyTest::solve ()
 {
@@ -99,6 +111,8 @@ MyTest::solvePoisson ()
         mlmg.setMaxFmgIter(max_fmg_iter);
         mlmg.setVerbose(verbose);
         mlmg.setBottomVerbose(bottom_verbose);
+        mlmg.setMultigridType(multigrid_type);
+        if (use_algmg_bottom) { mlmg.setBottomSolver(MLMG::BottomSolver::algmg); }
 #ifdef AMREX_USE_HYPRE
         if (use_hypre) {
             mlmg.setBottomSolver(MLMG::BottomSolver::hypre);
@@ -142,6 +156,11 @@ MyTest::solvePoisson ()
             mlmg.setMaxFmgIter(max_fmg_iter);
             mlmg.setVerbose(verbose);
             mlmg.setBottomVerbose(bottom_verbose);
+            mlmg.setMultigridType(multigrid_type);
+            if (use_algmg_bottom) { mlmg.setBottomSolver(MLMG::BottomSolver::algmg); }
+        if (use_algmg_bottom) { mlmg.setBottomSolver(MLMG::BottomSolver::algmg); }
+        mlmg.setMultigridType(multigrid_type);
+        if (use_algmg_bottom) { mlmg.setBottomSolver(MLMG::BottomSolver::algmg); }
 #ifdef AMREX_USE_HYPRE
             if (use_hypre) {
                 mlmg.setBottomSolver(MLMG::BottomSolver::hypre);
@@ -224,6 +243,8 @@ MyTest::solveABecLaplacian ()
         mlmg.setMaxFmgIter(max_fmg_iter);
         mlmg.setVerbose(verbose);
         mlmg.setBottomVerbose(bottom_verbose);
+        mlmg.setMultigridType(multigrid_type);
+        if (use_algmg_bottom) { mlmg.setBottomSolver(MLMG::BottomSolver::algmg); }
 #ifdef AMREX_USE_HYPRE
         if (use_hypre) {
             mlmg.setBottomSolver(MLMG::BottomSolver::hypre);
@@ -281,6 +302,11 @@ MyTest::solveABecLaplacian ()
             mlmg.setMaxFmgIter(max_fmg_iter);
             mlmg.setVerbose(verbose);
             mlmg.setBottomVerbose(bottom_verbose);
+            mlmg.setMultigridType(multigrid_type);
+            if (use_algmg_bottom) { mlmg.setBottomSolver(MLMG::BottomSolver::algmg); }
+        if (use_algmg_bottom) { mlmg.setBottomSolver(MLMG::BottomSolver::algmg); }
+        mlmg.setMultigridType(multigrid_type);
+        if (use_algmg_bottom) { mlmg.setBottomSolver(MLMG::BottomSolver::algmg); }
 #ifdef AMREX_USE_HYPRE
             if (use_hypre) {
                 mlmg.setBottomSolver(MLMG::BottomSolver::hypre);
@@ -357,6 +383,8 @@ MyTest::solveABecLaplacianInhomNeumann ()
         mlmg.setMaxFmgIter(max_fmg_iter);
         mlmg.setVerbose(verbose);
         mlmg.setBottomVerbose(bottom_verbose);
+        mlmg.setMultigridType(multigrid_type);
+        if (use_algmg_bottom) { mlmg.setBottomSolver(MLMG::BottomSolver::algmg); }
 #ifdef AMREX_USE_HYPRE
         if (use_hypre) {
             mlmg.setBottomSolver(MLMG::BottomSolver::hypre);
@@ -416,6 +444,11 @@ MyTest::solveABecLaplacianInhomNeumann ()
             mlmg.setMaxFmgIter(max_fmg_iter);
             mlmg.setVerbose(verbose);
             mlmg.setBottomVerbose(bottom_verbose);
+            mlmg.setMultigridType(multigrid_type);
+            if (use_algmg_bottom) { mlmg.setBottomSolver(MLMG::BottomSolver::algmg); }
+        if (use_algmg_bottom) { mlmg.setBottomSolver(MLMG::BottomSolver::algmg); }
+        mlmg.setMultigridType(multigrid_type);
+        if (use_algmg_bottom) { mlmg.setBottomSolver(MLMG::BottomSolver::algmg); }
 #ifdef AMREX_USE_HYPRE
             if (use_hypre) {
                 mlmg.setBottomSolver(MLMG::BottomSolver::hypre);
@@ -475,6 +508,11 @@ MyTest::solveNodeABecLaplacian ()
             mlmg.setMaxFmgIter(max_fmg_iter);
             mlmg.setVerbose(verbose);
             mlmg.setBottomVerbose(bottom_verbose);
+            mlmg.setMultigridType(multigrid_type);
+            if (use_algmg_bottom) { mlmg.setBottomSolver(MLMG::BottomSolver::algmg); }
+        if (use_algmg_bottom) { mlmg.setBottomSolver(MLMG::BottomSolver::algmg); }
+        mlmg.setMultigridType(multigrid_type);
+        if (use_algmg_bottom) { mlmg.setBottomSolver(MLMG::BottomSolver::algmg); }
 
             mlmg.solve({&solution[ilev]}, {&rhs[ilev]}, tol_rel, tol_abs);
         }
@@ -655,6 +693,8 @@ MyTest::readParameters ()
 #ifdef AMREX_USE_PETSC
     pp.query("use_petsc", use_petsc);
 #endif
+    pp.queryarr("multigrid_types", multigrid_types);
+    pp.query("use_algmg_bottom", use_algmg_bottom);
     AMREX_ALWAYS_ASSERT_WITH_MESSAGE(!(use_hypre && use_petsc),
                                      "use_hypre & use_petsc cannot be both true");
 }

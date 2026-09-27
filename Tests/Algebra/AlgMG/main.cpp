@@ -42,7 +42,8 @@ struct Params {
     Real jump = Real(1.e3);
     int block = 4;
     Real eps = Real(1.e-3);
-    int mlmg = 1;           // also solve with geometric MLMG for comparison
+    int mlmg = 1;           // also solve with MLMG for comparison
+    Vector<std::string> mlmg_types{"geometric"}; // MLMG multigrid types to run
     int max_grid_size = 64; // for MLMG
     std::optional<int> verbose, nu1, nu2, nu_bottom, p_max_elmts, max_levels,
                        aggressive_levels, cheby_degree, aggressive_direct;
@@ -117,8 +118,9 @@ Problem make_problem (Params const& p)
                          .domain = domain}};
 }
 
-// Geometric multigrid (MLMG) on the same problem, for comparison. MLMG may
-// fail on some of these problems; that is reported, not fatal.
+// MLMG on the same problem, for comparison, once per requested multigrid
+// type. The geometric type may fail on some of these problems; that is
+// reported, not fatal. The hybrid type then switches to AlgMG.
 void run_mlmg (Params const& p)
 {
     Problem const pr = make_problem(p);
@@ -188,35 +190,45 @@ void run_mlmg (Params const& p)
     mlmg.setMaxIter(p.max_iter);
     mlmg.setThrowException(true);
     mlmg.apply({&rhs}, {&exact}); // rhs = A*phi with the same operator
-    phi.setVal(0);
 
-    std::string failure;
-    Gpu::streamSynchronize();
-    auto const t0 = amrex::second();
-    try {
-        mlmg.solve({&phi}, {&rhs}, p.reltol, Real(0));
-    } catch (std::exception const& e) {
-        failure = e.what();
-    }
-    Gpu::streamSynchronize();
-    auto const t1 = amrex::second();
+    for (auto const& mgt : p.mlmg_types) {
+        mlmg.setMultigridType(amrex::getEnumCaseInsensitive<MultigridType>(mgt));
+        phi.setVal(0);
 
-    mlmg.compResidual({&res}, {&phi}, {&rhs});
-    Real const rel_res = res.norminf(0, 0) / rhs.norminf(0, 0);
-    MultiFab::Subtract(phi, exact, 0, 0, 1, 0);
-    if (a == Real(0) && !dirichlet) { // solution defined up to a constant
-        phi.plus(-phi.sum(0) / Real(domain.numPts()), 0, 1, 0);
-    }
-    amrex::Print() << "  MLMG for comparison: ";
-    if (failure.empty()) {
-        amrex::Print() << mlmg.getNumIters() << " iterations, "
-                       << std::fixed << std::setprecision(4) << (t1-t0) << std::defaultfloat
-                       << " s, rel_res " << sci(rel_res) << " (max norm), error "
-                       << sci(phi.norminf(0, 0)) << "\n";
-    } else {
-        if (failure.back() == '.') { failure.pop_back(); }
-        amrex::Print() << "did not converge after " << mlmg.getNumIters() << " iterations ("
-                       << failure << "); informational only, not an AlgMG result\n";
+        std::string failure;
+        Gpu::streamSynchronize();
+        auto const t0 = amrex::second();
+        try {
+            mlmg.solve({&phi}, {&rhs}, p.reltol, Real(0));
+        } catch (std::exception const& e) {
+            failure = e.what();
+        }
+        Gpu::streamSynchronize();
+        auto const t1 = amrex::second();
+
+        mlmg.compResidual({&res}, {&phi}, {&rhs});
+        Real const rel_res = res.norminf(0, 0) / rhs.norminf(0, 0);
+        MultiFab err(ba, dm, 1, 0);
+        MultiFab::Copy(err, phi, 0, 0, 1, 0);
+        MultiFab::Subtract(err, exact, 0, 0, 1, 0);
+        if (a == Real(0) && !dirichlet) { // solution defined up to a constant
+            err.plus(-err.sum(0) / Real(domain.numPts()), 0, 1, 0);
+        }
+        amrex::Print() << "  MLMG (" << mgt;
+        if (mgt == "hybrid") {
+            amrex::Print() << (mlmg.usedAlgMG() ? ", switched to AlgMG" : ", no switch");
+        }
+        amrex::Print() << ") for comparison: ";
+        if (failure.empty()) {
+            amrex::Print() << mlmg.getNumIters() << " iterations, "
+                           << std::fixed << std::setprecision(4) << (t1-t0) << std::defaultfloat
+                           << " s, rel_res " << sci(rel_res) << " (max norm), error "
+                           << sci(err.norminf(0, 0)) << "\n";
+        } else {
+            if (failure.back() == '.') { failure.pop_back(); }
+            amrex::Print() << "did not converge after " << mlmg.getNumIters() << " iterations ("
+                           << failure << "); informational only, not an AlgMG result\n";
+        }
     }
 }
 
@@ -607,6 +619,7 @@ int main (int argc, char* argv[])
         pp.query("block", p.block);
         pp.query("eps", p.eps);
         pp.query("mlmg", p.mlmg);
+        pp.queryarr("mlmg_types", p.mlmg_types);
         pp.query("max_grid_size", p.max_grid_size);
         // Seed of the random PMIS weights; each rank adds its rank.
         if (Long seed = 0; pp.query("seed", seed)) {
