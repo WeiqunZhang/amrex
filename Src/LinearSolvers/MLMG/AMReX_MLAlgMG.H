@@ -35,11 +35,11 @@ public:
      * \brief Cell-centered operator alpha*a - beta*div(b grad): rows are all
      * cells except those of fully covered boxes.
      *
-     * \param acoef   a coefficient, or nullptr for zero
-     * \param bcoef   face b coefficients, or nullptrs for one
-     * \param eb_bcoef  EB Dirichlet b coefficient, or nullptr
-     * \param bctype, bcl  domain BC type and location per box and face
-     * \param maxorder  order of the Dirichlet boundary stencil (2 or 3)
+     * The a coefficient may be nullptr (zero) and the b coefficients nullptrs
+     * (one). \p eb_bcoef is the EB Dirichlet b coefficient or nullptr.
+     * \p bctype and \p bcl give the domain BC type and location per box and
+     * face, and \p maxorder the order of the Dirichlet boundary stencil
+     * (2 or 3).
      */
     MLAlgMG (int mglev, BoxArray const& grids, DistributionMapping const& dmap,
              Geometry const& geom, FabFactory<FArrayBox> const& factory,

@@ -254,11 +254,9 @@ public:
      * \brief Fill the matrix rows of one box for the algebraic solver.
      *
      * Same packed layout as the Hypre version: ncols[lid] entries per row,
-     * diagonal first, neighbors without a row (gid == max()) dropped.
-     *
-     * \param mglev MG level of AMR level 0 being assembled.
-     * \param gid   Global row ids, numeric_limits<Long>::max() for no row.
-     * \param lid   Local row ids, negative for no row.
+     * diagonal first, neighbors without a row dropped. The MG level is on
+     * AMR level 0. Global row ids are numeric_limits<Long>::max() and local
+     * ids negative where there is no row.
      */
     virtual void fillAlgMatrix (int /*mglev*/, MFIter const& /*mfi*/,
                                 Array4<Long const> const& /*gid*/,

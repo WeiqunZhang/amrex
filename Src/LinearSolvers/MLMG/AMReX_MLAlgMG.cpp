@@ -560,7 +560,7 @@ MLAlgMG::Impl::loadRHS (MultiFab const& rhs)
             auto flag = cut ? m_flags->const_array(mfi) : Array4<EBCellFlag const>();
             auto vfrc = cut ? m_vfrac->const_array(mfi) : Array4<Real const>();
 #endif
-            AMREX_HOST_DEVICE_PARALLEL_FOR_3D(bx, i, j, k,
+            ParallelFor(bx, [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
             {
                 bool norow = (osm && osm(i,j,k) == 0);
                 Real w = Real(1.0);

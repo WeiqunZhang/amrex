@@ -770,14 +770,14 @@ MLCellABecLapT<MF>::makeAlgMG (int mglev) const
         }
 
         // The kernels support at most a third order Dirichlet stencil.
-        int const maxorder = std::min(3, this->getMaxOrder());
+        int const mo = std::min(3, this->getMaxOrder());
 
         auto ac = getACoeffs(amrlev, mglev);
         auto bc = getBCoeffs(amrlev, mglev);
         return std::make_unique<MLAlgMG>(mglev, ba, dm, geom, factory,
                                          getOversetMask(amrlev, mglev),
                                          getAScalar(), getBScalar(), ac, bc,
-                                         getEBBCoeffs(amrlev, mglev), bctype, bcl, maxorder);
+                                         getEBBCoeffs(amrlev, mglev), bctype, bcl, mo);
     }
 }
 

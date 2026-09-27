@@ -1,6 +1,9 @@
 ifndef AMREX_MLMG_MAKE
        AMREX_MLMG_MAKE := 1
 
+# MLMG uses the sparse linear algebra (AlgMG) in Src/LinearSolvers.
+include $(AMREX_HOME)/Src/LinearSolvers/Make.package
+
 USE_LINEAR_SOLVERS_INCFLO ?= TRUE
 USE_LINEAR_SOLVERS_EM ?= TRUE
 
