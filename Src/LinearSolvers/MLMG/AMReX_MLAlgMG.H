@@ -63,6 +63,9 @@ public:
      */
     void solve (MultiFab& soln, MultiFab const& rhs, Real reltol, int maxiter);
 
+    //! One AlgMG V-cycle with zero initial guess: the preconditioner form.
+    void applyVcycle (MultiFab& soln, MultiFab const& rhs);
+
     //! The solver, for settings such as verbosity and Krylov acceleration.
     [[nodiscard]] AlgMG<Real>& solver () noexcept;
 

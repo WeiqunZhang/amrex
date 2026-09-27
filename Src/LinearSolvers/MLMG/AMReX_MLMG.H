@@ -690,7 +690,8 @@ public:
     requires (std::same_as<TMF,MultiFab>)
     void bottomSolveWithAlgMG (MF& x, const MF& b);
 
-    //! AlgMG on the finest MG level of AMR level 0: res[0][0] -> cor[0][0].
+    //! AlgMG on the finest MG level of AMR level 0: res[0][0] -> cor[0][0]
+    //! (one V-cycle in preconditioner mode).
     template <class TMF=MF>
     requires (std::same_as<TMF,MultiFab>)
     void algmgLevel0Solve ();
@@ -923,10 +924,11 @@ MLMGT<MF>::solve (const Vector<AMF*>& a_sol, const Vector<AMF const*>& a_rhs,
     bool is_nsolve = linop.m_parent;
 
     m_algmg_active = (multigrid_type == MultigridType::algebraic);
-    const bool hybrid = (multigrid_type == MultigridType::hybrid)
-        && !is_nsolve && (do_fixed_number_of_iters == 0);
+    const bool hybrid = (multigrid_type == MultigridType::hybrid) && !is_nsolve;
     AMREX_ALWAYS_ASSERT_WITH_MESSAGE(!(do_nsolve && multigrid_type != MultigridType::geometric),
                                      "MLMG: NSolve requires the geometric multigrid type");
+    AMREX_ALWAYS_ASSERT_WITH_MESSAGE(!(hybrid && do_fixed_number_of_iters != 0),
+        "MLMG: the hybrid multigrid type needs a convergence test; as a preconditioner or with a fixed number of iterations use geometric or algebraic");
 
     auto solve_start_time = amrex::second();
 
@@ -2561,7 +2563,11 @@ MLMGT<MF>::bottomSolveWithAlgMG (MF& x, const MF& b)
         m_algmg_bottom = linop.makeAlgMG(mglev);
         configureAlgMG(*m_algmg_bottom, linop.isBottomSingular());
     }
-    m_algmg_bottom->solve(x, b, bottom_reltol, bottom_maxiter);
+    if (precond_mode) {
+        m_algmg_bottom->applyVcycle(x, b);
+    } else {
+        m_algmg_bottom->solve(x, b, bottom_reltol, bottom_maxiter);
+    }
 
     if (linop.isSingular(amrlev) && linop.getEnforceSingularSolvable()) {
         makeSolvable(amrlev, mglev, x);
@@ -2584,7 +2590,12 @@ MLMGT<MF>::algmgLevel0Solve ()
         m_algmg_level0 = linop.makeAlgMG(0);
         configureAlgMG(*m_algmg_level0, linop.isSingular(0));
     }
-    m_algmg_level0->solve(cor[0][0], res[0][0], bottom_reltol, bottom_maxiter);
+    // As a preconditioner MLMG must be a fixed linear operation: one V-cycle.
+    if (precond_mode) {
+        m_algmg_level0->applyVcycle(cor[0][0], res[0][0]);
+    } else {
+        m_algmg_level0->solve(cor[0][0], res[0][0], bottom_reltol, bottom_maxiter);
+    }
 
     // Known overset cells must not receive a correction.
     linop.applyOverset(0, cor[0][0]);

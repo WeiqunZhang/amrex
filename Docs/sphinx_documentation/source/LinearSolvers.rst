@@ -452,7 +452,11 @@ level is solved:
 
 Finer AMR levels always use the geometric cycles.  The algebraic types
 support the same operators as the hypre bottom solver, for single
-component :cpp:`MultiFab` problems.  :cpp:`MLMG::setAlgMGOptions` takes a
+component :cpp:`MultiFab` problems.  When MLMG serves as a preconditioner
+(for example in :cpp:`GMRESMLMG`), the algebraic type applies one AlgMG
+V-cycle on the coarsest AMR level, so the preconditioner stays a fixed
+linear operation; the hybrid type needs a convergence test and is not
+available there or with :cpp:`setFixedIter`.  :cpp:`MLMG::setAlgMGOptions` takes a
 callback that receives the :cpp:`AlgMG` solver so that its settings, such
 as the Krylov acceleration (BiCGStab by default when driven by MLMG), can be
 changed.  The type can also be read from an inputs file:

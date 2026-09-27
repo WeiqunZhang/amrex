@@ -28,6 +28,10 @@ MyTest::setMultigridType (std::string const& name)
         amrex::Print() << "\nMultigrid type " << name << " skipped: MLNodeABecLaplacian\n";
         return false;
     }
+    if (use_gmres && multigrid_type == MultigridType::hybrid) {
+        amrex::Print() << "\nMultigrid type " << name << " skipped: not a preconditioner\n";
+        return false;
+    }
     amrex::Print() << "\nMultigrid type: " << name << "\n";
     return true;
 }
@@ -613,6 +617,7 @@ MyTest::solveABecLaplacianGMRES ()
         }
 
         MLMG mlmg(mlabec);
+        mlmg.setMultigridType(multigrid_type);
         GMRESMLMGT<MultiFab> gmsolver(mlmg);
         gmsolver.usePrecond(true);
         gmsolver.setVerbose(verbose);
@@ -670,6 +675,7 @@ MyTest::solveABecLaplacianGMRES ()
             mlabec.setBCoeffs(0, amrex::GetArrOfConstPtrs(face_bcoef));
 
             MLMG mlmg(mlabec);
+            mlmg.setMultigridType(multigrid_type);
             GMRESMLMGT gmsolver(mlmg);
             gmsolver.usePrecond(true);
             gmsolver.setVerbose(verbose);

@@ -108,6 +108,16 @@ MLAlgMG::~MLAlgMG () = default;
 AlgMG<Real>& MLAlgMG::solver () noexcept { return m_impl->m_solver; }
 
 void
+MLAlgMG::applyVcycle (MultiFab& soln, MultiFab const& rhs)
+{
+    BL_PROFILE("MLAlgMG::applyVcycle()");
+
+    m_impl->loadRHS(rhs);
+    m_impl->m_solver.precond(m_impl->m_x, m_impl->m_b);
+    m_impl->getSolution(soln);
+}
+
+void
 MLAlgMG::solve (MultiFab& soln, MultiFab const& rhs, Real reltol, int maxiter)
 {
     BL_PROFILE("MLAlgMG::solve()");
