@@ -132,6 +132,10 @@ public:
 
     [[nodiscard]] std::unique_ptr<MLAlgMG> makeAlgMG (int mglev) const override;
 
+    //! Unit `b` coefficients with the metric factors (RZ, spherical) for the
+    //! matrix assembly of operators without `b` coefficients.
+    [[nodiscard]] Array<MF,AMREX_SPACEDIM> makeDefaultBCoeffs (int mglev) const;
+
 #if defined(AMREX_USE_HYPRE) && (AMREX_SPACEDIM > 1)
     //! Instantiate a Hypre backend using the current coefficient data and interface \p hypre_interface.
     [[nodiscard]] std::unique_ptr<Hypre> makeHypre (Hypre::Interface hypre_interface) const override;
@@ -744,6 +748,24 @@ MLCellABecLapT<MF>::applyOverset (int amrlev, MF& rhs) const
 }
 
 template <typename MF>
+Array<MF,AMREX_SPACEDIM>
+MLCellABecLapT<MF>::makeDefaultBCoeffs (int mglev) const
+{
+    const int amrlev = 0;
+    Array<MF,AMREX_SPACEDIM> beta;
+    for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
+        beta[idim].define(amrex::convert(this->m_grids[amrlev][mglev],
+                                         IntVect::TheDimensionVector(idim)),
+                          this->m_dmap[amrlev][mglev], 1, 0,
+                          MFInfo().SetArena(The_Async_Arena()),
+                          *(this->m_factory[amrlev][mglev]));
+        beta[idim].setVal(RT(1.0));
+        this->applyMetricTerm(amrlev, mglev, beta[idim]);
+    }
+    return beta;
+}
+
+template <typename MF>
 std::unique_ptr<MLAlgMG>
 MLCellABecLapT<MF>::makeAlgMG (int mglev) const
 {
@@ -774,6 +796,11 @@ MLCellABecLapT<MF>::makeAlgMG (int mglev) const
 
         auto ac = getACoeffs(amrlev, mglev);
         auto bc = getBCoeffs(amrlev, mglev);
+        Array<MF,AMREX_SPACEDIM> beta;
+        if (bc[0] == nullptr) {
+            beta = makeDefaultBCoeffs(mglev);
+            bc = amrex::GetArrOfConstPtrs(beta);
+        }
         return std::make_unique<MLAlgMG>(mglev, ba, dm, geom, factory,
                                          getOversetMask(amrlev, mglev),
                                          getAScalar(), getBScalar(), ac, bc,
@@ -822,13 +849,7 @@ MLCellABecLapT<MF>::makeHypre (Hypre::Interface hypre_interface) const
         }
         else
         {
-            Array<MultiFab,AMREX_SPACEDIM> beta;
-            for (int idim = 0; idim < AMREX_SPACEDIM; ++idim)
-            {
-                beta[idim].define(amrex::convert(ba,IntVect::TheDimensionVector(idim)),
-                              dm, 1, 0, MFInfo().SetArena(The_Async_Arena()), factory);
-                beta[idim].setVal(1.0);
-            }
+            auto beta = makeDefaultBCoeffs(mglev);
             hypre_solver->setBCoeffs(amrex::GetArrOfConstPtrs(beta));
         }
         hypre_solver->setIsMatrixSingular(this->isBottomSingular());
@@ -877,13 +898,7 @@ MLCellABecLapT<MF>::makePETSc () const
         }
         else
         {
-            Array<MultiFab,AMREX_SPACEDIM> beta;
-            for (int idim = 0; idim < AMREX_SPACEDIM; ++idim)
-            {
-                beta[idim].define(amrex::convert(ba,IntVect::TheDimensionVector(idim)),
-                                  dm, 1, 0, MFInfo().SetArena(The_Async_Arena()), factory);
-                beta[idim].setVal(1.0);
-            }
+            auto beta = makeDefaultBCoeffs(mglev);
             petsc_solver->setBCoeffs(amrex::GetArrOfConstPtrs(beta));
         }
         return petsc_solver;
