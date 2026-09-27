@@ -835,12 +835,12 @@ MLEBNodeFDLaplacian::fillAlgMatrix (int mglev, MFIter const& mfi,
     fillMatrix_doit(mglev, mfi, gid, lid, ncols, cols, mat);
 }
 
-template <typename Int, typename AtomicInt>
+template <typename AlgInt, typename AtomicInt>
 void
 MLEBNodeFDLaplacian::fillMatrix_doit (int mglev, MFIter const& mfi,
                                       Array4<AtomicInt const> const& gid,
                                       Array4<int const> const& lid,
-                                      Int* ncols, Int* cols, Real* mat) const
+                                      AlgInt* ncols, AlgInt* cols, Real* mat) const
 {
     const int amrlev = 0;
 
@@ -933,7 +933,7 @@ MLEBNodeFDLaplacian::fillMatrix_doit (int mglev, MFIter const& mfi,
                       sig, vfrc, levset, ec, ndlo, ndhi, reflect_lo, reflect_hi);
                  ncols[row_lid] = row.n;
                  for (int n = 0; n < row.n; ++n) {
-                     cols[ps+n] = static_cast<Int>
+                     cols[ps+n] = static_cast<AlgInt>
                          (gid(row.node[n].x, row.node[n].y, row.node[n].z));
                      mat[ps+n] = row.val[n];
                  }
@@ -953,7 +953,7 @@ MLEBNodeFDLaplacian::fillMatrix_doit (int mglev, MFIter const& mfi,
                                                         ndlo, ndhi, reflect_lo, reflect_hi);
                 ncols[lid(i,j,k)] = row.n;
                 for (int n = 0; n < row.n; ++n) {
-                    cols[nelems] = static_cast<Int>
+                    cols[nelems] = static_cast<AlgInt>
                         (gid(row.node[n].x, row.node[n].y, row.node[n].z));
                     mat[nelems] = row.val[n];
                     ++nelems;

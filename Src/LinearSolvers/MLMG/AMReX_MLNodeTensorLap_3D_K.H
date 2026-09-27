@@ -211,21 +211,21 @@ void mlndtslap_gauss_seidel (int i, int j, int k, Array4<Real> const& sol,
 }
 
 
-template <typename HypreInt, typename AtomicInt>
+template <typename AlgInt, typename AtomicInt>
 void mlndtslap_fill_ijmatrix_cpu (Box const& ndbx,
                                   Array4<AtomicInt const> const& gid,
                                   Array4<int const> const& lid,
-                                  HypreInt* const ncols, HypreInt* const cols,
+                                  AlgInt* const ncols, AlgInt* const cols,
                                   Real* const mat, // NOLINT(readability-non-const-parameter)
                                   GpuArray<Real,6> const& s) noexcept
 {
     constexpr auto gidmax = std::numeric_limits<AtomicInt>::max();
-    HypreInt nelems = 0;
+    AlgInt nelems = 0;
     amrex::LoopOnCpu(ndbx, [&] (int i, int j, int k) noexcept
     {
         if (lid(i,j,k) >= 0)
         {
-            HypreInt nelems_old = nelems;
+            AlgInt nelems_old = nelems;
 
             cols[nelems] = gid(i,j,k);
             mat[nelems] = Real(-2.)*(s[0]+s[3]+s[5]);
@@ -346,13 +346,13 @@ void mlndtslap_fill_ijmatrix_cpu (Box const& ndbx,
 
 #ifdef AMREX_USE_GPU
 
-template <typename HypreInt, typename AtomicInt>
+template <typename AlgInt, typename AtomicInt>
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE
 void mlndtslap_fill_ijmatrix_gpu (const int ps, const int i, const int j, const int k,
                                   const int offset, Box const& /*ndbx*/,
                                   Array4<AtomicInt const> const& gid,
                                   Array4<int const> const& lid,
-                                  HypreInt* const ncols, HypreInt* const cols,
+                                  AlgInt* const ncols, AlgInt* const cols,
                                   Real* const mat, // NOLINT(readability-non-const-parameter)
                                   GpuArray<Real,6> const& s) noexcept
 {

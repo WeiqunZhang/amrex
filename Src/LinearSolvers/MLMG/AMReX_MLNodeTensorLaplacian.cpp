@@ -331,12 +331,12 @@ MLNodeTensorLaplacian::fillAlgMatrix (int mglev, MFIter const& mfi,
     fillMatrix_doit(mglev, mfi, gid, lid, ncols, cols, mat);
 }
 
-template <typename Int, typename AtomicInt>
+template <typename AlgInt, typename AtomicInt>
 void
 MLNodeTensorLaplacian::fillMatrix_doit (int mglev, MFIter const& mfi,
                                         Array4<AtomicInt const> const& gid,
                                         Array4<int const> const& lid,
-                                        Int* ncols, Int* cols, Real* mat) const
+                                        AlgInt* ncols, AlgInt* cols, Real* mat) const
 {
     const int amrlev = 0;
     auto const& s = scaledSigma(amrlev, mglev);

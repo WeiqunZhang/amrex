@@ -29,12 +29,12 @@ MLNodeLaplacian::fillAlgMatrix (int mglev, MFIter const& mfi,
     fillMatrix_doit(mglev, mfi, gid, lid, ncols, cols, mat);
 }
 
-template <typename Int, typename AtomicInt>
+template <typename AlgInt, typename AtomicInt>
 void
 MLNodeLaplacian::fillMatrix_doit (int mglev, MFIter const& mfi,
                                   Array4<AtomicInt const> const& gid,
                                   Array4<int const> const& lid,
-                                  Int* ncols, Int* cols, Real* mat) const
+                                  AlgInt* ncols, AlgInt* cols, Real* mat) const
 {
 #ifdef AMREX_USE_GPU
     if (Gpu::inLaunchRegion()) {
@@ -48,12 +48,12 @@ MLNodeLaplacian::fillMatrix_doit (int mglev, MFIter const& mfi,
 
 #ifdef AMREX_USE_GPU
 
-template <typename Int, typename AtomicInt>
+template <typename AlgInt, typename AtomicInt>
 void
 MLNodeLaplacian::fillMatrix_gpu (int mglev, MFIter const& mfi,
                                  Array4<AtomicInt const> const& gid,
                                  Array4<int const> const& lid,
-                                 Int* ncols, Int* cols, Real* mat) const
+                                 AlgInt* ncols, AlgInt* cols, Real* mat) const
 {
     const int amrlev = 0;
 
@@ -186,12 +186,12 @@ MLNodeLaplacian::fillMatrix_gpu (int mglev, MFIter const& mfi,
 
 #endif
 
-template <typename Int, typename AtomicInt>
+template <typename AlgInt, typename AtomicInt>
 void
 MLNodeLaplacian::fillMatrix_cpu (int mglev, MFIter const& mfi,
                                  Array4<AtomicInt const> const& gid,
                                  Array4<int const> const& lid,
-                                 Int* ncols, Int* cols, Real* mat) const
+                                 AlgInt* ncols, AlgInt* cols, Real* mat) const
 {
     const int amrlev = 0;
 
