@@ -198,7 +198,7 @@ void mlndtslap_fill_ijmatrix_cpu (Box const& ndbx,
 template <typename HypreInt, typename AtomicInt>
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE
 void mlndtslap_fill_ijmatrix_gpu (const int ps, const int i, const int j, const int k,
-                                  const int offset, Box const& ndbx,
+                                  const int offset, Box const& /*ndbx*/,
                                   Array4<AtomicInt const> const& gid,
                                   Array4<int const> const& lid,
                                   HypreInt* const ncols, HypreInt* const cols, Real* const mat,

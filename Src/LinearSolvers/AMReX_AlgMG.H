@@ -486,7 +486,7 @@ public: // NOLINT
 
     //! Strong part of A: S_ij = a_ij / scale if i strongly depends on j,
     //! else absent. `scale` is strength_scale(A).
-    SpMatrix<TS> create_soc (SpMatrix<T> const& A, T scale) const;
+    [[nodiscard]] SpMatrix<TS> create_soc (SpMatrix<T> const& A, T scale) const;
 
     //! Largest |a_ii|, the unit of the strength matrix entries.
     static T strength_scale (SpMatrix<T> const& A);

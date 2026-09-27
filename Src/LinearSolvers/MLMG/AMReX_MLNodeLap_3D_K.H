@@ -8508,7 +8508,7 @@ template <typename HypreInt, typename AtomicInt>
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE
 void mlndlap_fillijmat_aa_gpu (const int ps, const int i, const int j, const int k,
                                const int offset,
-                               Box const& ndbx, Array4<AtomicInt const> const& gid,
+                               Box const& /*ndbx*/, Array4<AtomicInt const> const& gid,
                                Array4<int const> const& lid,
                                HypreInt* ncols, HypreInt* cols,
                                Real* mat, // NOLINT(readability-non-const-parameter)
@@ -9080,7 +9080,7 @@ template <typename HypreInt, typename AtomicInt>
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE
 void mlndlap_fillijmat_ha_gpu (const int ps, const int i, const int j, const int k,
                                const int offset,
-                               Box const& ndbx, Array4<AtomicInt const> const& gid,
+                               Box const& /*ndbx*/, Array4<AtomicInt const> const& gid,
                                Array4<int const> const& lid,
                                HypreInt* ncols, HypreInt* cols,
                                Real* mat, // NOLINT(readability-non-const-parameter)
@@ -9760,7 +9760,7 @@ template <typename HypreInt, typename AtomicInt>
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE
 void mlndlap_fillijmat_cs_gpu (const int ps, const int i, const int j, const int k,
                                const int offset,
-                               Box const& ndbx, Array4<AtomicInt const> const& gid,
+                               Box const& /*ndbx*/, Array4<AtomicInt const> const& gid,
                                Array4<int const> const& lid,
                                HypreInt* ncols, HypreInt* cols,
                                Real* mat, // NOLINT(readability-non-const-parameter)
