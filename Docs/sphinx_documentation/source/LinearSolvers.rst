@@ -1118,13 +1118,13 @@ their scaling on first use, so the first application, and
 - :cpp:`L1GaussSeidelSmoother<T>`: hybrid Gauss-Seidel with l1
   correction. CPU builds only.
 
-The algebraic multigrid solver :cpp:`AMG<T>` in ``AMReX_AMG.H`` is
+The algebraic multigrid solver :cpp:`AlgMG<T>` in ``AMReX_AlgMG.H`` is
 described below.
 
 Algebraic Multigrid
 -------------------
 
-:cpp:`AMG<T>` solves :math:`A x = b` for a square :cpp:`SpMatrix<T>` with
+:cpp:`AlgMG<T>` solves :math:`A x = b` for a square :cpp:`SpMatrix<T>` with
 V-cycles. The setup selects coarse points with PMIS coarsening
 [DeSterck2006]_ based on the classical strength of connection [Ruge1987]_,
 builds the interpolation :math:`P`, and forms the coarse operator
@@ -1136,10 +1136,10 @@ coarsest level is solved with smoother sweeps.
 
 ::
 
-    AMG<Real> amg(A);   // A must outlive amg
+    AlgMG<Real> amg(A);   // A must outlive amg
     amg.setVerbose(1);
     amg.setRelTol(1.e-10);
-    amg.setBottomSolver(AMG<Real>::BottomSolver::BiCGStab);
+    amg.setBottomSolver(AlgMG<Real>::BottomSolver::BiCGStab);
     amg.solve(x, b);    // x holds the initial guess
 
 The iteration stops when the residual 2-norm is below :cpp:`setRelTol` times
@@ -1174,7 +1174,7 @@ The following can be tuned:
 - :cpp:`setKrylovSolver`: use one V-cycle as the preconditioner of an outer
   BiCGStab (``BiCGStab``), GMRES (``GMRES``) or conjugate gradient (``PCG``)
   solver instead of iterating it on its own (``None``, the default). In the
-  tests in ``Tests/Algebra/AMG`` this roughly halved the number of V-cycles.
+  tests in ``Tests/Algebra/AlgMG`` this roughly halved the number of V-cycles.
   The coarse operators are Galerkin products with :math:`R = P^T`, so the
   matrix should be symmetric or nearly so (solve row-scaled systems in
   their unscaled form); PCG also requires positive definiteness. With PCG

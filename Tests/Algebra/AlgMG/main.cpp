@@ -1,4 +1,4 @@
-#include <AMReX_AMG.H>
+#include <AMReX_AlgMG.H>
 #include <AMReX_MLABecLaplacian.H>
 #include <AMReX_MLMG.H>
 #include <AMReX_MultiFab.H>
@@ -94,7 +94,7 @@ struct Coef
     }
 };
 
-// The operator a*phi - div(beta grad phi) of a run, shared by the AMG and
+// The operator a*phi - div(beta grad phi) of a run, shared by the AlgMG and
 // the MLMG solves.
 struct Problem
 {
@@ -216,7 +216,7 @@ void run_mlmg (Params const& p)
     } else {
         if (failure.back() == '.') { failure.pop_back(); }
         amrex::Print() << "did not converge after " << mlmg.getNumIters() << " iterations ("
-                       << failure << "); informational only, not an AMG result\n";
+                       << failure << "); informational only, not an AlgMG result\n";
     }
 }
 
@@ -343,7 +343,7 @@ Result run (Params const& p)
     }
     if (ptype != 0 || dirichlet) { SpMV(bvec, mat, exact); } // rhs = A*phi
 
-    AMG<Real> amg(mat);
+    AlgMG<Real> amg(mat);
     amg.setMaxIter(p.max_iter);
     amg.setFixedIter(p.fixed_iter);
     amg.setRelTol(p.reltol);
@@ -361,22 +361,22 @@ Result run (Params const& p)
     if (singular) { amg.setSingular(true); }
     if (p.max_coarse_size) { amg.setMaxCoarseSize(*p.max_coarse_size); }
     if (interp == "direct") {
-        amg.setInterpType(AMG<Real>::InterpType::Direct);
+        amg.setInterpType(AlgMG<Real>::InterpType::Direct);
     } else if (interp == "ext") {
-        amg.setInterpType(AMG<Real>::InterpType::MMExt);
+        amg.setInterpType(AlgMG<Real>::InterpType::MMExt);
     } else if (interp == "ext+i") {
-        amg.setInterpType(AMG<Real>::InterpType::MMExtI);
+        amg.setInterpType(AlgMG<Real>::InterpType::MMExtI);
     } else {
         amrex::Abort("Unknown interpolation: " + interp);
     }
     if (p.smoother == "jacobi") {
-        amg.setSmoother(AMG<Real>::Smoother::Jacobi);
+        amg.setSmoother(AlgMG<Real>::Smoother::Jacobi);
     } else if (p.smoother == "l1jacobi") {
-        amg.setSmoother(AMG<Real>::Smoother::L1Jacobi);
+        amg.setSmoother(AlgMG<Real>::Smoother::L1Jacobi);
     } else if (p.smoother == "chebyshev") {
-        amg.setSmoother(AMG<Real>::Smoother::Chebyshev);
+        amg.setSmoother(AlgMG<Real>::Smoother::Chebyshev);
     } else if (p.smoother == "l1gs") {
-        amg.setSmoother(AMG<Real>::Smoother::L1GaussSeidel);
+        amg.setSmoother(AlgMG<Real>::Smoother::L1GaussSeidel);
     } else {
         amrex::Abort("Unknown smoother: " + p.smoother);
     }
@@ -385,22 +385,22 @@ Result run (Params const& p)
     if (p.cheby_ratio) { amg.setChebyshevRatio(*p.cheby_ratio); }
     if (p.theta) { amg.setStrongThreshold(*p.theta); }
     if (bottom == "jacobi") {
-        amg.setBottomSolver(AMG<Real>::BottomSolver::Jacobi);
+        amg.setBottomSolver(AlgMG<Real>::BottomSolver::Jacobi);
     } else if (bottom == "bicgstab") {
-        amg.setBottomSolver(AMG<Real>::BottomSolver::BiCGStab);
+        amg.setBottomSolver(AlgMG<Real>::BottomSolver::BiCGStab);
     } else if (bottom == "gmres") {
-        amg.setBottomSolver(AMG<Real>::BottomSolver::GMRES);
+        amg.setBottomSolver(AlgMG<Real>::BottomSolver::GMRES);
     } else {
         amrex::Abort("Unknown bottom solver: " + bottom);
     }
     if (p.krylov == "none") {
-        amg.setKrylovSolver(AMG<Real>::KrylovSolver::None);
+        amg.setKrylovSolver(AlgMG<Real>::KrylovSolver::None);
     } else if (p.krylov == "bicgstab") {
-        amg.setKrylovSolver(AMG<Real>::KrylovSolver::BiCGStab);
+        amg.setKrylovSolver(AlgMG<Real>::KrylovSolver::BiCGStab);
     } else if (p.krylov == "gmres") {
-        amg.setKrylovSolver(AMG<Real>::KrylovSolver::GMRES);
+        amg.setKrylovSolver(AlgMG<Real>::KrylovSolver::GMRES);
     } else if (p.krylov == "pcg") {
-        amg.setKrylovSolver(AMG<Real>::KrylovSolver::PCG);
+        amg.setKrylovSolver(AlgMG<Real>::KrylovSolver::PCG);
     } else {
         amrex::Abort("Unknown Krylov solver: " + p.krylov);
     }
@@ -739,7 +739,7 @@ int main (int argc, char* argv[])
         for (auto const& f : failures) { amrex::Print() << "  FAILED " << f << "\n"; }
         amrex::Print() << "\n";
         if (!failures.empty()) {
-            amrex::Abort(std::to_string(failures.size()) + " AMG case(s) failed");
+            amrex::Abort(std::to_string(failures.size()) + " AlgMG case(s) failed");
         }
     }
     amrex::Finalize();
