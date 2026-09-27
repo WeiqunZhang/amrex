@@ -1139,7 +1139,7 @@ coarsest level is solved with smoother sweeps.
     AlgMG<Real> amg(A);   // A must outlive amg
     amg.setVerbose(1);
     amg.setRelTol(1.e-10);
-    amg.setBottomSolver(AlgMG<Real>::BottomSolver::BiCGStab);
+    amg.setBottomSolver(AlgMG<Real>::BottomSolver::bicgstab);
     amg.solve(x, b);    // x holds the initial guess
 
 The iteration stops when the residual 2-norm is below :cpp:`setRelTol` times
@@ -1150,11 +1150,11 @@ set per solver object, so several solvers with different settings can
 coexist. The solver runs on CPUs and GPUs with any number of MPI processes.
 The following can be tuned:
 
-- :cpp:`setInterpType`: extended+i (``MMExtI``, the default), extended
-  (``MMExt``) or classical direct (``Direct``) [Ruge1987]_ interpolation.
-- :cpp:`setSmoother`: Chebyshev (``Chebyshev``, the default), l1-Jacobi
-  (``L1Jacobi``) [Baker2011]_, weighted Jacobi (``Jacobi``) or, in CPU
-  builds, l1 hybrid Gauss-Seidel (``L1GaussSeidel``) [Baker2011]_. In the
+- :cpp:`setInterpType`: extended+i (``mm_ext_i``, the default), extended
+  (``mm_ext``) or classical direct (``direct``) [Ruge1987]_ interpolation.
+- :cpp:`setSmoother`: Chebyshev (``chebyshev``, the default), l1-Jacobi
+  (``l1_jacobi``) [Baker2011]_, weighted Jacobi (``jacobi``) or, in CPU
+  builds, l1 hybrid Gauss-Seidel (``l1_gauss_seidel``) [Baker2011]_. In the
   Poisson tests l1 hybrid Gauss-Seidel needs fewer cycles than the other
   smoothers, but each sweep is sequential within a process or OpenMP thread.
 - :cpp:`setChebyshevDegree` and :cpp:`setChebyshevRatio`: the Chebyshev
@@ -1166,14 +1166,14 @@ The following can be tuned:
 - :cpp:`setPreSmooth` and :cpp:`setPostSmooth`: number of smoother sweeps
   before and after the coarse correction (1 for Chebyshev, 2 for the other
   smoothers).
-- :cpp:`setBottomSolver`: smoother sweeps (``Jacobi``, the default), or
-  BiCGStab (``BiCGStab``) or GMRES (``GMRES``) preconditioned by l1-Jacobi
-  (weighted Jacobi when the smoother is ``Jacobi``).
+- :cpp:`setBottomSolver`: smoother sweeps (``jacobi``, the default), or
+  BiCGStab (``bicgstab``) or GMRES (``gmres``) preconditioned by l1-Jacobi
+  (weighted Jacobi when the smoother is ``jacobi``).
 - :cpp:`setBottomTol`: relative tolerance of the BiCGStab or GMRES bottom
   solver (:math:`10^{-4}`).
 - :cpp:`setKrylovSolver`: use one V-cycle as the preconditioner of an outer
-  BiCGStab (``BiCGStab``), GMRES (``GMRES``) or conjugate gradient (``PCG``)
-  solver instead of iterating it on its own (``None``, the default). In the
+  BiCGStab (``bicgstab``), GMRES (``gmres``) or conjugate gradient (``pcg``)
+  solver instead of iterating it on its own (``none``, the default). In the
   tests in ``Tests/Algebra/AlgMG`` this roughly halved the number of V-cycles.
   The coarse operators are Galerkin products with :math:`R = P^T`, so the
   matrix should be symmetric or nearly so (solve row-scaled systems in

@@ -25,8 +25,8 @@ max_iter = 200
 mlmg = 1          # also solve with geometric multigrid (MLMG); 0 to skip
 
 # AlgMG options. Commented-out ones show the solver's defaults.
-interp   = ext+i     # direct, ext, ext+i
-smoother = chebyshev # jacobi, l1jacobi, chebyshev, l1gs (CPU only)
+interp   = mm_ext_i  # direct, mm_ext, mm_ext_i
+smoother = chebyshev # jacobi, l1_jacobi, chebyshev, l1_gauss_seidel (CPU only)
 krylov   = none      # none, bicgstab, gmres, pcg
 bottom   = jacobi    # jacobi, bicgstab, gmres; used as is with variations = 0
 # theta = 0.25            # strength threshold

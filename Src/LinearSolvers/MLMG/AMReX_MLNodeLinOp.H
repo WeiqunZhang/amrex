@@ -224,6 +224,10 @@ public:
      */
     void interpAssign (int amrlev, int fmglev, MultiFab& fine, MultiFab& crse) const override;
 
+#if (AMREX_SPACEDIM > 1)
+    [[nodiscard]] std::unique_ptr<MLAlgMG> makeAlgMG (int mglev) const override;
+#endif
+
 #if defined(AMREX_USE_HYPRE) && (AMREX_SPACEDIM > 1)
     /**
      * \brief Build a Hypre nodal Laplacian using the current metadata.

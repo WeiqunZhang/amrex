@@ -9,6 +9,8 @@ foreach(D IN LISTS AMReX_SPACEDIM)
        PRIVATE
        MLMG/AMReX_MLMG.H
        MLMG/AMReX_MLMG.cpp
+       MLMG/AMReX_MLAlgMG.H
+       MLMG/AMReX_MLAlgMG.cpp
        MLMG/AMReX_MLMG_K.H
        MLMG/AMReX_MLMG_${D}D_K.H
        MLMG/AMReX_MLMGBndry.H
@@ -22,6 +24,8 @@ foreach(D IN LISTS AMReX_SPACEDIM)
        MLMG/AMReX_MLCellABecLap.H
        MLMG/AMReX_MLCellABecLap_K.H
        MLMG/AMReX_MLCellABecLap_${D}D_K.H
+       MLMG/AMReX_Habec_K.H
+       MLMG/AMReX_Habec_${D}D_K.H
        MLMG/AMReX_MLCGSolver.H
        MLMG/AMReX_PCGSolver.H
        MLMG/AMReX_SingleBoxCGSolver.H

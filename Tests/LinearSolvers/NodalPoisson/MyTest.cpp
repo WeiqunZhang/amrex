@@ -19,6 +19,13 @@ MyTest::MyTest ()
 }
 
 void
+MyTest::setMultigridType (std::string const& name)
+{
+    multigrid_type = amrex::getEnumCaseInsensitive<MultigridType>(name);
+    amrex::Print() << "\nMultigrid type: " << name << "\n";
+}
+
+void
 MyTest::solve ()
 {
     BL_PROFILE("NodalPoisson::solve()");
@@ -56,6 +63,7 @@ MyTest::solve ()
         mlmg.setMaxFmgIter(max_fmg_iter);
         mlmg.setVerbose(verbose);
         mlmg.setBottomVerbose(bottom_verbose);
+        mlmg.setMultigridType(multigrid_type);
         // solution is passed to MLMG::solve to provide an initial guess.
         // Additionally it also provides boundary conditions for Dirichlet
         // boundaries if there are any.
@@ -97,6 +105,7 @@ MyTest::solve ()
             mlmg.setMaxFmgIter(max_fmg_iter);
             mlmg.setVerbose(verbose);
             mlmg.setBottomVerbose(bottom_verbose);
+            mlmg.setMultigridType(multigrid_type);
 #ifdef AMREX_USE_HYPRE
             if (use_hypre) {
                 mlmg.setBottomSolver(MLMG::BottomSolver::hypre);
@@ -193,6 +202,7 @@ MyTest::readParameters ()
 
     pp.query("do_plots", do_plots);
     pp.query("num_trials", num_trials);
+    pp.queryarr("multigrid_types", multigrid_types);
     pp.query("test_sigma_update", test_sigma_update);
     if (test_sigma_update) { do_plots = false; }
 

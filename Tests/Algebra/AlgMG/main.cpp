@@ -27,10 +27,10 @@ struct Params {
     Real reltol = (sizeof(Real) == 4) ? Real(1.e-5) : Real(1.e-10);
     Real alpha = Real(1); // 1.e-6 makes the constant mode nearly null
     int variations = 1; // 1: also run variations of the options; 0: only them
-    std::string bottom = "jacobi"; // jacobi, bicgstab, gmres
-    std::string interp = "ext+i"; // direct, ext, ext+i
-    std::string smoother = "chebyshev"; // jacobi, l1jacobi, chebyshev, l1gs (CPU)
-    std::string krylov = "none"; // none, bicgstab, gmres, pcg
+    std::string bottom = "jacobi"; // AlgMGBottomSolver names
+    std::string interp = "mm_ext_i"; // AlgMGInterpType names
+    std::string smoother = "chebyshev"; // AlgMGSmoother names (l1_gauss_seidel: CPU)
+    std::string krylov = "none"; // AlgMGKrylovSolver names
     // periodic, or dirichlet: homogeneous Dirichlet on the domain faces
     std::string bc = "periodic";
     // Input `problem` is a list (all four by default); each run has one.
@@ -360,50 +360,14 @@ Result run (Params const& p)
     bool const singular = (p.alpha == Real(0) && !dirichlet);
     if (singular) { amg.setSingular(true); }
     if (p.max_coarse_size) { amg.setMaxCoarseSize(*p.max_coarse_size); }
-    if (interp == "direct") {
-        amg.setInterpType(AlgMG<Real>::InterpType::Direct);
-    } else if (interp == "ext") {
-        amg.setInterpType(AlgMG<Real>::InterpType::MMExt);
-    } else if (interp == "ext+i") {
-        amg.setInterpType(AlgMG<Real>::InterpType::MMExtI);
-    } else {
-        amrex::Abort("Unknown interpolation: " + interp);
-    }
-    if (p.smoother == "jacobi") {
-        amg.setSmoother(AlgMG<Real>::Smoother::Jacobi);
-    } else if (p.smoother == "l1jacobi") {
-        amg.setSmoother(AlgMG<Real>::Smoother::L1Jacobi);
-    } else if (p.smoother == "chebyshev") {
-        amg.setSmoother(AlgMG<Real>::Smoother::Chebyshev);
-    } else if (p.smoother == "l1gs") {
-        amg.setSmoother(AlgMG<Real>::Smoother::L1GaussSeidel);
-    } else {
-        amrex::Abort("Unknown smoother: " + p.smoother);
-    }
+    amg.setInterpType(amrex::getEnumCaseInsensitive<AlgMGInterpType>(interp));
+    amg.setSmoother(amrex::getEnumCaseInsensitive<AlgMGSmoother>(p.smoother));
     if (p.relax_weight) { amg.setRelaxWeight(*p.relax_weight); }
     if (p.cheby_degree) { amg.setChebyshevDegree(*p.cheby_degree); }
     if (p.cheby_ratio) { amg.setChebyshevRatio(*p.cheby_ratio); }
     if (p.theta) { amg.setStrongThreshold(*p.theta); }
-    if (bottom == "jacobi") {
-        amg.setBottomSolver(AlgMG<Real>::BottomSolver::Jacobi);
-    } else if (bottom == "bicgstab") {
-        amg.setBottomSolver(AlgMG<Real>::BottomSolver::BiCGStab);
-    } else if (bottom == "gmres") {
-        amg.setBottomSolver(AlgMG<Real>::BottomSolver::GMRES);
-    } else {
-        amrex::Abort("Unknown bottom solver: " + bottom);
-    }
-    if (p.krylov == "none") {
-        amg.setKrylovSolver(AlgMG<Real>::KrylovSolver::None);
-    } else if (p.krylov == "bicgstab") {
-        amg.setKrylovSolver(AlgMG<Real>::KrylovSolver::BiCGStab);
-    } else if (p.krylov == "gmres") {
-        amg.setKrylovSolver(AlgMG<Real>::KrylovSolver::GMRES);
-    } else if (p.krylov == "pcg") {
-        amg.setKrylovSolver(AlgMG<Real>::KrylovSolver::PCG);
-    } else {
-        amrex::Abort("Unknown Krylov solver: " + p.krylov);
-    }
+    amg.setBottomSolver(amrex::getEnumCaseInsensitive<AlgMGBottomSolver>(bottom));
+    amg.setKrylovSolver(amrex::getEnumCaseInsensitive<AlgMGKrylovSolver>(p.krylov));
 
     auto bnorm = bvec.norm2();
     Gpu::streamSynchronize();
@@ -559,7 +523,7 @@ Vector<Params> make_cases (Params const& p)
         return cases;
     }
     for (auto const& b : {"jacobi", "bicgstab", "gmres"}) { add(b); }
-    for (auto const& it : {"direct", "ext", "ext+i"}) {
+    for (auto const& it : {"direct", "mm_ext", "mm_ext_i"}) {
         if (it != p.interp) { add("bicgstab").interp = it; }
     }
     if (!p.aggressive_levels) {
@@ -594,9 +558,9 @@ Vector<Params> make_cases (Params const& p)
         add("jacobi").krylov = "gmres";
         if (symmetric) { add("jacobi").krylov = "pcg"; }
     }
-    Vector<std::string> smoothers = {"jacobi", "l1jacobi", "chebyshev"};
+    Vector<std::string> smoothers = {"jacobi", "l1_jacobi", "chebyshev"};
 #ifndef AMREX_USE_GPU
-    smoothers.push_back("l1gs");
+    smoothers.push_back("l1_gauss_seidel");
 #endif
     for (auto const& sm : smoothers) {
         if (sm != p.smoother) { add("bicgstab").smoother = sm; }
@@ -606,7 +570,7 @@ Vector<Params> make_cases (Params const& p)
         // PCG with symmetric Gauss-Seidel sweeps at the bottom: one level
         // makes the bottom the whole problem.
         auto& c = add("jacobi");
-        c.smoother = "l1gs";
+        c.smoother = "l1_gauss_seidel";
         c.krylov = "pcg";
         c.max_levels = 1;
         c.max_iter = std::max(p.max_iter, 50*p.n_cell); // not scalable

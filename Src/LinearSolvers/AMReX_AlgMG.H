@@ -3,6 +3,7 @@
 #include <AMReX_Config.H>
 
 #include <AMReX_Algebra.H>
+#include <AMReX_Enum.H>
 #include <AMReX_BiCGStab_MV.H>
 #include <AMReX_BLProfiler.H>
 #include <AMReX_CArena.H>
@@ -186,6 +187,29 @@ struct MMInterpRow
 
 }
 
+
+//! Coarsest-level solver of AlgMG: smoother sweeps, or BiCGStab or GMRES
+//! preconditioned by l1-Jacobi (weighted Jacobi when the smoother is jacobi).
+AMREX_ENUM(AlgMGBottomSolver, jacobi, bicgstab, gmres);
+
+//! none: iterate V-cycles. Otherwise use one V-cycle as the preconditioner
+//! of the Krylov solver. pcg needs a symmetric positive definite matrix and
+//! a symmetric cycle (same pre- and post-smoother, smoother sweeps at the
+//! bottom).
+AMREX_ENUM(AlgMGKrylovSolver, none, bicgstab, gmres, pcg);
+
+//! direct: classical direct interpolation. mm_ext and mm_ext_i: extended
+//! and extended+i interpolation in matrix-matrix form.
+AMREX_ENUM(AlgMGInterpType, direct, mm_ext, mm_ext_i);
+
+//! jacobi: weighted Jacobi (weight 2/3). l1_jacobi: l1-Jacobi (weight 4/3).
+//! chebyshev (default): polynomial of degree `cheby_degree` on the
+//! l1-scaled operator, damping [1 / cheby_ratio, 1]; one sweep costs
+//! `cheby_degree` matrix-vector products, and one sweep is the default
+//! versus two for the Jacobi smoothers. l1_gauss_seidel: l1 hybrid
+//! Gauss-Seidel, forward before and backward after the coarse correction;
+//! CPU builds only.
+AMREX_ENUM(AlgMGSmoother, jacobi, l1_jacobi, chebyshev, l1_gauss_seidel);
 /**
  * \brief Algebraic multigrid solver for SpMatrix / AlgVector systems.
  *
@@ -226,23 +250,10 @@ public:
     //! entries are the matrix entries divided by `strength_scale`.
     using TS = std::conditional_t<std::is_same_v<T,double>, float, T>;
 
-    enum class BottomSolver { Jacobi, BiCGStab, GMRES };
-    //! None: iterate V-cycles. Otherwise use one V-cycle as the
-    //! preconditioner of the Krylov solver. PCG needs a symmetric positive
-    //! definite matrix and a symmetric cycle (same pre- and post-smoother,
-    //! smoother sweeps at the bottom).
-    enum class KrylovSolver { None, BiCGStab, GMRES, PCG };
-    //! Direct: classical direct interpolation. MMExt and MMExtI:
-    //! extended and extended+i interpolation in matrix-matrix form.
-    enum class InterpType { Direct, MMExt, MMExtI };
-    //! Jacobi: weighted Jacobi (weight 2/3). L1Jacobi: l1-Jacobi [6]
-    //! (weight 4/3). Chebyshev (default): polynomial of degree
-    //! `cheby_degree` on the l1-scaled operator, damping
-    //! [1 / cheby_ratio, 1]; one sweep costs `cheby_degree` matrix-vector
-    //! products, and one sweep is the default versus two for the Jacobi
-    //! smoothers. L1GaussSeidel: l1 hybrid Gauss-Seidel [6], forward before
-    //! and backward after the coarse correction; CPU builds only.
-    enum class Smoother { Jacobi, L1Jacobi, Chebyshev, L1GaussSeidel };
+    using BottomSolver = AlgMGBottomSolver;
+    using KrylovSolver = AlgMGKrylovSolver;
+    using InterpType   = AlgMGInterpType;
+    using Smoother     = AlgMGSmoother;
 
     AlgMG () = default;
     explicit AlgMG (SpMatrix<T>& a_mat);
@@ -358,7 +369,7 @@ private:
     int m_fixediter = 0;
     int m_niters = 0;
 
-    Smoother m_smoother_type = Smoother::Chebyshev;
+    Smoother m_smoother_type = Smoother::chebyshev;
     T m_relax_weight = T(-1);
     int m_cheby_degree = 2;
     T m_cheby_ratio = T(6);
@@ -367,13 +378,13 @@ private:
     int m_nu_bottom = -1;
 
     [[nodiscard]] int numPreSmooth () const {
-        return (m_nu1 >= 0) ? m_nu1 : ((m_smoother_type == Smoother::Chebyshev) ? 1 : 2);
+        return (m_nu1 >= 0) ? m_nu1 : ((m_smoother_type == Smoother::chebyshev) ? 1 : 2);
     }
     [[nodiscard]] int numPostSmooth () const {
-        return (m_nu2 >= 0) ? m_nu2 : ((m_smoother_type == Smoother::Chebyshev) ? 1 : 2);
+        return (m_nu2 >= 0) ? m_nu2 : ((m_smoother_type == Smoother::chebyshev) ? 1 : 2);
     }
     [[nodiscard]] int numBottomSmooth () const {
-        return (m_nu_bottom >= 0) ? m_nu_bottom : ((m_smoother_type == Smoother::Chebyshev) ? 4 : 8);
+        return (m_nu_bottom >= 0) ? m_nu_bottom : ((m_smoother_type == Smoother::chebyshev) ? 4 : 8);
     }
 
     int m_max_levels = 25;
@@ -384,10 +395,10 @@ private:
     std::unique_ptr<AlgVector<T>> m_bproj; // rhs with the mean removed
     T m_strong_threshold = T(0.25);
 
-    InterpType m_interp_type = InterpType::MMExtI;
+    InterpType m_interp_type = InterpType::mm_ext_i;
     int m_p_max_elmts = default_p_max_elmts;
     T m_trunc_factor = T(0);
-    BottomSolver m_bottom_solver = BottomSolver::Jacobi;
+    BottomSolver m_bottom_solver = BottomSolver::jacobi;
     T m_bottom_reltol = T(1.e-4);
     int m_bottom_maxiter = 200;
     int m_bottom_verbose = 0;
@@ -432,7 +443,7 @@ private:
     std::unique_ptr<GMRES_MV<T>> m_gmres;
     std::unique_ptr<BiCGStab_MV<T>> m_bicgstab;
 
-    KrylovSolver m_krylov = KrylovSolver::None;
+    KrylovSolver m_krylov = KrylovSolver::none;
     std::unique_ptr<BiCGStab_MV<T>> m_krylov_bicgstab;
     std::unique_ptr<GMRES_MV<T>> m_krylov_gmres;
     std::unique_ptr<PCG_MV<T>> m_krylov_pcg;
@@ -622,7 +633,7 @@ void AlgMG<T>::solve (AlgVector<T>& a_sol, AlgVector<T> const& a_rhs)
         return;
     }
 
-    if (m_krylov != KrylovSolver::None) {
+    if (m_krylov != KrylovSolver::none) {
         solve_krylov(a_sol, rhs, res_target);
         project_out(a_sol);
         return;
@@ -722,14 +733,14 @@ void AlgMG<T>::solve_krylov (AlgVector<T>& a_sol, AlgVector<T> const& a_rhs, T r
     };
 
     char const* name = "";
-    if (m_krylov == KrylovSolver::BiCGStab) {
+    if (m_krylov == KrylovSolver::bicgstab) {
         name = "BiCGStab";
         if (!m_krylov_bicgstab) {
             m_krylov_bicgstab = std::make_unique<BiCGStab_MV<T>>(m_mat);
         }
         m_krylov_bicgstab->setPrecond(pc);
         run(m_krylov_bicgstab->getSolver());
-    } else if (m_krylov == KrylovSolver::GMRES) {
+    } else if (m_krylov == KrylovSolver::gmres) {
         name = "GMRES";
         if (!m_krylov_gmres) {
             m_krylov_gmres = std::make_unique<GMRES_MV<T>>(m_mat);
@@ -833,11 +844,11 @@ template <typename T>
 void AlgMG<T>::smooth (int lev, AlgVector<T>& xvec, AlgVector<T> const& bvec, int nu,
                      bool with_initial_guess, bool backward)
 {
-    if (m_smoother_type == Smoother::L1GaussSeidel) {
+    if (m_smoother_type == Smoother::l1_gauss_seidel) {
         auto& smoother = *m_l1gs[lev];
         smoother.setNumIters(nu);
         smoother(xvec, bvec, with_initial_guess, backward);
-    } else if (m_smoother_type == Smoother::Chebyshev) {
+    } else if (m_smoother_type == Smoother::chebyshev) {
         auto& smoother = *m_cheby[lev];
         smoother.setNumIters(nu);
         smoother(xvec, bvec, with_initial_guess);
@@ -856,7 +867,7 @@ void AlgMG<T>::bottom_solve ()
     int const lev = numLevels()-1;
     project_out(m_res[lev]); // keep the coarsest solve consistent
     auto smooth_bottom = [&] () {
-        if (m_smoother_type == Smoother::L1GaussSeidel) {
+        if (m_smoother_type == Smoother::l1_gauss_seidel) {
             // Forward then backward sweeps keep the cycle symmetric.
             int const nu = (numBottomSmooth()+1)/2;
             smooth(lev, m_cor[lev], m_res[lev], nu, false);
@@ -882,20 +893,20 @@ void AlgMG<T>::bottom_solve ()
         }
     };
     switch (m_bottom_solver) {
-    case BottomSolver::Jacobi:
+    case BottomSolver::jacobi:
         smooth_bottom();
         break;
-    case BottomSolver::GMRES:
+    case BottomSolver::gmres:
         if (!m_gmres) {
             m_gmres = std::make_unique<GMRES_MV<T>>(m_a[lev]);
-            m_gmres->setPrecond(JacobiSmoother<T>(m_a[lev], m_smoother_type != Smoother::Jacobi));
+            m_gmres->setPrecond(JacobiSmoother<T>(m_a[lev], m_smoother_type != Smoother::jacobi));
         }
         krylov_bottom(*m_gmres);
         break;
-    case BottomSolver::BiCGStab:
+    case BottomSolver::bicgstab:
         if (!m_bicgstab) {
             m_bicgstab = std::make_unique<BiCGStab_MV<T>>(m_a[lev]);
-            m_bicgstab->setPrecond(JacobiSmoother<T>(m_a[lev], m_smoother_type != Smoother::Jacobi));
+            m_bicgstab->setPrecond(JacobiSmoother<T>(m_a[lev], m_smoother_type != Smoother::jacobi));
         }
         krylov_bottom(*m_bicgstab);
         break;
@@ -1032,17 +1043,17 @@ void AlgMG<T>::build_smoothers ()
     m_bicgstab.reset();
     int const nlev = numLevels();
     for (int lev = 0; lev < nlev; ++lev) {
-        if (m_smoother_type == Smoother::L1GaussSeidel) {
+        if (m_smoother_type == Smoother::l1_gauss_seidel) {
 #ifdef AMREX_USE_GPU
             amrex::Abort("AlgMG: L1GaussSeidel smoother is only available in CPU builds");
 #endif
             m_l1gs.push_back(std::make_unique<L1GaussSeidelSmoother<T>>(m_a[lev]));
-        } else if (m_smoother_type == Smoother::Chebyshev) {
+        } else if (m_smoother_type == Smoother::chebyshev) {
             m_cheby.push_back(std::make_unique<ChebyshevSmoother<T>>(m_a[lev], true));
             m_cheby.back()->setDegree(m_cheby_degree);
             m_cheby.back()->setEigRatio(m_cheby_ratio);
         } else {
-            bool const l1 = (m_smoother_type == Smoother::L1Jacobi);
+            bool const l1 = (m_smoother_type == Smoother::l1_jacobi);
             m_smoother.push_back(std::make_unique<JacobiSmoother<T>>(m_a[lev], l1));
             T const w = (m_relax_weight >= T(0)) ? m_relax_weight : (l1 ? T(4./3.) : T(2./3.));
             m_smoother.back()->setWeight(w);
@@ -1112,7 +1123,7 @@ bool AlgMG<T>::coarsen_level (int lev, SpMatrix<T>& A, SpMatrix<T>& P, AlgPartit
             note_memory(lev, "P1");
             // P2 needs only the rows of the first-pass C-points.
             auto Pf = build_interp_mm(A, S, ST, statef, cidxf, cpart2, sscale,
-                                      m_interp_type != InterpType::MMExt,
+                                      m_interp_type != InterpType::mm_ext,
                                       state.data());
             if (trunc) { Pf = truncate_interp(Pf, cpart2, m_p_max_elmts, m_trunc_factor); }
             auto P2 = select_coarse_rows(Pf, state, cidx, cpart);
@@ -1693,11 +1704,11 @@ SpMatrix<T> AlgMG<T>::interpolation (SpMatrix<T>& A, SpMatrix<TS>& S, SpMatrix<T
                                    Gpu::DeviceVector<Long> const& cidx,
                                    AlgPartition const& cpart, T scale) const
 {
-    if (m_interp_type == InterpType::Direct) {
+    if (m_interp_type == InterpType::direct) {
         return build_interp(A, S, state, cidx, cpart);
     } else {
         return build_interp_mm(A, S, ST, state, cidx, cpart, scale,
-                               m_interp_type == InterpType::MMExtI);
+                               m_interp_type == InterpType::mm_ext_i);
     }
 }
 

@@ -22,6 +22,10 @@ public:
 
     [[nodiscard]] int getNumTrials () const { return num_trials; }
     [[nodiscard]] int getDoPlots () const { return do_plots; }
+    [[nodiscard]] amrex::Vector<std::string> const& getMultigridTypes () const {
+        return multigrid_types;
+    }
+    void setMultigridType (std::string const& name);
 
 private:
 
@@ -54,6 +58,8 @@ private:
     //int smooth_num_sweeps = 4;
 
     bool use_hypre = false;
+    amrex::Vector<std::string> multigrid_types{"geometric"};
+    amrex::MultigridType multigrid_type = amrex::MultigridType::geometric;
     bool do_plots = true;
     int num_trials = 1;
     bool test_sigma_update = false;
