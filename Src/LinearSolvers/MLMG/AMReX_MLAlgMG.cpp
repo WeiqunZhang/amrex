@@ -83,6 +83,7 @@ struct MLAlgMG::Impl
 
     // cell-centered
     iMultiFab const* m_overset_mask = nullptr;
+    iMultiFab m_osm_grown;               // overset mask with filled ghost cells
 #if defined(AMREX_USE_EB) && (AMREX_SPACEDIM > 1)
     FabArray<EBCellFlagFab> const* m_flags = nullptr;
     MultiFab const* m_vfrac = nullptr;
@@ -366,6 +367,16 @@ MLAlgMG::Impl::defineCell (BoxArray const& grids, DistributionMapping const& dma
 
     m_gid.FillBoundary(m_geom.periodicity());
 
+    // The known cells hold a zero correction, so the couplings into them
+    // are dropped below to keep the matrix symmetric. That needs the mask
+    // of the neighbors: ghost cells outside the domain count as unknown.
+    if (overset_mask) {
+        m_osm_grown.define(grids, dmap, 1, 1);
+        m_osm_grown.setVal(1);
+        iMultiFab::Copy(m_osm_grown, *overset_mask, 0, 0, 1, 0);
+        m_osm_grown.FillBoundary(m_geom.periodicity());
+    }
+
     // Default coefficients: a = 0, b = 1.
     MultiFab alpha;
     if (acoef == nullptr) {
@@ -471,7 +482,7 @@ MLAlgMG::Impl::assembleCell (FabFactory<FArrayBox> const& factory, iMultiFab con
 
         if (ss == reg_stencil)
         {
-            auto osmsk = overset_mask ? overset_mask->const_array(mfi) : Array4<int const>();
+            auto osmsk = overset_mask ? m_osm_grown.const_array(mfi) : Array4<int const>();
             BaseFab<GpuArray<Real,reg_stencil>> tmpmatfab
                 (bx, 1, (GpuArray<Real,reg_stencil>*)matp);
             amrex::fill(tmpmatfab,
@@ -479,6 +490,14 @@ MLAlgMG::Impl::assembleCell (FabFactory<FArrayBox> const& factory, iMultiFab con
             {
                 habec_ijmat(sten, ncols_a, i, j, k, cid_a,
                             sa, afab, sb, dx, bfabs, bct, bcloc, bho, osmsk);
+                if (osmsk && osmsk(i,j,k) != 0) { // drop couplings into known cells
+                    AMREX_D_TERM(if (osmsk(i-1,j,k) == 0) { sten[1] = Real(0.0); }
+                                 if (osmsk(i+1,j,k) == 0) { sten[2] = Real(0.0); },
+                                 if (osmsk(i,j-1,k) == 0) { sten[3] = Real(0.0); }
+                                 if (osmsk(i,j+1,k) == 0) { sten[4] = Real(0.0); },
+                                 if (osmsk(i,j,k-1) == 0) { sten[5] = Real(0.0); }
+                                 if (osmsk(i,j,k+1) == 0) { sten[6] = Real(0.0); })
+                }
             });
             BaseFab<GpuArray<Long,reg_stencil>> tmpcolfab
                 (bx, 1, (GpuArray<Long,reg_stencil>*)colp);
