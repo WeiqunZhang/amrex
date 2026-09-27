@@ -15,6 +15,7 @@
 #include <AMReX_MultiFabUtil.H>
 
 #include <limits>
+#include <numeric>
 
 namespace amrex {
 
@@ -28,9 +29,8 @@ AlgPartition make_partition (Long nrows_proc)
 #ifdef AMREX_USE_MPI
     ParallelAllGather::AllGather(nrows_proc, counts.data(), ParallelContext::CommunicatorSub());
 #endif
-    Vector<Long> rows(nprocs+1);
-    rows[0] = 0;
-    for (int i = 0; i < nprocs; ++i) { rows[i+1] = rows[i] + counts[i]; }
+    Vector<Long> rows(nprocs+1, 0); // exclusive prefix sum of counts
+    std::partial_sum(counts.begin(), counts.end(), rows.begin()+1);
     return AlgPartition(std::move(rows));
 }
 

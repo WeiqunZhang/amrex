@@ -18,6 +18,7 @@
 #include <cmath>
 #include <iomanip>
 #include <limits>
+#include <numeric>
 #include <memory>
 #include <stdexcept>
 #include <string>
@@ -1452,9 +1453,8 @@ AlgPartition AlgMG<T>::coarse_numbering (Gpu::DeviceVector<int> const& state,
     // One value per rank: an all-gather, not a reduction of a P-vector.
     ParallelAllGather::AllGather(nc, counts.data(), ParallelContext::CommunicatorSub());
 #endif
-    Vector<Long> rows(nprocs+1);
-    rows[0] = 0;
-    for (int i = 0; i < nprocs; ++i) { rows[i+1] = rows[i] + counts[i]; }
+    Vector<Long> rows(nprocs+1, 0); // exclusive prefix sum of counts
+    std::partial_sum(counts.begin(), counts.end(), rows.begin()+1);
     return AlgPartition(std::move(rows));
 }
 
