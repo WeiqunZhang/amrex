@@ -279,9 +279,9 @@ MLNodeLaplacian::fillRHS (int mglev, MFIter const& mfi, Array4<int const> const&
     {
         if (lid(i,j,k) >= 0) {
             Real fac = Real(1.0);
-            AMREX_D_TERM(if ((neumann_lo[0] == i) || neumann_hi[0] == i) { fac *= 0.5; },
-                         if ((neumann_lo[1] == j) || neumann_hi[1] == j) { fac *= 0.5; },
-                         if ((neumann_lo[2] == k) || neumann_hi[2] == k) { fac *= 0.5; })
+            AMREX_D_TERM(if ((neumann_lo[0] == i) || neumann_hi[0] == i) { fac *= Real(0.5); },
+                         if ((neumann_lo[1] == j) || neumann_hi[1] == j) { fac *= Real(0.5); },
+                         if ((neumann_lo[2] == k) || neumann_hi[2] == k) { fac *= Real(0.5); })
             rhs[lid(i,j,k)] = fac * bfab(i,j,k);
         }
     });

@@ -103,7 +103,7 @@ void test_bottom_solvers (Geometry const& geom, BoxArray const& grids,
     int use_sigma_mf = 1;
     int plot = 0;
     Real phi_eb = 1.0;
-    Real bottom_reltol = 1.e-9;
+    Real bottom_reltol = Real(1.e-9);
     Real max_rel_diff = std::is_same_v<Real,float> ? Real(1.e-4) : Real(1.e-12);
     {
         ParmParse pp;
