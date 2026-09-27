@@ -744,7 +744,7 @@ The following parameters can be set in the inputs file to control the choice of 
 
 - :cpp:`hypre.hypre_preconditioner`: Default is none;  otherwise the type must be specified.
 
-- :cpp:`hypre.recompute_preconditioner`: Default true.  Option to recompute the preconditioner.
+- :cpp:`hypre.recompute_preconditioner`: Default false.  Option to redo the solver and preconditioner setup on every solve.  By default the setup runs once per assembled matrix.
 
 - :cpp:`hypre.write_matrix_files`: Default false.   Option to write the matrix to text files.
 
