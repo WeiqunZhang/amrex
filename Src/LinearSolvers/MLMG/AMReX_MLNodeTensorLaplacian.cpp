@@ -331,10 +331,10 @@ MLNodeTensorLaplacian::fillAlgMatrix (int mglev, MFIter const& mfi,
     fillMatrix_doit(mglev, mfi, gid, lid, ncols, cols, mat);
 }
 
-template <typename AlgInt, typename AtomicInt>
+template <typename AlgInt, typename AlgGid>
 void
 MLNodeTensorLaplacian::fillMatrix_doit (int mglev, MFIter const& mfi,
-                                        Array4<AtomicInt const> const& gid,
+                                        Array4<AlgGid const> const& gid,
                                         Array4<int const> const& lid,
                                         AlgInt* ncols, AlgInt* cols, Real* mat) const
 {
@@ -360,7 +360,7 @@ MLNodeTensorLaplacian::fillMatrix_doit (int mglev, MFIter const& mfi,
                  Dim3 node2 = nodelap_detail::GetNode2()(offset, node);
                  return (lid(node.x,node.y,node.z) >= 0 &&
                          gid(node2.x,node2.y,node2.z)
-                         < std::numeric_limits<AtomicInt>::max());
+                         < std::numeric_limits<AlgGid>::max());
              },
              [=] AMREX_GPU_DEVICE (int offset, int ps) noexcept
              {

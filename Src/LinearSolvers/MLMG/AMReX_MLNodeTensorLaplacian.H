@@ -164,9 +164,9 @@ public:
                   Array4<Real const> const& bfab) const override;
 
     // Public for nvcc.
-    template <typename AlgInt, typename AtomicInt>
+    template <typename AlgInt, typename AlgGid>
     void fillMatrix_doit (int mglev, MFIter const& mfi,
-                          Array4<AtomicInt const> const& gid,
+                          Array4<AlgGid const> const& gid,
                           Array4<int const> const& lid,
                           AlgInt* ncols, AlgInt* cols, Real* mat) const;
 #endif

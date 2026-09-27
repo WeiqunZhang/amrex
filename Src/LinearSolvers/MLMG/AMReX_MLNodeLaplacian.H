@@ -323,22 +323,23 @@ public :
     void fillRHS (int mglev, MFIter const& mfi, Array4<int const> const& lid,
                   Real* rhs, Array4<Real const> const& bfab) const override;
 
-    // Public for nvcc.
-    template <typename AlgInt, typename AtomicInt>
+    // Public for nvcc. AlgGid is the global row id type: Long for AlgMG,
+    // HypreNodeLap::AtomicInt for hypre.
+    template <typename AlgInt, typename AlgGid>
     void fillMatrix_doit (int mglev, MFIter const& mfi,
-                          Array4<AtomicInt const> const& gid,
+                          Array4<AlgGid const> const& gid,
                           Array4<int const> const& lid,
                           AlgInt* ncols, AlgInt* cols, Real* mat) const;
 #ifdef AMREX_USE_GPU
-    template <typename AlgInt, typename AtomicInt>
+    template <typename AlgInt, typename AlgGid>
     void fillMatrix_gpu (int mglev, MFIter const& mfi,
-                         Array4<AtomicInt const> const& gid,
+                         Array4<AlgGid const> const& gid,
                          Array4<int const> const& lid,
                          AlgInt* ncols, AlgInt* cols, Real* mat) const;
 #endif
-    template <typename AlgInt, typename AtomicInt>
+    template <typename AlgInt, typename AlgGid>
     void fillMatrix_cpu (int mglev, MFIter const& mfi,
-                         Array4<AtomicInt const> const& gid,
+                         Array4<AlgGid const> const& gid,
                          Array4<int const> const& lid,
                          AlgInt* ncols, AlgInt* cols, Real* mat) const;
 #endif
