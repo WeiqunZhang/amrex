@@ -393,7 +393,7 @@ void habec_ijmat_eb (GpuArray<Real,27>& sten, Array4<Int> const& ncols,
             Real bf1, bf2, bflo;
             detail::comp_bflo(bf1, bf2, bflo, sb, dx[0], bctype[cdir], bcl[cdir], bho);
 
-            Real tmp = (Real(1.0)-fracy)*(1.0-fracz)*area*b[0](i,j,k);
+            Real tmp = (Real(1.0)-fracy)*(Real(1.0)-fracz)*area*b[0](i,j,k);
             // cell(i-1,j,k) is not covered because area > 0
             if (cell_id(i-1,j,k) >= 0) {
                 mat_tmp( 0,0,0) += tmp*f;
