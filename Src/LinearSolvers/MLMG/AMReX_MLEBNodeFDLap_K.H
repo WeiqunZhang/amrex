@@ -206,7 +206,7 @@ void mlebndfdlap_grad_z (Box const& b, Array4<Real> const& pz, Array4<Real const
 #endif
 
 
-#if defined(AMREX_USE_HYPRE) && (AMREX_SPACEDIM > 1)
+#if (AMREX_SPACEDIM > 1)
 
 namespace ebnodefdlap_detail {
 

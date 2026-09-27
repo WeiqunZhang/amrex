@@ -244,15 +244,34 @@ public:
     {
         amrex::Abort("MLNodeLinOp::fillIJMatrix: how did we get here?");
     }
+#endif
 
-    virtual void fillRHS (MFIter const& /*mfi*/,
+    /**
+     * \brief Fill the matrix rows of one box for the algebraic solver.
+     *
+     * Same packed layout as the Hypre version: ncols[lid] entries per row,
+     * diagonal first, neighbors without a row (gid == max()) dropped.
+     *
+     * \param mglev MG level of AMR level 0 being assembled.
+     * \param gid   Global row ids, numeric_limits<Long>::max() for no row.
+     * \param lid   Local row ids, negative for no row.
+     */
+    virtual void fillAlgMatrix (int /*mglev*/, MFIter const& /*mfi*/,
+                                Array4<Long const> const& /*gid*/,
+                                Array4<int const> const& /*lid*/,
+                                Long* /*ncols*/, Long* /*cols*/, Real* /*mat*/) const
+    {
+        amrex::Abort("MLNodeLinOp::fillAlgMatrix: not supported by this operator");
+    }
+
+    //! Fill the right-hand side of the rows of one box on MG level \p mglev.
+    virtual void fillRHS (int /*mglev*/, MFIter const& /*mfi*/,
                           Array4<int const> const& /*lid*/,
                           Real* /*rhs*/,
                           Array4<Real const> const& /*bfab*/) const
     {
         amrex::Abort("MLNodeLinOp:fillRHS: how did we get here?");
     }
-#endif
 
 protected:
 

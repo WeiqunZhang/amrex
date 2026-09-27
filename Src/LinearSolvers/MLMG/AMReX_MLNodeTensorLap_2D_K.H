@@ -121,7 +121,6 @@ void mlndtslap_gauss_seidel (int i, int j, int k, Array4<Real> const& sol,
     }
 }
 
-#if defined(AMREX_USE_HYPRE) && (AMREX_SPACEDIM > 1)
 
 template <typename HypreInt, typename AtomicInt>
 void mlndtslap_fill_ijmatrix_cpu (Box const& ndbx,
@@ -259,7 +258,6 @@ void mlndtslap_fill_ijmatrix_gpu (const int ps, const int i, const int j, const 
 }
 #endif
 
-#endif
 
 }
 

@@ -98,6 +98,7 @@ foreach(D IN LISTS AMReX_SPACEDIM)
           MLMG/AMReX_MLNodeLaplacian_sync.cpp
           MLMG/AMReX_MLNodeLaplacian_sten.cpp
           MLMG/AMReX_MLNodeLaplacian_misc.cpp
+          MLMG/AMReX_MLNodeLaplacian_matrix.cpp
           MLMG/AMReX_MLNodeLap_K.H
           MLMG/AMReX_MLNodeLap_${D}D_K.H
           MLMG/AMReX_MLTensorOp.H
@@ -139,12 +140,6 @@ foreach(D IN LISTS AMReX_SPACEDIM)
           )
     endif ()
 
-    if (AMReX_HYPRE AND AMReX_LINEAR_SOLVERS_INCFLO)
-       target_sources(amrex_${D}d
-          PRIVATE
-          MLMG/AMReX_MLNodeLaplacian_hypre.cpp
-          )
-    endif ()
 
     if (D EQUAL 3)
 

@@ -2207,7 +2207,6 @@ void mlndlap_set_surface_integral_eb (int i, int j, int, Array4<Real> const& sin
 
 #endif
 
-#if defined(AMREX_USE_HYPRE)
 
 template <typename HypreInt, typename AtomicInt>
 void mlndlap_fillijmat_sten_cpu (Box const& ndbx,
@@ -2225,7 +2224,7 @@ void mlndlap_fillijmat_sten_cpu (Box const& ndbx,
         {
             cols[nelems] = gid(i,j,k);
             mat[nelems] = sten(i,j,k,0);
-            HypreNodeLap::Int nelems_old = nelems;
+            HypreInt nelems_old = nelems;
             ++nelems;
 
             if                (gid(i-1,j-1,k) < gidmax) {
@@ -3406,7 +3405,6 @@ void mlndlap_fillijmat_cs_gpu (const int ps, const int i, const int j, const int
 
 #endif
 
-#endif
 
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE
 int mlndlap_color (int i, int j, int)

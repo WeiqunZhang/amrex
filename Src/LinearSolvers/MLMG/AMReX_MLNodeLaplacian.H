@@ -305,32 +305,42 @@ public :
 
 #endif
 
-#if defined(AMREX_USE_HYPRE) && (AMREX_SPACEDIM > 1)
+#if (AMREX_SPACEDIM > 1)
+#if defined(AMREX_USE_HYPRE)
     void fillIJMatrix (MFIter const& mfi,
-                               Array4<HypreNodeLap::AtomicInt const> const& gid,
-                               Array4<int const> const& lid,
-                               HypreNodeLap::Int* ncols,
-                               HypreNodeLap::Int* cols,
-                               Real* mat) const override;
-
-#ifdef AMREX_USE_GPU
-    void fillIJMatrix_gpu (MFIter const& mfi,
-                           Array4<HypreNodeLap::AtomicInt const> const& gid,
-                           Array4<int const> const& lid,
-                           HypreNodeLap::Int* ncols,
-                           HypreNodeLap::Int* cols,
-                           Real* mat) const;
+                       Array4<HypreNodeLap::AtomicInt const> const& gid,
+                       Array4<int const> const& lid,
+                       HypreNodeLap::Int* ncols,
+                       HypreNodeLap::Int* cols,
+                       Real* mat) const override;
 #endif
 
-    void fillIJMatrix_cpu (MFIter const& mfi,
-                           Array4<HypreNodeLap::AtomicInt const> const& gid,
-                           Array4<int const> const& lid,
-                           HypreNodeLap::Int* ncols,
-                           HypreNodeLap::Int* cols,
-                           Real* mat) const;
+    void fillAlgMatrix (int mglev, MFIter const& mfi,
+                        Array4<Long const> const& gid,
+                        Array4<int const> const& lid,
+                        Long* ncols, Long* cols, Real* mat) const override;
 
-    void fillRHS (MFIter const& mfi, Array4<int const> const& lid,
+    void fillRHS (int mglev, MFIter const& mfi, Array4<int const> const& lid,
                   Real* rhs, Array4<Real const> const& bfab) const override;
+
+    // Public for nvcc.
+    template <typename Int, typename AtomicInt>
+    void fillMatrix_doit (int mglev, MFIter const& mfi,
+                          Array4<AtomicInt const> const& gid,
+                          Array4<int const> const& lid,
+                          Int* ncols, Int* cols, Real* mat) const;
+#ifdef AMREX_USE_GPU
+    template <typename Int, typename AtomicInt>
+    void fillMatrix_gpu (int mglev, MFIter const& mfi,
+                         Array4<AtomicInt const> const& gid,
+                         Array4<int const> const& lid,
+                         Int* ncols, Int* cols, Real* mat) const;
+#endif
+    template <typename Int, typename AtomicInt>
+    void fillMatrix_cpu (int mglev, MFIter const& mfi,
+                         Array4<AtomicInt const> const& gid,
+                         Array4<int const> const& lid,
+                         Int* ncols, Int* cols, Real* mat) const;
 #endif
 
 protected:
