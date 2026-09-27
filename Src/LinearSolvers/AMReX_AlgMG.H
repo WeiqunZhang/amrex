@@ -194,7 +194,7 @@ struct MMInterpRow
 AMREX_ENUM(AlgMGBottomSolver, jacobi, bicgstab, gmres);
 
 //! none: iterate V-cycles. Otherwise use one V-cycle as the preconditioner
-//! of the Krylov solver. pcg needs a symmetric positive definite matrix and
+//! of the Krylov solver. pcg needs a symmetric definite matrix (either sign) and
 //! a symmetric cycle (same pre- and post-smoother, smoother sweeps at the
 //! bottom).
 AMREX_ENUM(AlgMGKrylovSolver, none, bicgstab, gmres, pcg);

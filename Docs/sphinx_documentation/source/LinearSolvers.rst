@@ -1083,10 +1083,10 @@ PCG
 
 :cpp:`PCG<V,M>` in ``AMReX_PCG.H`` is the preconditioned conjugate gradient
 method with the same operator requirements as :cpp:`GMRES<V,M>`. It needs a
-symmetric positive definite operator and preconditioner, and is then the
-cheapest of the three: one operator and one preconditioner application and
-three global reductions per iteration. :cpp:`getStatus` reports a loss of
-positive definiteness.
+symmetric definite operator and preconditioner of the same sign (positive
+or negative definite), and is then the cheapest of the three: one operator
+and one preconditioner application and three global reductions per
+iteration. :cpp:`getStatus` reports a loss of definiteness.
 
 Sparse Linear Algebra
 =====================
@@ -1148,7 +1148,7 @@ them accepts a preconditioner functor.
 - :cpp:`GMRES_MV<T>` in ``AMReX_GMRES_MV.H``: GMRES.
 - :cpp:`BiCGStab_MV<T>` in ``AMReX_BiCGStab_MV.H``: BiCGStab.
 - :cpp:`PCG_MV<T>` in ``AMReX_PCG_MV.H``: preconditioned conjugate
-  gradient, for symmetric positive definite systems.
+  gradient, for symmetric definite systems.
 
 All three are aliases of :cpp:`KrylovMV<S,T>` in ``AMReX_KrylovMV.H``. Use
 :cpp:`getSolver` to reach the underlying solver, e.g., to call
@@ -1231,7 +1231,7 @@ The following can be tuned:
   tests in ``Tests/Algebra/AlgMG`` this roughly halved the number of V-cycles.
   The coarse operators are Galerkin products with :math:`R = P^T`, so the
   matrix should be symmetric or nearly so (solve row-scaled systems in
-  their unscaled form); PCG also requires positive definiteness. With PCG
+  their unscaled form); PCG also requires definiteness (either sign). With PCG
   or GMRES, use smoother sweeps as the bottom
   solver, and with PCG also the same number of pre- and post-smoothing
   sweeps.
