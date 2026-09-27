@@ -50,6 +50,15 @@ struct MLAlgMG::Impl
           LayoutData<GpuArray<int,2*AMREX_SPACEDIM>> const& bctype,
           LayoutData<GpuArray<Real,2*AMREX_SPACEDIM>> const& bcl, int maxorder);
 
+    // Constructors cannot hold device lambdas (nvcc), so they call these.
+    void defineNodal (BoxArray const& grids, DistributionMapping const& dmap,
+                      iMultiFab const& owner_mask, iMultiFab const& dirichlet_mask);
+    void defineCell (BoxArray const& grids, DistributionMapping const& dmap,
+                     FabFactory<FArrayBox> const& factory, iMultiFab const* overset_mask,
+                     Real ascalar, Real bscalar, MultiFab const* acoef,
+                     Array<MultiFab const*,AMREX_SPACEDIM> const& bcoef, MultiFab const* eb_bcoef,
+                     LayoutData<GpuArray<int,2*AMREX_SPACEDIM>> const& bctype,
+                     LayoutData<GpuArray<Real,2*AMREX_SPACEDIM>> const& bcl, int maxorder);
     void assembleNodal (MLNodeLinOp const& linop);
     void assembleCell (FabFactory<FArrayBox> const& factory, iMultiFab const* overset_mask,
                        Real ascalar, Real bscalar, MultiFab const& acoef,
@@ -116,7 +125,14 @@ MLAlgMG::Impl::Impl (int mglev, BoxArray const& grids, DistributionMapping const
                      iMultiFab const& dirichlet_mask, MLNodeLinOp const& linop)
     : m_mglev(mglev), m_nodelinop(&linop), m_geom(geom)
 {
-    BL_PROFILE("MLAlgMG::Impl(nodal)");
+    defineNodal(grids, dmap, owner_mask, dirichlet_mask);
+}
+
+void
+MLAlgMG::Impl::defineNodal (BoxArray const& grids, DistributionMapping const& dmap,
+                            iMultiFab const& owner_mask, iMultiFab const& dirichlet_mask)
+{
+    BL_PROFILE("MLAlgMG::defineNodal()");
 
     const BoxArray& nba = amrex::convert(grids, IntVect::TheNodeVector());
     m_lid.define(nba, dmap, 1, 0);
@@ -201,7 +217,7 @@ MLAlgMG::Impl::Impl (int mglev, BoxArray const& grids, DistributionMapping const
     amrex::OverrideSync(m_gid, owner_mask, m_geom.periodicity());
     m_gid.FillBoundary(m_geom.periodicity());
 
-    assembleNodal(linop);
+    assembleNodal(*m_nodelinop);
 
     m_x.define(m_part);
     m_b.define(m_part);
@@ -278,7 +294,19 @@ MLAlgMG::Impl::Impl (int mglev, BoxArray const& grids, DistributionMapping const
                      LayoutData<GpuArray<Real,2*AMREX_SPACEDIM>> const& bcl, int maxorder)
     : m_mglev(mglev), m_nodal(false), m_geom(geom), m_overset_mask(overset_mask)
 {
-    BL_PROFILE("MLAlgMG::Impl(cell)");
+    defineCell(grids, dmap, factory, overset_mask, ascalar, bscalar, acoef, bcoef, eb_bcoef,
+               bctype, bcl, maxorder);
+}
+
+void
+MLAlgMG::Impl::defineCell (BoxArray const& grids, DistributionMapping const& dmap,
+                           FabFactory<FArrayBox> const& factory, iMultiFab const* overset_mask,
+                           Real ascalar, Real bscalar, MultiFab const* acoef,
+                           Array<MultiFab const*,AMREX_SPACEDIM> const& bcoef, MultiFab const* eb_bcoef,
+                           LayoutData<GpuArray<int,2*AMREX_SPACEDIM>> const& bctype,
+                           LayoutData<GpuArray<Real,2*AMREX_SPACEDIM>> const& bcl, int maxorder)
+{
+    BL_PROFILE("MLAlgMG::defineCell()");
 
     m_gid.define(grids, dmap, 1, 1);
     m_nrows_grid.define(grids, dmap);
