@@ -8,4 +8,4 @@ max_iter = 100
 max_fmg_iter = 0
 # reltol = 1.e-11
 
-multigrid_types = geometric algebraic hybrid
+multigrid_types = algebraic hybrid geometric

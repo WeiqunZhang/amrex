@@ -74,6 +74,8 @@ private:
     bool use_petsc = false;
     amrex::Vector<std::string> multigrid_types{"geometric"};
     amrex::MultigridType multigrid_type = amrex::MultigridType::geometric;
+    //! Testing aid: AlgMG as the bottom solver of the geometric cycles of
+    //! the hybrid type only, so that the geometric type stays the benchmark.
     bool use_algmg_bottom = false;
     //! Testing aid, not for normal use: a non-negative value overrides the
     //! hybrid stall rate; 0 forces the switch to AlgMG.

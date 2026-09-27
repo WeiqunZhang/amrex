@@ -12,7 +12,7 @@ if (AMReX_GPU_BACKEND STREQUAL NONE)
         set(_input_files)
 
         setup_test(${D} _sources _input_files
-           CMDLINE_PARAMS "multigrid_types=geometric algebraic hybrid")
+           CMDLINE_PARAMS "multigrid_types=algebraic hybrid geometric")
 
         unset(_sources)
         unset(_input_files)

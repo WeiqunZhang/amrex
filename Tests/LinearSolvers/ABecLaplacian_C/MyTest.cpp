@@ -113,7 +113,9 @@ MyTest::solvePoisson ()
         mlmg.setBottomVerbose(bottom_verbose);
         mlmg.setMultigridType(multigrid_type);
         if (hybrid_stall_rate >= 0) { mlmg.setHybridStallCriterion(4, hybrid_stall_rate); }
-        if (use_algmg_bottom) { mlmg.setBottomSolver(MLMG::BottomSolver::algmg); }
+        if (use_algmg_bottom && multigrid_type == MultigridType::hybrid) {
+            mlmg.setBottomSolver(MLMG::BottomSolver::algmg);
+        }
 #ifdef AMREX_USE_HYPRE
         if (use_hypre) {
             mlmg.setBottomSolver(MLMG::BottomSolver::hypre);
@@ -159,11 +161,17 @@ MyTest::solvePoisson ()
             mlmg.setBottomVerbose(bottom_verbose);
             mlmg.setMultigridType(multigrid_type);
             if (hybrid_stall_rate >= 0) { mlmg.setHybridStallCriterion(4, hybrid_stall_rate); }
-            if (use_algmg_bottom) { mlmg.setBottomSolver(MLMG::BottomSolver::algmg); }
-        if (use_algmg_bottom) { mlmg.setBottomSolver(MLMG::BottomSolver::algmg); }
+            if (use_algmg_bottom && multigrid_type == MultigridType::hybrid) {
+            mlmg.setBottomSolver(MLMG::BottomSolver::algmg);
+        }
+        if (use_algmg_bottom && multigrid_type == MultigridType::hybrid) {
+            mlmg.setBottomSolver(MLMG::BottomSolver::algmg);
+        }
         mlmg.setMultigridType(multigrid_type);
         if (hybrid_stall_rate >= 0) { mlmg.setHybridStallCriterion(4, hybrid_stall_rate); }
-        if (use_algmg_bottom) { mlmg.setBottomSolver(MLMG::BottomSolver::algmg); }
+        if (use_algmg_bottom && multigrid_type == MultigridType::hybrid) {
+            mlmg.setBottomSolver(MLMG::BottomSolver::algmg);
+        }
 #ifdef AMREX_USE_HYPRE
             if (use_hypre) {
                 mlmg.setBottomSolver(MLMG::BottomSolver::hypre);
@@ -248,7 +256,9 @@ MyTest::solveABecLaplacian ()
         mlmg.setBottomVerbose(bottom_verbose);
         mlmg.setMultigridType(multigrid_type);
         if (hybrid_stall_rate >= 0) { mlmg.setHybridStallCriterion(4, hybrid_stall_rate); }
-        if (use_algmg_bottom) { mlmg.setBottomSolver(MLMG::BottomSolver::algmg); }
+        if (use_algmg_bottom && multigrid_type == MultigridType::hybrid) {
+            mlmg.setBottomSolver(MLMG::BottomSolver::algmg);
+        }
 #ifdef AMREX_USE_HYPRE
         if (use_hypre) {
             mlmg.setBottomSolver(MLMG::BottomSolver::hypre);
@@ -308,11 +318,17 @@ MyTest::solveABecLaplacian ()
             mlmg.setBottomVerbose(bottom_verbose);
             mlmg.setMultigridType(multigrid_type);
             if (hybrid_stall_rate >= 0) { mlmg.setHybridStallCriterion(4, hybrid_stall_rate); }
-            if (use_algmg_bottom) { mlmg.setBottomSolver(MLMG::BottomSolver::algmg); }
-        if (use_algmg_bottom) { mlmg.setBottomSolver(MLMG::BottomSolver::algmg); }
+            if (use_algmg_bottom && multigrid_type == MultigridType::hybrid) {
+            mlmg.setBottomSolver(MLMG::BottomSolver::algmg);
+        }
+        if (use_algmg_bottom && multigrid_type == MultigridType::hybrid) {
+            mlmg.setBottomSolver(MLMG::BottomSolver::algmg);
+        }
         mlmg.setMultigridType(multigrid_type);
         if (hybrid_stall_rate >= 0) { mlmg.setHybridStallCriterion(4, hybrid_stall_rate); }
-        if (use_algmg_bottom) { mlmg.setBottomSolver(MLMG::BottomSolver::algmg); }
+        if (use_algmg_bottom && multigrid_type == MultigridType::hybrid) {
+            mlmg.setBottomSolver(MLMG::BottomSolver::algmg);
+        }
 #ifdef AMREX_USE_HYPRE
             if (use_hypre) {
                 mlmg.setBottomSolver(MLMG::BottomSolver::hypre);
@@ -391,7 +407,9 @@ MyTest::solveABecLaplacianInhomNeumann ()
         mlmg.setBottomVerbose(bottom_verbose);
         mlmg.setMultigridType(multigrid_type);
         if (hybrid_stall_rate >= 0) { mlmg.setHybridStallCriterion(4, hybrid_stall_rate); }
-        if (use_algmg_bottom) { mlmg.setBottomSolver(MLMG::BottomSolver::algmg); }
+        if (use_algmg_bottom && multigrid_type == MultigridType::hybrid) {
+            mlmg.setBottomSolver(MLMG::BottomSolver::algmg);
+        }
 #ifdef AMREX_USE_HYPRE
         if (use_hypre) {
             mlmg.setBottomSolver(MLMG::BottomSolver::hypre);
@@ -453,11 +471,17 @@ MyTest::solveABecLaplacianInhomNeumann ()
             mlmg.setBottomVerbose(bottom_verbose);
             mlmg.setMultigridType(multigrid_type);
             if (hybrid_stall_rate >= 0) { mlmg.setHybridStallCriterion(4, hybrid_stall_rate); }
-            if (use_algmg_bottom) { mlmg.setBottomSolver(MLMG::BottomSolver::algmg); }
-        if (use_algmg_bottom) { mlmg.setBottomSolver(MLMG::BottomSolver::algmg); }
+            if (use_algmg_bottom && multigrid_type == MultigridType::hybrid) {
+            mlmg.setBottomSolver(MLMG::BottomSolver::algmg);
+        }
+        if (use_algmg_bottom && multigrid_type == MultigridType::hybrid) {
+            mlmg.setBottomSolver(MLMG::BottomSolver::algmg);
+        }
         mlmg.setMultigridType(multigrid_type);
         if (hybrid_stall_rate >= 0) { mlmg.setHybridStallCriterion(4, hybrid_stall_rate); }
-        if (use_algmg_bottom) { mlmg.setBottomSolver(MLMG::BottomSolver::algmg); }
+        if (use_algmg_bottom && multigrid_type == MultigridType::hybrid) {
+            mlmg.setBottomSolver(MLMG::BottomSolver::algmg);
+        }
 #ifdef AMREX_USE_HYPRE
             if (use_hypre) {
                 mlmg.setBottomSolver(MLMG::BottomSolver::hypre);
@@ -519,11 +543,17 @@ MyTest::solveNodeABecLaplacian ()
             mlmg.setBottomVerbose(bottom_verbose);
             mlmg.setMultigridType(multigrid_type);
             if (hybrid_stall_rate >= 0) { mlmg.setHybridStallCriterion(4, hybrid_stall_rate); }
-            if (use_algmg_bottom) { mlmg.setBottomSolver(MLMG::BottomSolver::algmg); }
-        if (use_algmg_bottom) { mlmg.setBottomSolver(MLMG::BottomSolver::algmg); }
+            if (use_algmg_bottom && multigrid_type == MultigridType::hybrid) {
+            mlmg.setBottomSolver(MLMG::BottomSolver::algmg);
+        }
+        if (use_algmg_bottom && multigrid_type == MultigridType::hybrid) {
+            mlmg.setBottomSolver(MLMG::BottomSolver::algmg);
+        }
         mlmg.setMultigridType(multigrid_type);
         if (hybrid_stall_rate >= 0) { mlmg.setHybridStallCriterion(4, hybrid_stall_rate); }
-        if (use_algmg_bottom) { mlmg.setBottomSolver(MLMG::BottomSolver::algmg); }
+        if (use_algmg_bottom && multigrid_type == MultigridType::hybrid) {
+            mlmg.setBottomSolver(MLMG::BottomSolver::algmg);
+        }
 
             mlmg.solve({&solution[ilev]}, {&rhs[ilev]}, tol_rel, tol_abs);
         }
