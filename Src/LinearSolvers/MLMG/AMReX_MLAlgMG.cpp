@@ -82,10 +82,10 @@ struct MLAlgMG::Impl
     MultiFab m_tmp;                      // scratch for the nodal scatter
 
     // cell-centered
-    MultiFab m_diaginv;                  // row scaling applied by the kernels
     iMultiFab const* m_overset_mask = nullptr;
 #if defined(AMREX_USE_EB) && (AMREX_SPACEDIM > 1)
     FabArray<EBCellFlagFab> const* m_flags = nullptr;
+    MultiFab const* m_vfrac = nullptr;
 #endif
 
     AlgPartition m_part;
@@ -311,13 +311,13 @@ MLAlgMG::Impl::defineCell (BoxArray const& grids, DistributionMapping const& dma
     m_gid.define(grids, dmap, 1, 1);
     m_nrows_grid.define(grids, dmap);
     m_row_begin.define(grids, dmap);
-    m_diaginv.define(grids, dmap, 1, 0, MFInfo(), factory);
 
 #if defined(AMREX_USE_EB) && (AMREX_SPACEDIM > 1)
     auto const* ebfactory = dynamic_cast<EBFArrayBoxFactory const*>(&factory);
     AMREX_ALWAYS_ASSERT_WITH_MESSAGE(overset_mask == nullptr || ebfactory == nullptr,
                                      "MLAlgMG: cannot have both EB and overset");
     m_flags = ebfactory ? &(ebfactory->getMultiEBCellFlagFab()) : nullptr;
+    m_vfrac = ebfactory ? &(ebfactory->getVolFrac()) : nullptr;
 #endif
 
     // Rows: every cell of every box, except boxes that are fully covered.
@@ -461,7 +461,6 @@ MLAlgMG::Impl::assembleCell (FabFactory<FArrayBox> const& factory, iMultiFab con
             AMREX_D_DECL(bcoef[0]->const_array(mfi),
                          bcoef[1]->const_array(mfi),
                          bcoef[2]->const_array(mfi))};
-        Array4<Real> const& diaginvfab = m_diaginv.array(mfi);
         GpuArray<int,AMREX_SPACEDIM*2> const bct = bctype[mfi];
         GpuArray<Real,AMREX_SPACEDIM*2> const bcloc = bcl[mfi];
         Real const sa = ascalar;
@@ -478,7 +477,7 @@ MLAlgMG::Impl::assembleCell (FabFactory<FArrayBox> const& factory, iMultiFab con
             amrex::fill(tmpmatfab,
             [=] AMREX_GPU_HOST_DEVICE (GpuArray<Real,reg_stencil>& sten, int i, int j, int k)
             {
-                habec_ijmat(sten, ncols_a, diaginvfab, i, j, k, cid_a,
+                habec_ijmat(sten, ncols_a, i, j, k, cid_a,
                             sa, afab, sb, dx, bfabs, bct, bcloc, bho, osmsk);
             });
             BaseFab<GpuArray<Long,reg_stencil>> tmpcolfab
@@ -509,7 +508,7 @@ MLAlgMG::Impl::assembleCell (FabFactory<FArrayBox> const& factory, iMultiFab con
             amrex::fill(tmpmatfab,
             [=] AMREX_GPU_HOST_DEVICE (GpuArray<Real,eb_stencil>& sten, int i, int j, int k)
             {
-                habec_ijmat_eb(sten, ncols_a, diaginvfab, i, j, k, cid_a,
+                habec_ijmat_eb(sten, ncols_a, i, j, k, cid_a,
                                sa, afab, sb, dx, bfabs, bct, bcloc, bho,
                                flag_a, vfrac_a, AMREX_D_DECL(apx,apy,apz),
                                AMREX_D_DECL(fcx,fcy,fcz), barea_a, bcent_a, beb);
@@ -548,26 +547,30 @@ MLAlgMG::Impl::loadRHS (MultiFab const& rhs)
         }
         Gpu::streamSynchronize();
     } else {
-        // Same scaling as the matrix rows; no row for overset and covered cells.
+        // Cut-cell rows are weighted by the volume fraction like the matrix
+        // rows; zero rhs for overset and covered cells.
         for (MFIter mfi(m_gid, MFItInfo{}.UseDefaultStream()); mfi.isValid(); ++mfi) {
             if (m_nrows_grid[mfi] == 0) { continue; }
             const Box& bx = mfi.validbox();
             Real* bp = m_b.data() + m_row_begin[mfi];
             auto const& rhs_a = rhs.const_array(mfi);
-            auto const& dinv = m_diaginv.const_array(mfi);
             auto osm = m_overset_mask ? m_overset_mask->const_array(mfi) : Array4<int const>();
 #if defined(AMREX_USE_EB) && (AMREX_SPACEDIM > 1)
-            auto flag = (m_flags && (*m_flags)[mfi].getType(bx) == FabType::singlevalued)
-                ? m_flags->const_array(mfi) : Array4<EBCellFlag const>();
+            bool const cut = m_flags && (*m_flags)[mfi].getType(bx) == FabType::singlevalued;
+            auto flag = cut ? m_flags->const_array(mfi) : Array4<EBCellFlag const>();
+            auto vfrc = cut ? m_vfrac->const_array(mfi) : Array4<Real const>();
 #endif
             AMREX_HOST_DEVICE_PARALLEL_FOR_3D(bx, i, j, k,
             {
                 bool norow = (osm && osm(i,j,k) == 0);
+                Real w = Real(1.0);
 #if defined(AMREX_USE_EB) && (AMREX_SPACEDIM > 1)
-                norow = norow || (flag && flag(i,j,k).isCovered());
+                if (flag) {
+                    norow = norow || flag(i,j,k).isCovered();
+                    w = vfrc(i,j,k);
+                }
 #endif
-                bp[bx.index(IntVect{AMREX_D_DECL(i,j,k)})] =
-                    norow ? Real(0.0) : rhs_a(i,j,k) * dinv(i,j,k);
+                bp[bx.index(IntVect{AMREX_D_DECL(i,j,k)})] = norow ? Real(0.0) : rhs_a(i,j,k) * w;
             });
         }
         Gpu::streamSynchronize();
