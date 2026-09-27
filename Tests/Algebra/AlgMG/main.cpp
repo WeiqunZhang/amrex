@@ -120,8 +120,9 @@ Problem make_problem (Params const& p)
 
 // MLMG on the same problem, for comparison, once per requested multigrid
 // type. The geometric type may fail on some of these problems; that is
-// reported, not fatal. The hybrid type then switches to AlgMG.
-void run_mlmg (Params const& p)
+// reported, not fatal. The hybrid type must converge, and it must have
+// switched to AlgMG whenever the geometric type failed.
+void run_mlmg (Params const& p, Vector<std::string>& failures)
 {
     Problem const pr = make_problem(p);
     Box const& domain = pr.domain;
@@ -191,6 +192,7 @@ void run_mlmg (Params const& p)
     mlmg.setThrowException(true);
     mlmg.apply({&rhs}, {&exact}); // rhs = A*phi with the same operator
 
+    bool geometric_failed = false;
     for (auto const& mgt : p.mlmg_types) {
         mlmg.setMultigridType(amrex::getEnumCaseInsensitive<MultigridType>(mgt));
         phi.setVal(0);
@@ -227,7 +229,16 @@ void run_mlmg (Params const& p)
         } else {
             if (failure.back() == '.') { failure.pop_back(); }
             amrex::Print() << "did not converge after " << mlmg.getNumIters() << " iterations ("
-                           << failure << "); informational only, not an AlgMG result\n";
+                           << failure << ")" << (mgt == "hybrid" ? "\n" : "; informational only\n");
+        }
+        if (mgt == "geometric") {
+            geometric_failed = !failure.empty();
+        } else if (mgt == "hybrid") {
+            if (!failure.empty()) {
+                failures.push_back(p.problem + ": MLMG hybrid " + failure);
+            } else if (geometric_failed && !mlmg.usedAlgMG()) {
+                failures.push_back(p.problem + ": MLMG hybrid did not switch to AlgMG");
+            }
         }
     }
 }
@@ -708,7 +719,7 @@ int main (int argc, char* argv[])
                 }
             }
             amrex::Print() << rule << "\n";
-            if (p.mlmg) { run_mlmg(p); }
+            if (p.mlmg) { run_mlmg(p, failures); }
         }
         amrex::Print() << "\nSummary: " << ncases << (ncases == 1 ? " case, " : " cases, ")
                        << ncases - failures.size()

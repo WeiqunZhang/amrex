@@ -60,6 +60,9 @@ private:
     bool use_hypre = false;
     amrex::Vector<std::string> multigrid_types{"geometric"};
     amrex::MultigridType multigrid_type = amrex::MultigridType::geometric;
+    //! Testing aid, not for normal use: a non-negative value overrides the
+    //! hybrid stall rate; 0 forces the switch to AlgMG.
+    amrex::Real hybrid_stall_rate = -1.0;
     bool do_plots = true;
     int num_trials = 1;
     bool test_sigma_update = false;

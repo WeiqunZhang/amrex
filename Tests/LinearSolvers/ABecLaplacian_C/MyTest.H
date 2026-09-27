@@ -75,6 +75,9 @@ private:
     amrex::Vector<std::string> multigrid_types{"geometric"};
     amrex::MultigridType multigrid_type = amrex::MultigridType::geometric;
     bool use_algmg_bottom = false;
+    //! Testing aid, not for normal use: a non-negative value overrides the
+    //! hybrid stall rate; 0 forces the switch to AlgMG.
+    amrex::Real hybrid_stall_rate = -1.0;
 
     // GMRES
     bool use_gmres = false;
