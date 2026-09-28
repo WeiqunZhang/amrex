@@ -761,7 +761,7 @@ The following parameters can be set in the inputs file to control the BoomerAMG 
 
 - :cpp:`hypre.bamg_cycle_type`: Default 1.  See `HYPRE_BoomerAMGSetCycleType`
 
-- :cpp:`hypre.bamg_relax_type`: Default 6 (16 on GPUs).  See `HYPRE_BoomerAMGSetRelaxType`
+- :cpp:`hypre.bamg_relax_type`: Default 6 (18 on GPUs).  See `HYPRE_BoomerAMGSetRelaxType`
 
 - :cpp:`hypre.bamg_relax_order`: Default 1 (0 on GPUs).  See `HYPRE_BoomerAMGSetRelaxOrder`
 
@@ -777,9 +777,10 @@ The following parameters can be set in the inputs file to control the BoomerAMG 
   See `HYPRE_BoomerAMGSetOldDefault`
 
 With a GPU build of HYPRE, the defaults above switch to HYPRE's recommended GPU options
-(PMIS coarsening, extended+i interpolation with :cpp:`hypre.bamg_pmax_elmts` 4, Chebyshev
+(PMIS coarsening, extended+i interpolation with :cpp:`hypre.bamg_pmax_elmts` 4, l1-Jacobi
 relaxation in natural order, and :cpp:`hypre.bamg_keep_transpose` 1), because the classical
-CPU settings run their relaxation and coarsening on the host.
+CPU settings run their relaxation and coarsening on the host.  For symmetric problems,
+Chebyshev relaxation (:cpp:`hypre.bamg_relax_type` 16) often needs half as many iterations.
 
 When BoomerAMG is the solver, :cpp:`hypre.bamg_max_levels` defaults to HYPRE's own default.
 The defaults of :cpp:`hypre.bamg_coarsen_type`, :cpp:`hypre.bamg_interp_type` and

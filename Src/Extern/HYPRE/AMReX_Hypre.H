@@ -26,7 +26,7 @@ namespace amrex
  * \brief BoomerAMG defaults.
  *
  * GPU builds of HYPRE get HYPRE's recommended GPU options (PMIS coarsening,
- * extended+i interpolation, Chebyshev relaxation, kept
+ * extended+i interpolation, l1-Jacobi relaxation in natural order, kept
  * transposes); CPU builds keep the classical settings.
  */
 namespace HypreDefaults {
@@ -41,7 +41,7 @@ namespace HypreDefaults {
     inline constexpr int interp_type = gpu ? 6 : 0;
     inline constexpr int pmax_elmts = 4;
     inline constexpr int keep_transpose = gpu ? 1 : 0;
-    inline constexpr int relax_type = gpu ? 16 : 6;
+    inline constexpr int relax_type = gpu ? 18 : 6;
     inline constexpr int relax_order = gpu ? 0 : 1;
 
     //! Coarsening, interpolation and transpose options for GPU builds.
