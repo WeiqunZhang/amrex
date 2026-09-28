@@ -27,7 +27,7 @@ struct Params {
     Real reltol = (sizeof(Real) == 4) ? Real(1.e-5) : Real(1.e-10);
     Real alpha = Real(1); // 1.e-6 makes the constant mode nearly null
     int variations = 1; // 1: also run variations of the options; 0: only them
-    std::string bottom = "jacobi"; // AlgMGBottomSolver names
+    std::string bottom = "direct"; // AlgMGBottomSolver names
     std::string interp = "mm_ext_i"; // AlgMGInterpType names
     std::string smoother = "chebyshev"; // AlgMGSmoother names (l1_gauss_seidel: CPU)
     std::string krylov = "none"; // AlgMGKrylovSolver names
@@ -545,7 +545,7 @@ Vector<Params> make_cases (Params const& p)
         cases.push_back(p);
         return cases;
     }
-    for (auto const& b : {"jacobi", "bicgstab", "gmres"}) { add(b); }
+    for (auto const& b : {"direct", "jacobi", "bicgstab", "gmres"}) { add(b); }
     for (auto const& it : {"direct", "mm_ext", "mm_ext_i"}) {
         if (it != p.interp) { add("bicgstab").interp = it; }
     }

@@ -29,7 +29,7 @@ mlmg_types = geometric hybrid   # MLMG multigrid types: geometric, algebraic, hy
 interp   = mm_ext_i  # direct, mm_ext, mm_ext_i
 smoother = chebyshev # jacobi, l1_jacobi, chebyshev, l1_gauss_seidel (CPU only)
 krylov   = none      # none, bicgstab, gmres, pcg
-bottom   = jacobi    # jacobi, bicgstab, gmres; used as is with variations = 0
+bottom   = direct    # direct, jacobi, bicgstab, gmres; used as is with variations = 0
 # theta = 0.25            # strength threshold
 # aggressive_levels = 0   # levels with aggressive coarsening
 # p_max_elmts = 4         # max entries per row of P (0: no limit)

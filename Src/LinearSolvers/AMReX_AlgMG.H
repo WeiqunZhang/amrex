@@ -189,9 +189,10 @@ struct MMInterpRow
 }
 
 
-//! Coarsest-level solver of AlgMG: smoother sweeps, or BiCGStab or GMRES
-//! preconditioned by l1-Jacobi (weighted Jacobi when the smoother is jacobi).
-AMREX_ENUM(AlgMGBottomSolver, jacobi, bicgstab, gmres);
+//! Coarsest-level solver of AlgMG: a dense LU factorization (direct, the
+//! default), smoother sweeps, or BiCGStab or GMRES preconditioned by
+//! l1-Jacobi (weighted Jacobi when the smoother is jacobi).
+AMREX_ENUM(AlgMGBottomSolver, jacobi, bicgstab, gmres, direct);
 
 //! none: iterate V-cycles. Otherwise use one V-cycle as the preconditioner
 //! of the Krylov solver. pcg needs a symmetric definite matrix (either sign) and
@@ -337,10 +338,16 @@ public:
     //! This is the preconditioner used by the Krylov solver; usable
     //! stand-alone after the first solve or setup.
     void precond (AlgVector<T>& x, AlgVector<T> const& b);
+    //! Coarsest-level solver (see BottomSolver). Default direct: the
+    //! coarsest matrix is gathered and factored on every process, which
+    //! resolves the near-null modes of nearly singular problems that
+    //! smoother sweeps leave behind. Falls back to BiCGStab when the
+    //! coarsest level has more than 1024 rows.
     void setBottomSolver (BottomSolver bs) {
         m_bottom_solver = bs;
         m_gmres.reset();
         m_bicgstab.reset();
+        m_bottom_n = -1;
     }
     void setBottomTol (T t) { m_bottom_reltol = t; }
     void setBottomMaxIter (int n) { m_bottom_maxiter = n; }
@@ -399,7 +406,13 @@ private:
     InterpType m_interp_type = InterpType::mm_ext_i;
     int m_p_max_elmts = default_p_max_elmts;
     T m_trunc_factor = T(0);
-    BottomSolver m_bottom_solver = BottomSolver::jacobi;
+    BottomSolver m_bottom_solver = BottomSolver::direct;
+    // Dense LU on every process: 8 MB, 70 ms to factor and 0.4 ms per solve
+    // at this size (one core). Beyond it BiCGStab is used.
+    static constexpr Long max_direct_size = 1024;
+    Long m_bottom_n = -1;          // rows of the factored coarsest matrix; -1: not built, 0: not applicable
+    Vector<double> m_bottom_lu;    // dense LU, row-major, pivoted
+    Vector<int> m_bottom_piv;
     T m_bottom_reltol = T(1.e-4);
     int m_bottom_maxiter = 200;
     int m_bottom_verbose = 0;
@@ -451,6 +464,9 @@ private:
 
     void clear_levels ();
     void build_smoothers ();
+    //! Gather the coarsest matrix to every process and factor it.
+    void build_direct_bottom ();
+    void direct_bottom_solve ();
     //! Runs the setup if needed, or rebuilds only the smoothers.
     void prepare ()
     {
@@ -590,6 +606,9 @@ void AlgMG<T>::clear_levels ()
     m_l1gs.clear();
     m_gmres.reset();
     m_bicgstab.reset();
+    m_bottom_n = -1;
+    m_bottom_lu.clear();
+    m_bottom_piv.clear();
 }
 
 template <typename T>
@@ -893,7 +912,15 @@ void AlgMG<T>::bottom_solve ()
             smooth_bottom();
         }
     };
-    switch (m_bottom_solver) {
+    auto bottom_solver = m_bottom_solver;
+    if (bottom_solver == BottomSolver::direct) {
+        if (m_bottom_n < 0) { build_direct_bottom(); }
+        if (m_bottom_n == 0) { bottom_solver = BottomSolver::bicgstab; }
+    }
+    switch (bottom_solver) {
+    case BottomSolver::direct:
+        direct_bottom_solve();
+        break;
     case BottomSolver::jacobi:
         smooth_bottom();
         break;
@@ -1032,6 +1059,144 @@ void AlgMG<T>::setup ()
     }
 
     m_prepared = true;
+}
+
+template <typename T>
+void AlgMG<T>::build_direct_bottom ()
+{
+    BL_PROFILE("AlgMG::build_direct_bottom");
+    int const lev = numLevels()-1;
+    auto const& A = *m_a[lev];
+    Long const n = A.numGlobalRows();
+    m_bottom_n = 0;
+    m_bottom_lu.clear();
+    m_bottom_piv.clear();
+    if (n < 1 || n > max_direct_size) {
+        if (m_verbose >= 1 && n > max_direct_size) {
+            amrex::Print() << m_print_ident << "AlgMG: coarsest level has " << n
+                           << " rows, using BiCGStab instead of the direct bottom solver\n";
+        }
+        return;
+    }
+
+    // Dense copy of the local rows; summed over the processes below.
+    Vector<double> dense(n*n, 0.0);
+    auto const pc = A.const_parcsr();
+    auto to_host = [] (auto const* dptr, Long cnt) {
+        Vector<std::remove_const_t<std::remove_pointer_t<decltype(dptr)>>> h(cnt);
+        if (cnt > 0) { Gpu::copy(Gpu::deviceToHost, dptr, dptr+cnt, h.begin()); }
+        return h;
+    };
+    {
+        auto const& c = pc.csr0;
+        auto ro = to_host(c.row_offset, (c.nrows > 0) ? c.nrows+1 : 0);
+        auto ci = to_host(c.col_index, c.nnz);
+        auto va = to_host(c.mat, c.nnz);
+        for (Long i = 0; i < c.nrows; ++i) {
+            Long const ig = pc.row_begin + i;
+            for (int idx = ro[i]; idx < ro[i+1]; ++idx) {
+                dense[ig*n + pc.col_begin + ci[idx]] += double(va[idx]);
+            }
+        }
+    }
+    if (pc.csr1.nrows > 0 && pc.csr1.nnz > 0) {
+        auto const& c = pc.csr1;
+        auto ro = to_host(c.row_offset, c.nrows+1);
+        auto ci = to_host(c.col_index, c.nnz);
+        auto va = to_host(c.mat, c.nnz);
+        auto rmap = to_host(pc.row_map, pc.csr0.nrows); // local row -> csr1 row or -1
+        int ncols = 0;
+        for (auto j : ci) { ncols = std::max(ncols, j+1); }
+        auto cmap = to_host(pc.col_map, ncols);
+        for (Long i = 0; i < pc.csr0.nrows; ++i) {
+            Long const r = rmap[i];
+            if (r < 0) { continue; }
+            Long const ig = pc.row_begin + i;
+            for (int idx = ro[r]; idx < ro[r+1]; ++idx) {
+                dense[ig*n + cmap[ci[idx]]] += double(va[idx]);
+            }
+        }
+    }
+    ParallelAllReduce::Sum(dense.data(), int(n*n), ParallelContext::CommunicatorSub());
+
+    // Singular: the constant vector is in the null space. Adding (1/n) 1 1^T
+    // makes the matrix regular; the coarsest residual and correction have
+    // their mean removed, so the added term never acts on them.
+    if (m_singular) {
+        double const w = 1.0/double(n);
+        for (auto& v : dense) { v += w; }
+    }
+
+    // LU with partial pivoting, in place (Doolittle).
+    Vector<int> piv(n);
+    std::iota(piv.begin(), piv.end(), 0);
+    for (Long i = 0; i < n; ++i) {
+        Long imax = i;
+        double amax = std::abs(dense[i*n+i]);
+        for (Long k = i+1; k < n; ++k) {
+            double const a = std::abs(dense[k*n+i]);
+            if (a > amax) { amax = a; imax = k; }
+        }
+        if (amax < std::numeric_limits<double>::min()) {
+            if (m_verbose >= 1) {
+                amrex::Print() << m_print_ident << "AlgMG: coarsest matrix is singular, "
+                               << "using BiCGStab instead of the direct bottom solver\n";
+            }
+            return;
+        }
+        if (imax != i) {
+            std::swap(piv[i], piv[imax]);
+            for (Long j = 0; j < n; ++j) { std::swap(dense[i*n+j], dense[imax*n+j]); }
+        }
+        double const dinv = 1.0/dense[i*n+i];
+        for (Long j = i+1; j < n; ++j) {
+            double const f = dense[j*n+i]*dinv;
+            dense[j*n+i] = f;
+            for (Long k = i+1; k < n; ++k) { dense[j*n+k] -= f*dense[i*n+k]; }
+        }
+    }
+    m_bottom_lu = std::move(dense);
+    m_bottom_piv = std::move(piv);
+    m_bottom_n = n;
+}
+
+template <typename T>
+void AlgMG<T>::direct_bottom_solve ()
+{
+    int const lev = numLevels()-1;
+    auto const& r = m_res[lev];
+    auto& x = m_cor[lev];
+    Long const n = m_bottom_n;
+    Long const nl = r.numLocalRows();
+    Long const b0 = r.globalBegin();
+
+    // Gather the residual (sum of the zero-padded local parts).
+    Vector<double> rhs(n, 0.0);
+    Vector<T> loc(nl);
+    if (nl > 0) {
+        Gpu::copy(Gpu::deviceToHost, r.data(), r.data()+nl, loc.begin());
+        for (Long i = 0; i < nl; ++i) { rhs[b0+i] = double(loc[i]); }
+    }
+    ParallelAllReduce::Sum(rhs.data(), int(n), ParallelContext::CommunicatorSub());
+
+    // P A = L U: forward substitution with the unit lower part, then back.
+    Vector<double> y(n);
+    auto const& lu = m_bottom_lu;
+    for (Long i = 0; i < n; ++i) {
+        double v = rhs[m_bottom_piv[i]];
+        for (Long k = 0; k < i; ++k) { v -= lu[i*n+k]*y[k]; }
+        y[i] = v;
+    }
+    for (Long i = n-1; i >= 0; --i) {
+        double v = y[i];
+        for (Long k = i+1; k < n; ++k) { v -= lu[i*n+k]*y[k]; }
+        y[i] = v/lu[i*n+i];
+    }
+
+    if (nl > 0) {
+        for (Long i = 0; i < nl; ++i) { loc[i] = T(y[b0+i]); }
+        Gpu::copy(Gpu::hostToDevice, loc.begin(), loc.end(), x.data());
+    }
 }
 
 template <typename T>

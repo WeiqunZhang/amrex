@@ -1230,9 +1230,11 @@ The following can be tuned:
 - :cpp:`setPreSmooth` and :cpp:`setPostSmooth`: number of smoother sweeps
   before and after the coarse correction (1 for Chebyshev, 2 for the other
   smoothers).
-- :cpp:`setBottomSolver`: smoother sweeps (``jacobi``, the default), or
-  BiCGStab (``bicgstab``) or GMRES (``gmres``) preconditioned by l1-Jacobi
-  (weighted Jacobi when the smoother is ``jacobi``).
+- :cpp:`setBottomSolver`: a direct solve of the coarsest level (``direct``,
+  the default; the small coarsest matrix is factored on every process),
+  smoother sweeps (``jacobi``), or BiCGStab (``bicgstab``) or GMRES
+  (``gmres``) preconditioned by l1-Jacobi (weighted Jacobi when the smoother
+  is ``jacobi``).
 - :cpp:`setBottomTol`: relative tolerance of the BiCGStab or GMRES bottom
   solver (:math:`10^{-4}`).
 - :cpp:`setKrylovSolver`: use one V-cycle as the preconditioner of an outer
@@ -1242,9 +1244,9 @@ The following can be tuned:
   The coarse operators are Galerkin products with :math:`R = P^T`, so the
   matrix should be symmetric or nearly so (solve row-scaled systems in
   their unscaled form); PCG also requires definiteness (either sign). With PCG
-  or GMRES, use smoother sweeps as the bottom
-  solver, and with PCG also the same number of pre- and post-smoothing
-  sweeps.
+  or GMRES, use the direct bottom solver or smoother sweeps (not a Krylov
+  bottom solver), and with PCG also the same number of pre- and
+  post-smoothing sweeps.
 - :cpp:`setSingular(true)`: for singular matrices whose null space is the
   constant vector, such as the Poisson operator with periodic or Neumann
   boundaries. As in MLMG, the mean of the right-hand side is removed, but
