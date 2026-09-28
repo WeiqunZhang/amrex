@@ -757,13 +757,13 @@ The following parameters can be set in the inputs file to control the BoomerAMG 
 
 - :cpp:`hypre.bamg_logging`: Default 0. See `HYPRE_BoomerAMGSetLogging`
 
-- :cpp:`hypre.bamg_coarsen_type`: Default 6.  See `HYPRE_BoomerAMGSetCoarsenType`
+- :cpp:`hypre.bamg_coarsen_type`: Default 6 (8 on GPUs).  See `HYPRE_BoomerAMGSetCoarsenType`
 
 - :cpp:`hypre.bamg_cycle_type`: Default 1.  See `HYPRE_BoomerAMGSetCycleType`
 
-- :cpp:`hypre.bamg_relax_type`: Default 6.  See `HYPRE_BoomerAMGSetRelaxType`
+- :cpp:`hypre.bamg_relax_type`: Default 6 (16 on GPUs).  See `HYPRE_BoomerAMGSetRelaxType`
 
-- :cpp:`hypre.bamg_relax_order`: Default 1.  See `HYPRE_BoomerAMGSetRelaxOrder`
+- :cpp:`hypre.bamg_relax_order`: Default 1 (0 on GPUs).  See `HYPRE_BoomerAMGSetRelaxOrder`
 
 - :cpp:`hypre.bamg_num_sweeps`: Default 2.  See `HYPRE_BoomerAMGSetNumSweeps`
 
@@ -771,10 +771,15 @@ The following parameters can be set in the inputs file to control the BoomerAMG 
 
 - :cpp:`hypre.bamg_strong_threshold`: Default 0.25 for 2D, 0.57 for 3D.  See `HYPRE_BoomerAMGSetStrongThreshold`
 
-- :cpp:`hypre.bamg_interp_type`:  Default 0.  See `HYPRE_BoomerAMGSetInterpType`
+- :cpp:`hypre.bamg_interp_type`:  Default 0 (6 on GPUs).  See `HYPRE_BoomerAMGSetInterpType`
 
-- :cpp:`hypre.bamg_use_old_default`: Default true.  Only used when BoomerAMG is the solver.
+- :cpp:`hypre.bamg_use_old_default`: Default true (false on GPUs).  Only used when BoomerAMG is the solver.
   See `HYPRE_BoomerAMGSetOldDefault`
+
+With a GPU build of HYPRE, the defaults above switch to HYPRE's recommended GPU options
+(PMIS coarsening, extended+i interpolation with :cpp:`hypre.bamg_pmax_elmts` 4, Chebyshev
+relaxation in natural order, and :cpp:`hypre.bamg_keep_transpose` 1), because the classical
+CPU settings run their relaxation and coarsening on the host.
 
 When BoomerAMG is the solver, :cpp:`hypre.bamg_max_levels` defaults to HYPRE's own default.
 The defaults of :cpp:`hypre.bamg_coarsen_type`, :cpp:`hypre.bamg_interp_type` and
