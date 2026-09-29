@@ -10,9 +10,16 @@
 
 #include <algorithm>
 #include <limits>
+#include <type_traits>
 #include <utility>
 
 namespace amrex::detail {
+
+//! Row callback of SpGEMM that leaves the rows as they are.
+struct NoRowPost {
+    template <typename I, typename T>
+    Long operator() (Long, I*, T*, Long n) const { return n; }
+};
 
 //! CSR with `nrows` empty rows.
 template <typename T, template<typename> class V, typename I = Long>
@@ -186,10 +193,13 @@ CSR<T,V,I> csr_from_rows_cpu (Long nrows, W const& work, F const& make_row)
 }
 
 // Gustavson's algorithm with a dense marker holding the position of each
-// column in the current row. Output rows are sorted.
-template <typename T, template<typename> class V, typename I>
+// column in the current row. Output rows are sorted, then passed to
+// `row_post(i, col, val, n)`, which may change them in place and returns
+// the new length.
+template <typename T, template<typename> class V, typename I, typename F = NoRowPost>
 CSR<T,V,I> spgemm_local_cpu (Long nrows, Long ncols,
-                             CsrView<T const,I> const& A, CsrView<T const,I> const& B)
+                             CsrView<T const,I> const& A, CsrView<T const,I> const& B,
+                             F const& row_post = {})
 {
     auto nprod = [&] (Long i) {
         Long n = 0;
@@ -227,6 +237,7 @@ CSR<T,V,I> spgemm_local_cpu (Long nrows, Long ncols,
                 }
             }
             sort_row_cpu(col.data(), val.data(), n, tmp);
+            n = row_post(i, col.data(), val.data(), n);
             rc = col.data();
             rv = val.data();
             return n;
@@ -234,37 +245,210 @@ CSR<T,V,I> spgemm_local_cpu (Long nrows, Long ncols,
     });
 }
 
+#ifdef AMREX_USE_MPI
 /**
- * \brief Galerkin product R (A P) of local CSR matrices on the host.
+ * \brief Local part of a distributed product on the host, without first
+ * copying A and B into one block each.
  *
- * The rows of A P are computed in chunks of fine rows when a row of R
- * first needs them, and a chunk is reused once no later row of R does, so
- * A P is never stored in full. The sums are done in the same order as
- * SpGEMM(R, SpGEMM(A, P)). `R` has `nc` rows, `A` is square with `nf`
- * rows and `P` has `nc` columns. Output rows are sorted.
+ * Row i of A is A0's row (column k) followed by A1's row (column nb + j).
+ * Row k < nb of B is B0's row followed by B1's row with columns mapped by
+ * `b1map`; row k >= nb is row k - nb of E. The sums are the same as those
+ * of spgemm_local_cpu on the concatenated blocks. `row_post` is as in
+ * spgemm_local_cpu.
+ */
+template <typename T, template<typename> class V, typename I, typename F>
+CSR<T,V,I> spgemm_split_cpu (Long nrows, Long ncols, Long nb,
+                             CsrView<T const,I> const& A0, CsrView<T const,I> const& A1,
+                             CsrView<T const,I> const& B0, CsrView<T const,I> const& B1,
+                             I const* b1map, CsrView<T const,I> const& E, F const& row_post)
+{
+    auto blen = [&] (Long k) -> Long {
+        if (k < nb) {
+            return (B0.row_offset[k+1] - B0.row_offset[k])
+                + ((B1.nnz > 0) ? (B1.row_offset[k+1] - B1.row_offset[k]) : 0);
+        } else {
+            return E.row_offset[k-nb+1] - E.row_offset[k-nb];
+        }
+    };
+    auto nprod = [&] (Long i) {
+        Long n = 0;
+        for (Long ap = A0.row_offset[i]; ap < A0.row_offset[i+1]; ++ap) { n += blen(A0.col_index[ap]); }
+        if (A1.nnz > 0) {
+            for (Long ap = A1.row_offset[i]; ap < A1.row_offset[i+1]; ++ap) { n += blen(nb + A1.col_index[ap]); }
+        }
+        return n;
+    };
+    return csr_from_rows_cpu<T,V,I>(nrows, nprod, [&] (int) {
+        return [&, marker = Vector<I>(ncols, I(-1)), col = Vector<I>(), val = Vector<T>(),
+                tmp = Vector<std::pair<I,T>>()]
+            (Long i, I const*& rc, T const*& rv) mutable -> Long
+        {
+            Long const maxlen = std::min(nprod(i), ncols);
+            if (Long(col.size()) < maxlen) {
+                col.resize(maxlen);
+                val.resize(maxlen);
+            }
+            Long n = 0;
+            auto add = [&] (I j, T x) {
+                Long const m = marker[j]; // may be left over from an earlier row
+                if (m >= 0 && m < n && col[m] == j) {
+                    val[m] += x;
+                } else {
+                    marker[j] = I(n);
+                    col[n] = j;
+                    val[n] = x;
+                    ++n;
+                }
+            };
+            auto brow = [&] (Long k, T a) {
+                if (k < nb) {
+                    for (Long bp = B0.row_offset[k]; bp < B0.row_offset[k+1]; ++bp) {
+                        add(B0.col_index[bp], a * B0.mat[bp]);
+                    }
+                    if (B1.nnz > 0) {
+                        for (Long bp = B1.row_offset[k]; bp < B1.row_offset[k+1]; ++bp) {
+                            add(b1map[B1.col_index[bp]], a * B1.mat[bp]);
+                        }
+                    }
+                } else {
+                    for (Long bp = E.row_offset[k-nb]; bp < E.row_offset[k-nb+1]; ++bp) {
+                        add(E.col_index[bp], a * E.mat[bp]);
+                    }
+                }
+            };
+            for (Long ap = A0.row_offset[i]; ap < A0.row_offset[i+1]; ++ap) {
+                brow(A0.col_index[ap], A0.mat[ap]);
+            }
+            if (A1.nnz > 0) {
+                for (Long ap = A1.row_offset[i]; ap < A1.row_offset[i+1]; ++ap) {
+                    brow(nb + A1.col_index[ap], A1.mat[ap]);
+                }
+            }
+            sort_row_cpu(col.data(), val.data(), n, tmp);
+            n = row_post(i, col.data(), val.data(), n);
+            rc = col.data();
+            rv = val.data();
+            return n;
+        };
+    });
+}
+#endif
+
+/**
+ * \brief Rows of A P on the host.
+ *
+ * Row i of A is A0's row (local column k) followed by A1's row (remote
+ * index k). Row k of P is P0's row followed by P1's row with columns mapped
+ * by `p1map`, and remote row k is row k of PE. `row(i, ...)` appends row i
+ * to col/val at position p, with the same sums as spgemm_local_cpu, but
+ * leaves it unsorted.
+ */
+template <typename T, typename I>
+struct APRowsCpu
+{
+    CsrView<T const,I> A0, A1, P0, P1, PE;
+    I const* p1map = nullptr;
+
+    [[nodiscard]] Long plen (Long k) const {
+        return (P0.row_offset[k+1] - P0.row_offset[k])
+            + ((P1.nnz > 0) ? (P1.row_offset[k+1] - P1.row_offset[k]) : 0);
+    }
+
+    //! Upper bound on the length of row i.
+    [[nodiscard]] Long maxlen (Long i) const {
+        Long n = 0;
+        for (Long ap = A0.row_offset[i]; ap < A0.row_offset[i+1]; ++ap) { n += plen(A0.col_index[ap]); }
+        if (A1.nnz > 0) {
+            for (Long ap = A1.row_offset[i]; ap < A1.row_offset[i+1]; ++ap) {
+                Long const k = A1.col_index[ap];
+                n += PE.row_offset[k+1] - PE.row_offset[k];
+            }
+        }
+        return n;
+    }
+
+    //! `marker[j]` holds the position of column j; positions before p are
+    //! from earlier rows. col/val must have room for maxlen(i) more entries.
+    Long row (Long i, I* marker, I* col, T* val, Long p) const {
+        Long const rs = p;
+        auto add = [&] (I j, T x) {
+            Long const m = marker[j]; // may be left over from elsewhere
+            if (m >= rs && m < p && col[m] == j) {
+                val[m] += x;
+            } else {
+                marker[j] = I(p);
+                col[p] = j;
+                val[p] = x;
+                ++p;
+            }
+        };
+        for (Long ap = A0.row_offset[i]; ap < A0.row_offset[i+1]; ++ap) {
+            Long const k = A0.col_index[ap];
+            T const a = A0.mat[ap];
+            for (Long pp = P0.row_offset[k]; pp < P0.row_offset[k+1]; ++pp) {
+                add(P0.col_index[pp], a * P0.mat[pp]);
+            }
+            if (P1.nnz > 0) {
+                for (Long pp = P1.row_offset[k]; pp < P1.row_offset[k+1]; ++pp) {
+                    add(p1map[P1.col_index[pp]], a * P1.mat[pp]);
+                }
+            }
+        }
+        if (A1.nnz > 0) {
+            for (Long ap = A1.row_offset[i]; ap < A1.row_offset[i+1]; ++ap) {
+                Long const k = A1.col_index[ap];
+                T const a = A1.mat[ap];
+                for (Long pp = PE.row_offset[k]; pp < PE.row_offset[k+1]; ++pp) {
+                    add(PE.col_index[pp], a * PE.mat[pp]);
+                }
+            }
+        }
+        return p;
+    }
+};
+
+/**
+ * \brief Local part of the Galerkin product R (A P) on the host.
+ *
+ * Row c of R is R0's row (local fine rows) followed by R1's row (remote
+ * index j, whose row of A P is row j of APE). The local rows of A P
+ * (`ap`) are computed in chunks of fine rows when a row of R first needs
+ * them, and a chunk is reused once no later row of R does, so A P is never
+ * stored in full. The sums are done in the same order as
+ * SpGEMM(R, SpGEMM(A, P)). Output rows are sorted.
  */
 template <typename T, template<typename> class V, typename I>
-CSR<T,V,I> rap_local_cpu (Long nf, Long nc, CsrView<T const,I> const& R,
-                          CsrView<T const,I> const& A, CsrView<T const,I> const& P)
+CSR<T,V,I> rap_local_cpu (Long nf, Long nc, Long ncols,
+                          CsrView<T const,I> const& R0, CsrView<T const,I> const& R1,
+                          CsrView<T const,I> const& APE, APRowsCpu<T,I> const& ap)
 {
     constexpr Long chunk_rows = 1024;
     Long const nchunks = (nf + chunk_rows - 1) / chunk_rows;
 
+    // About the length of row c: also the capacity guess of csr_from_rows_cpu.
     auto work = [&] (Long c) {
         Long n = 0;
-        for (Long rp = R.row_offset[c]; rp < R.row_offset[c+1]; ++rp) {
-            Long const i = R.col_index[rp];
-            n += A.row_offset[i+1] - A.row_offset[i];
+        for (Long rp = R0.row_offset[c]; rp < R0.row_offset[c+1]; ++rp) {
+            Long const i = R0.col_index[rp];
+            n += ap.A0.row_offset[i+1] - ap.A0.row_offset[i];
+            if (ap.A1.nnz > 0) { n += ap.A1.row_offset[i+1] - ap.A1.row_offset[i]; }
+        }
+        if (R1.nnz > 0) {
+            for (Long rp = R1.row_offset[c]; rp < R1.row_offset[c+1]; ++rp) {
+                Long const j = R1.col_index[rp];
+                n += APE.row_offset[j+1] - APE.row_offset[j];
+            }
         }
         return n;
     };
 
-    // Last row of R that needs a chunk: the largest column of P in it.
+    // Last row of R that needs a chunk: the largest local column of P in it.
     Vector<Long> chunk_last(nchunks, -1);
     for (Long q = 0; q < nchunks; ++q) {
         for (Long i = q*chunk_rows; i < std::min(nf, (q+1)*chunk_rows); ++i) {
-            if (P.row_offset[i+1] > P.row_offset[i]) {
-                chunk_last[q] = std::max(chunk_last[q], Long(P.col_index[P.row_offset[i+1]-1]));
+            if (ap.P0.row_offset[i+1] > ap.P0.row_offset[i]) {
+                chunk_last[q] = std::max(chunk_last[q],
+                                         Long(ap.P0.col_index[ap.P0.row_offset[i+1]-1]));
             }
         }
     }
@@ -276,14 +460,13 @@ CSR<T,V,I> rap_local_cpu (Long nf, Long nc, CsrView<T const,I> const& R,
     };
 
     return csr_from_rows_cpu<T,V,I>(nc, work, [&] (int) {
-        return [&, cmarker = Vector<I>(nc, I(-1)), marker = Vector<I>(nc, I(-1)),
+        return [&, cmarker = Vector<I>(ncols, I(-1)), marker = Vector<I>(ncols, I(-1)),
                 slot = Vector<int>(nchunks, -1), chunks = Vector<Chunk>(),
                 live = Vector<Long>(), free_slots = Vector<int>(),
                 next_release = std::numeric_limits<Long>::max(),
                 col = Vector<I>(), val = Vector<T>(), tmp = Vector<std::pair<I,T>>()]
             (Long c, I const*& rc, T const*& rv) mutable -> Long
         {
-            // Rows of A P for chunk q, unsorted.
             auto compute_chunk = [&] (Long q) {
                 int s;
                 if (free_slots.empty()) {
@@ -303,32 +486,12 @@ CSR<T,V,I> rap_local_cpu (Long nf, Long nc, CsrView<T const,I> const& R,
                 ch.off[0] = 0;
                 Long p = 0;
                 for (Long i = i0; i < i1; ++i) {
-                    Long maxlen = 0;
-                    for (Long ap = A.row_offset[i]; ap < A.row_offset[i+1]; ++ap) {
-                        Long const k = A.col_index[ap];
-                        maxlen += P.row_offset[k+1] - P.row_offset[k];
-                    }
+                    Long const maxlen = ap.maxlen(i);
                     if (Long(ch.col.size()) < p + maxlen) {
                         ch.col.resize(std::max(p + maxlen, Long(ch.col.size())*2));
                         ch.val.resize(ch.col.size());
                     }
-                    Long const rs = p;
-                    for (Long ap = A.row_offset[i]; ap < A.row_offset[i+1]; ++ap) {
-                        Long const k = A.col_index[ap];
-                        T const a = A.mat[ap];
-                        for (Long pp = P.row_offset[k]; pp < P.row_offset[k+1]; ++pp) {
-                            I const j = P.col_index[pp];
-                            Long const m = cmarker[j]; // may be left over from elsewhere
-                            if (m >= rs && m < p && ch.col[m] == j) {
-                                ch.val[m] += a * P.mat[pp];
-                            } else {
-                                cmarker[j] = I(p);
-                                ch.col[p] = j;
-                                ch.val[p] = a * P.mat[pp];
-                                ++p;
-                            }
-                        }
-                    }
+                    p = ap.row(i, cmarker.data(), ch.col.data(), ch.val.data(), p);
                     ch.off[i-i0+1] = p;
                 }
             };
@@ -351,35 +514,52 @@ CSR<T,V,I> rap_local_cpu (Long nf, Long nc, CsrView<T const,I> const& R,
             }
 
             Long maxlen = 0;
-            for (Long rp = R.row_offset[c]; rp < R.row_offset[c+1]; ++rp) {
-                Long const i = R.col_index[rp];
+            for (Long rp = R0.row_offset[c]; rp < R0.row_offset[c+1]; ++rp) {
+                Long const i = R0.col_index[rp];
                 Long const q = i / chunk_rows;
                 if (slot[q] < 0) { compute_chunk(q); }
                 auto const& ch = chunks[slot[q]];
                 maxlen += ch.off[i-q*chunk_rows+1] - ch.off[i-q*chunk_rows];
             }
-            maxlen = std::min(maxlen, nc);
+            if (R1.nnz > 0) {
+                for (Long rp = R1.row_offset[c]; rp < R1.row_offset[c+1]; ++rp) {
+                    Long const j = R1.col_index[rp];
+                    maxlen += APE.row_offset[j+1] - APE.row_offset[j];
+                }
+            }
+            maxlen = std::min(maxlen, ncols);
             if (Long(col.size()) < maxlen) {
                 col.resize(maxlen);
                 val.resize(maxlen);
             }
 
             Long n = 0;
-            for (Long rp = R.row_offset[c]; rp < R.row_offset[c+1]; ++rp) {
-                Long const i = R.col_index[rp];
-                T const r = R.mat[rp];
+            auto add = [&] (I j, T x) {
+                Long const m = marker[j]; // may be left over from an earlier row
+                if (m >= 0 && m < n && col[m] == j) {
+                    val[m] += x;
+                } else {
+                    marker[j] = I(n);
+                    col[n] = j;
+                    val[n] = x;
+                    ++n;
+                }
+            };
+            for (Long rp = R0.row_offset[c]; rp < R0.row_offset[c+1]; ++rp) {
+                Long const i = R0.col_index[rp];
+                T const r = R0.mat[rp];
                 Long const q = i / chunk_rows;
                 auto const& ch = chunks[slot[q]];
                 for (Long x = ch.off[i-q*chunk_rows]; x < ch.off[i-q*chunk_rows+1]; ++x) {
-                    I const j = ch.col[x];
-                    Long const m = marker[j];
-                    if (m >= 0 && m < n && col[m] == j) {
-                        val[m] += r * ch.val[x];
-                    } else {
-                        marker[j] = I(n);
-                        col[n] = j;
-                        val[n] = r * ch.val[x];
-                        ++n;
+                    add(ch.col[x], r * ch.val[x]);
+                }
+            }
+            if (R1.nnz > 0) {
+                for (Long rp = R1.row_offset[c]; rp < R1.row_offset[c+1]; ++rp) {
+                    Long const j = R1.col_index[rp];
+                    T const r = R1.mat[rp];
+                    for (Long x = APE.row_offset[j]; x < APE.row_offset[j+1]; ++x) {
+                        add(APE.col_index[x], r * APE.mat[x]);
                     }
                 }
             }
@@ -699,9 +879,10 @@ CSR<T,V,I> spgemm_local_onemkl (Long nrows, Long ncols,
  * `A` must have `nrows` rows and column indices in `[0, B.nrows)`; `B` must
  * have column indices in `[0, ncols)`. Rows of the result are sorted.
  */
-template <typename T, template<typename> class V, typename I>
+template <typename T, template<typename> class V, typename I, typename F = NoRowPost>
 CSR<T,V,I> spgemm_local (Long nrows, Long ncols,
-                         CsrView<T const,I> const& A, CsrView<T const,I> const& B)
+                         CsrView<T const,I> const& A, CsrView<T const,I> const& B,
+                         F const& row_post = {})
 {
     AMREX_ASSERT(A.nrows == nrows);
 
@@ -710,8 +891,11 @@ CSR<T,V,I> spgemm_local (Long nrows, Long ncols,
     }
 
 #if !defined(AMREX_USE_GPU)
-    return spgemm_local_cpu<T,V,I>(nrows, ncols, A, B);
-#elif defined(AMREX_USE_CUDA)
+    return spgemm_local_cpu<T,V,I>(nrows, ncols, A, B, row_post);
+#else
+    amrex::ignore_unused(row_post);
+#endif
+#if defined(AMREX_USE_CUDA)
     return spgemm_local_cusparse<T,V,I>(nrows, ncols, A, B);
 #elif defined(AMREX_USE_HIP)
     return spgemm_local_rocsparse<T,V,I>(nrows, ncols, A, B);
@@ -818,12 +1002,37 @@ namespace amrex {
  *
  * \return Product of matrices `A` and `B`
  */
+template <typename T, template <typename> class Allocator, typename F>
+SpMatrix<T,Allocator>
+SpGEMM (SpMatrix<T,Allocator> const& A, SpMatrix<T,Allocator> const& B,
+        AlgPartition const& col_partition, F const& row_post);
+
 template <typename T, template <typename> class Allocator>
 SpMatrix<T,Allocator>
 SpGEMM (SpMatrix<T,Allocator> const& A, SpMatrix<T,Allocator> const& B,
         AlgPartition const& col_partition)
 {
+    return SpGEMM(A, B, col_partition, detail::NoRowPost{});
+}
+
+/**
+ * \brief SpGEMM with a callback on each row of the product.
+ *
+ * `row_post(i, col, val, n)` gets local row i with its n entries sorted by
+ * column (compact column indices that sort like the global ones), may
+ * change them in place, and returns the new number of entries, which must
+ * stay sorted. CPU builds only; GPU builds accept only detail::NoRowPost.
+ */
+template <typename T, template <typename> class Allocator, typename F>
+SpMatrix<T,Allocator>
+SpGEMM (SpMatrix<T,Allocator> const& A, SpMatrix<T,Allocator> const& B,
+        AlgPartition const& col_partition, F const& row_post)
+{
     BL_PROFILE("SpGEMM");
+#ifdef AMREX_USE_GPU
+    static_assert(std::is_same_v<F,detail::NoRowPost>, "SpGEMM: row_post is CPU only");
+    amrex::ignore_unused(row_post);
+#endif
 
     using SpMat = SpMatrix<T,Allocator>;
 
@@ -850,7 +1059,7 @@ SpGEMM (SpMatrix<T,Allocator> const& A, SpMatrix<T,Allocator> const& B,
 
     if (ext.nrows == 0 && Am.m_remote_cols_v.empty() && Bm.m_remote_cols_v.empty()) {
         auto Ch = detail::spgemm_local<T,SpMat::template container_type,int>
-            (nrows, nlocal, Am.m_csr_local.const_view(), Bm.m_csr_local.const_view());
+            (nrows, nlocal, Am.m_csr_local.const_view(), Bm.m_csr_local.const_view(), row_post);
         SpMat C;
         C.define_split(Am.partition(), col_partition, std::move(Ch), nlocal, nullptr, 0);
         return C;
@@ -873,6 +1082,34 @@ SpGEMM (SpMatrix<T,Allocator> const& A, SpMatrix<T,Allocator> const& B,
                         nb + Long(Am.m_remote_cols_v.size()) < Long(std::numeric_limits<int>::max()));
 
     using local_csr_type = typename SpMat::local_csr_type;
+#ifndef AMREX_USE_GPU
+    {
+        // The rows of B fetched from other processes, in the compact
+        // column space; B's own remote columns are mapped once each.
+        local_csr_type E;
+        E.resize(0, 0);
+        E.row_offset[0] = 0;
+        if (ext.nrows > 0) {
+            detail::append_ext_rows(E, ext.row_offset.data(), ext.col_index, ext.mat,
+                                    ext.nrows, ext.nnz, c0, c1, ru, nru);
+        }
+        ext.clear();
+        Vector<int> b1map(Bm.m_remote_cols_v.size());
+        for (Long j = 0; j < Long(b1map.size()); ++j) {
+            b1map[j] = int(nlocal + (std::lower_bound(ru, ru+nru, Bm.m_remote_cols_v[j]) - ru));
+        }
+        auto const a1 = Am.m_remote_cols_v.empty() ? CsrView<T const,int>{}
+                                                   : Am.remote_full_const_view();
+        auto const b1 = Bm.m_remote_cols_v.empty() ? CsrView<T const,int>{}
+                                                   : Bm.remote_full_const_view();
+        auto Ch = detail::spgemm_split_cpu<T,SpMat::template container_type,int>
+            (nrows, ncols_hat, nb, Am.m_csr_local.const_view(), a1,
+             Bm.m_csr_local.const_view(), b1, b1map.data(), E.const_view(), row_post);
+        SpMat C;
+        C.define_split(Am.partition(), col_partition, std::move(Ch), nlocal, ru, nru);
+        return C;
+    }
+#endif
     local_csr_type Ah = detail::concat_csr_cols<T,SpMat::template container_type>
         (nrows, Am.m_csr_local.const_view(), Am.remote_full_const_view(),
          [=] AMREX_GPU_DEVICE (int c) { return c; },
@@ -919,11 +1156,164 @@ SpGEMM (SpMatrix<T,Allocator> const& A, SpMatrix<T,Allocator> const& B,
     Long const ncols = col_partition.numGlobalRows();
     AMREX_ALWAYS_ASSERT(ncols < Long(std::numeric_limits<int>::max()));
     auto Ch = detail::spgemm_local<T,SpMat::template container_type,int>
-        (nrows, ncols, Am.m_csr_local.const_view(), Bm.m_csr_local.const_view());
+        (nrows, ncols, Am.m_csr_local.const_view(), Bm.m_csr_local.const_view(), row_post);
     SpMat C;
     C.define_split(Am.partition(), col_partition, std::move(Ch), ncols, nullptr, 0);
     return C;
 
+#endif
+}
+
+/**
+ * \brief Galerkin product R (A P), with the result of
+ * SpGEMM(R, SpGEMM(A, P, col_partition), col_partition).
+ *
+ * In CPU builds A P is not stored in full: only its rows that other
+ * processes need are formed as a matrix, and the local rows are computed
+ * in chunks as the rows of R need them. The row partition of `R` must be
+ * `col_partition`, and its column partition is set to the row partition of
+ * `A`, as in SpGEMM.
+ */
+template <typename T, template <typename> class Allocator>
+SpMatrix<T,Allocator>
+RAP (SpMatrix<T,Allocator> const& R, SpMatrix<T,Allocator> const& A,
+     SpMatrix<T,Allocator> const& P, AlgPartition const& col_partition)
+{
+    BL_PROFILE("RAP");
+#ifdef AMREX_USE_GPU
+    auto AP = SpGEMM(A, P, col_partition);
+    return SpGEMM(R, AP, col_partition);
+#else
+    using SpMat = SpMatrix<T,Allocator>;
+    using local_csr_type = typename SpMat::local_csr_type;
+    auto& Rm = const_cast<SpMat&>(R);
+    auto& Am = const_cast<SpMat&>(A);
+    auto& Pm = const_cast<SpMat&>(P);
+    Am.setColumnPartition(Pm.partition());
+    Pm.setColumnPartition(col_partition);
+    Rm.setColumnPartition(Am.partition());
+
+    Long const nf = Am.numLocalRows();
+    Long const nc = col_partition.numLocalRows();
+    AMREX_ALWAYS_ASSERT(Rm.numLocalRows() == nc);
+
+    detail::APRowsCpu<T,int> ap;
+    ap.A0 = Am.m_csr_local.const_view();
+    ap.P0 = Pm.m_csr_local.const_view();
+    CsrView<T const,int> r1{};
+    local_csr_type pe, ape;
+    pe.resize(0, 0);
+    pe.row_offset[0] = 0;
+    ape.resize(0, 0);
+    ape.row_offset[0] = 0;
+    ap.PE = pe.const_view();
+    Vector<int> p1map;
+    Vector<Long> ru;
+
+#ifdef AMREX_USE_MPI
+    Long const c0 = col_partition.globalRowBegin();
+    Long const c1 = col_partition.globalRowEnd();
+    if (! Am.m_remote_cols_v.empty()) { ap.A1 = Am.remote_full_const_view(); }
+    if (! Pm.m_remote_cols_v.empty()) { ap.P1 = Pm.remote_full_const_view(); }
+
+    // Remote columns [ru_first, ru_last) as sorted unique global indices,
+    // P's remote columns mapped into the compact space of `cols`, and the
+    // fetched rows `ext` in that space.
+    auto add_remote = [&] (Vector<Long>& cols, typename SpMat::RemoteRowsMM const& ext) {
+        for (Long i = 0; i < ext.nnz; ++i) {
+            auto g = ext.col_index[i];
+            if (g < c0 || g >= c1) { cols.push_back(g); }
+        }
+        RemoveDuplicates(cols);
+    };
+    auto compact_ext = [&] (local_csr_type& E, typename SpMat::RemoteRowsMM const& ext,
+                            Vector<Long> const& cols) {
+        E.resize(0, 0);
+        E.row_offset[0] = 0;
+        if (ext.nrows > 0) {
+            detail::append_ext_rows(E, ext.row_offset.data(), ext.col_index, ext.mat,
+                                    ext.nrows, ext.nnz, c0, c1, cols.data(), Long(cols.size()));
+        }
+    };
+    auto map_p1 = [&] (Vector<Long> const& cols) {
+        p1map.resize(Pm.m_remote_cols_v.size());
+        for (Long j = 0; j < Long(p1map.size()); ++j) {
+            p1map[j] = int(nc + (std::lower_bound(cols.begin(), cols.end(),
+                                                  Pm.m_remote_cols_v[j]) - cols.begin()));
+        }
+        ap.p1map = p1map.data();
+    };
+
+    // Rows of P needed by A's remote columns.
+    typename SpMat::RemoteRowsMM pext;
+    if (! detail::spmat_comm_is_local(Am.partition(), Pm.partition())) {
+        pext = Am.fetch_remote_rows_mm(Pm);
+    }
+    Vector<Long> ru_ap = Pm.m_remote_cols_v;
+    add_remote(ru_ap, pext);
+
+    // The rows of A P that other processes need: those where P has remote
+    // columns, since the transpose of P then has a remote column there.
+    SpMat APb;
+    {
+        compact_ext(pe, pext, ru_ap);
+        ap.PE = pe.const_view();
+        map_p1(ru_ap);
+        Long const ncols = nc + Long(ru_ap.size());
+        AMREX_ALWAYS_ASSERT(ncols < Long(std::numeric_limits<int>::max()));
+        auto has_remote = [&] (Long i) {
+            return ap.P1.nnz > 0 && ap.P1.row_offset[i+1] > ap.P1.row_offset[i];
+        };
+        auto csr = detail::csr_from_rows_cpu<T,SpMat::template container_type,int>
+            (nf, [&] (Long i) { return has_remote(i) ? ap.maxlen(i) : Long(0); },
+             [&] (int) {
+            return [&, marker = Vector<int>(ncols, -1), col = Vector<int>(), val = Vector<T>(),
+                    tmp = Vector<std::pair<int,T>>()]
+                (Long i, int const*& rc, T const*& rv) mutable -> Long
+            {
+                Long n = 0;
+                if (has_remote(i)) {
+                    Long const maxlen = ap.maxlen(i);
+                    if (Long(col.size()) < maxlen) {
+                        col.resize(maxlen);
+                        val.resize(maxlen);
+                    }
+                    n = ap.row(i, marker.data(), col.data(), val.data(), 0);
+                    // fetch_remote_rows_mm sends rows sorted by column.
+                    detail::sort_row_cpu(col.data(), val.data(), n, tmp);
+                }
+                rc = col.data();
+                rv = val.data();
+                return n;
+            };
+        });
+        APb.define_split(Am.partition(), col_partition, std::move(csr), nc,
+                         ru_ap.data(), Long(ru_ap.size()));
+    }
+
+    // Rows of A P needed by R's remote columns.
+    typename SpMat::RemoteRowsMM apext;
+    if (! detail::spmat_comm_is_local(Rm.partition(), APb.partition())) {
+        apext = Rm.fetch_remote_rows_mm(APb);
+    }
+    ru = ru_ap;
+    add_remote(ru, apext);
+    AMREX_ALWAYS_ASSERT(nc + Long(ru.size()) < Long(std::numeric_limits<int>::max()));
+    compact_ext(pe, pext, ru);
+    compact_ext(ape, apext, ru);
+    ap.PE = pe.const_view();
+    map_p1(ru);
+    pext.clear();
+    apext.clear();
+    if (! Rm.m_remote_cols_v.empty()) { r1 = Rm.remote_full_const_view(); }
+#endif
+
+    Long const nru = Long(ru.size());
+    auto csr = detail::rap_local_cpu<T,SpMat::template container_type,int>
+        (nf, nc, nc+nru, Rm.m_csr_local.const_view(), r1, ape.const_view(), ap);
+    SpMat C;
+    C.define_split(Rm.partition(), col_partition, std::move(csr), nc, ru.data(), nru);
+    return C;
 #endif
 }
 

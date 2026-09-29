@@ -572,13 +572,17 @@ public: // NOLINT
     //! Extended (plus_i = false) or extended+i interpolation in
     //! matrix-matrix form. ST is the transpose of S, `scale` its unit.
     //! With `row_state`, only its C-points get a row of P; the other rows
-    //! are empty.
+    //! are empty. In CPU builds, P is also truncated as in truncate_interp
+    //! if `max_elmts` or `trunc_factor` is positive, and `nnz_untruncated`
+    //! (if not null) gets the number of weights before.
     static SpMatrix<T> build_interp_mm (SpMatrix<T>& A, SpMatrix<TS>& S,
                                         SpMatrix<TS> const& ST,
                                         Gpu::DeviceVector<int> const& state,
                                         Gpu::DeviceVector<Long> const& cidx,
                                         AlgPartition const& cpart, T scale,
-                                        bool plus_i, int const* row_state = nullptr);
+                                        bool plus_i, int const* row_state = nullptr,
+                                        int max_elmts = 0, T trunc_factor = T(0),
+                                        Long* nnz_untruncated = nullptr);
 
 #ifndef AMREX_USE_GPU
     //! build_interp_mm followed by truncate_interp, row by row on the host,
@@ -1036,17 +1040,8 @@ void AlgMG<T>::setup ()
         note_memory(lev, "R");
         SpMatrix<T> Ac;
 #ifndef AMREX_USE_GPU
-        if (detail::spmat_comm_is_local(A.partition(), cpart)) {
-            // R (A P) without storing A P in full.
-            BL_PROFILE("AlgMG::galerkin_host");
-            P.setColumnPartition(cpart);
-            R.setColumnPartition(A.partition());
-            auto csr = detail::rap_local_cpu<T,SpMatrix<T>::template container_type,int>
-                (A.numLocalRows(), cpart.numLocalRows(), R.const_parcsr().csr0,
-                 A.const_parcsr().csr0, P.const_parcsr().csr0);
-            Ac.define_split(cpart, cpart, std::move(csr), cpart.numLocalRows(), nullptr, 0);
-        } else
-#endif
+        Ac = amrex::RAP(R, A, P, cpart);
+#else
         {
             // R (A P): measured smaller and faster than (R A) P, whose
             // intermediate gathers several fine rows per coarse row.
@@ -1054,6 +1049,7 @@ void AlgMG<T>::setup ()
             note_memory(lev, "A*P");
             Ac = amrex::SpGEMM(R, AP, cpart);
         }
+#endif
         note_memory(lev, "coarse operator");
 
         m_P.push_back(std::move(P));
@@ -1339,6 +1335,10 @@ bool AlgMG<T>::coarsen_level (int lev, SpMatrix<T>& A, SpMatrix<T>& P, AlgPartit
                 P1 = build_interp_mm_host(A, S, ST, state, cidx, cpart, sscale,
                                           m_interp_type == InterpType::mm_ext_i,
                                           m_p_max_elmts, m_trunc_factor, unused);
+            } else if (!m_aggressive_direct_interp && m_interp_type != InterpType::direct) {
+                P1 = build_interp_mm(A, S, ST, state, cidx, cpart, sscale,
+                                     m_interp_type == InterpType::mm_ext_i, nullptr,
+                                     m_p_max_elmts, m_trunc_factor);
             } else
 #endif
             {
@@ -1348,10 +1348,16 @@ bool AlgMG<T>::coarsen_level (int lev, SpMatrix<T>& A, SpMatrix<T>& P, AlgPartit
             }
             note_memory(lev, "P1");
             // P2 needs only the rows of the first-pass C-points.
+#ifndef AMREX_USE_GPU
+            auto Pf = build_interp_mm(A, S, ST, statef, cidxf, cpart2, sscale,
+                                      m_interp_type != InterpType::mm_ext,
+                                      state.data(), m_p_max_elmts, m_trunc_factor);
+#else
             auto Pf = build_interp_mm(A, S, ST, statef, cidxf, cpart2, sscale,
                                       m_interp_type != InterpType::mm_ext,
                                       state.data());
             if (trunc) { Pf = truncate_interp(Pf, cpart2, m_p_max_elmts, m_trunc_factor); }
+#endif
             auto P2 = select_coarse_rows(Pf, state, cidx, cpart);
             note_memory(lev, "P2");
             P = amrex::SpGEMM(P1, P2, cpart2);
@@ -1365,6 +1371,11 @@ bool AlgMG<T>::coarsen_level (int lev, SpMatrix<T>& A, SpMatrix<T>& P, AlgPartit
             P = build_interp_mm_host(A, S, ST, state, cidx, cpart, sscale,
                                      m_interp_type == InterpType::mm_ext_i,
                                      m_p_max_elmts, m_trunc_factor, nnz_untruncated);
+            truncated = true;
+        } else if (m_interp_type != InterpType::direct) {
+            P = build_interp_mm(A, S, ST, state, cidx, cpart, sscale,
+                                m_interp_type == InterpType::mm_ext_i, nullptr,
+                                m_p_max_elmts, m_trunc_factor, &nnz_untruncated);
             truncated = true;
         } else
 #endif
@@ -1436,17 +1447,25 @@ SpMatrix<typename AlgMG<T>::TS> AlgMG<T>::create_soc (SpMatrix<T> const& A, T sc
     T const tol = T(64) * std::numeric_limits<T>::epsilon();
 
 #ifndef AMREX_USE_GPU
-    if (a.csr1.nnz == 0) {
+    {
         // One pass per row on the host.
         auto const& c0 = a.csr0;
+        auto const& c1 = a.csr1;
+        auto rlen1 = [&] (Long i) -> Long {
+            if (!detail::has_remote_row(a, i)) { return 0; }
+            Long const ii = a.row_map[i];
+            return c1.row_offset[ii+1] - c1.row_offset[ii];
+        };
         auto csr = detail::csr_from_rows_cpu<TS,SpMatrix<TS>::template container_type,int>
-            (nrows, [&] (Long i) { return c0.row_offset[i+1] - c0.row_offset[i]; },
+            (nrows, [&] (Long i) { return c0.row_offset[i+1] - c0.row_offset[i] + rlen1(i); },
              [&] (int) {
             return [&, col = Vector<int>(), val = Vector<TS>()]
                 (Long i, int const*& rc, TS const*& rv) mutable -> Long
             {
                 Long const b = c0.row_offset[i];
                 Long const e = c0.row_offset[i+1];
+                Long const n1 = rlen1(i);
+                Long const b1 = (n1 > 0) ? Long(c1.row_offset[a.row_map[i]]) : 0;
                 T const sgn = std::copysign(T(1), A_ii[i]);
                 T rs = T(0);
                 T amin = std::numeric_limits<T>::max();
@@ -1454,17 +1473,28 @@ SpMatrix<typename AlgMG<T>::TS> AlgMG<T>::create_soc (SpMatrix<T> const& A, T sc
                     rs += c0.mat[idx];
                     if (c0.col_index[idx] != i) { amin = std::min(amin, sgn*c0.mat[idx]); }
                 }
+                for (Long idx = b1; idx < b1+n1; ++idx) {
+                    rs += c1.mat[idx];
+                    amin = std::min(amin, sgn*c1.mat[idx]);
+                }
                 Long n = 0;
                 if (!(std::abs(rs) > T(0.9)*std::abs(A_ii[i])) && amin < T(0)) {
                     T const thr = amin * threshold * (T(1) - tol);
-                    if (Long(col.size()) < e-b) {
-                        col.resize(e-b);
-                        val.resize(e-b);
+                    if (Long(col.size()) < e-b+n1) {
+                        col.resize(e-b+n1);
+                        val.resize(e-b+n1);
                     }
                     for (Long idx = b; idx < e; ++idx) {
                         if (c0.col_index[idx] != i && sgn*c0.mat[idx] <= thr) {
                             col[n] = c0.col_index[idx];
                             val[n] = TS(c0.mat[idx]/scale);
+                            ++n;
+                        }
+                    }
+                    for (Long idx = b1; idx < b1+n1; ++idx) {
+                        if (sgn*c1.mat[idx] <= thr) {
+                            col[n] = nlocal + c1.col_index[idx];
+                            val[n] = TS(c1.mat[idx]/scale);
                             ++n;
                         }
                     }
@@ -1475,10 +1505,10 @@ SpMatrix<typename AlgMG<T>::TS> AlgMG<T>::create_soc (SpMatrix<T> const& A, T sc
             };
         });
         SpMatrix<TS> S;
-        S.define_split(A.partition(), A.partition(), std::move(csr), nlocal, nullptr, 0);
+        S.define_split(A.partition(), A.partition(), std::move(csr), nlocal, a.col_map, 0);
         return S;
     }
-#endif
+#else
 
     auto const rsA = A.rowSum();
     auto const* AMREX_RESTRICT prs = rsA.data();
@@ -1568,6 +1598,7 @@ SpMatrix<typename AlgMG<T>::TS> AlgMG<T>::create_soc (SpMatrix<T> const& A, T sc
     SpMatrix<TS> S;
     S.define_split(A.partition(), A.partition(), std::move(csr), nlocal, a.col_map, 0);
     return S;
+#endif
 }
 
 template <typename T>
@@ -1909,6 +1940,61 @@ struct TruncRow
     }
 };
 
+#ifndef AMREX_USE_GPU
+//! truncate_interp for one row of P, sorted by column, in place on the
+//! host. Returns the new number of entries, still sorted.
+template <typename T, int KMAX>
+Long truncate_row_host (int* col, T* val, Long n, int max_elmts, T trunc_factor, int nc)
+{
+    // The row as a one-row CSR for TruncRow.
+    int ro[2] = {0, int(n)};
+    ParCsr<T const> prow;
+    prow.csr0 = CsrView<T const,int>{val, col, ro, n, 1};
+    TruncRow<T,KMAX> const tr{prow, max_elmts, trunc_factor, nc};
+    T sum_pos, sum_neg;
+    T const thresh = tr.threshold(0, sum_pos, sum_neg);
+    int tcol[KMAX];
+    T tval[KMAX];
+    Long nk = 0;
+    T kept_pos = T(0), kept_neg = T(0);
+    if (max_elmts > 0) {
+        nk = tr.select(0, thresh, tcol, tval);
+        for (Long k = 0; k < nk; ++k) {
+            if (tval[k] > T(0)) { kept_pos += tval[k]; } else { kept_neg += tval[k]; }
+        }
+    } else {
+        for (Long k = 0; k < n; ++k) {
+            if (std::abs(val[k]) >= thresh) {
+                if (val[k] > T(0)) { kept_pos += val[k]; } else { kept_neg += val[k]; }
+            }
+        }
+    }
+    T const fpos = (kept_pos != T(0)) ? sum_pos/kept_pos : T(1);
+    T const fneg = (kept_neg != T(0)) ? sum_neg/kept_neg : T(1);
+    if (max_elmts > 0) {
+        // Kept by decreasing magnitude; back to column order.
+        for (Long k = 0; k < nk; ++k) {
+            Long m = k;
+            for (; m > 0 && col[m-1] > tcol[k]; --m) {
+                col[m] = col[m-1];
+                val[m] = val[m-1];
+            }
+            col[m] = tcol[k];
+            val[m] = tval[k] * ((tval[k] > T(0)) ? fpos : fneg);
+        }
+    } else {
+        for (Long k = 0; k < n; ++k) {
+            if (std::abs(val[k]) >= thresh) {
+                col[nk] = col[k];
+                val[nk] = val[k] * ((val[k] > T(0)) ? fpos : fneg);
+                ++nk;
+            }
+        }
+    }
+    return nk;
+}
+#endif
+
 }
 
 namespace detail {
@@ -2229,7 +2315,8 @@ SpMatrix<T> AlgMG<T>::build_interp_mm (SpMatrix<T>& A, SpMatrix<TS>& S,
                                      Gpu::DeviceVector<int> const& state,
                                      Gpu::DeviceVector<Long> const& cidx,
                                      AlgPartition const& cpart, T sscale,
-                                     bool plus_i, int const* row_state)
+                                     bool plus_i, int const* row_state,
+                                     int max_elmts, T trunc_factor, Long* nnz_untruncated)
 {
     BL_PROFILE("AlgMG::build_interp_mm");
 
@@ -2408,6 +2495,25 @@ SpMatrix<T> AlgMG<T>::build_interp_mm (SpMatrix<T>& A, SpMatrix<TS>& S,
     SpMatrix<T> M, B;
     M.define_split(A.partition(), A.partition(), std::move(mcsr), nlocal_f, s.col_map, 0);
     B.define_split(A.partition(), cpart, std::move(bcsr), nlocal_c, gcidx_r.data(), 0);
+#ifndef AMREX_USE_GPU
+    if (max_elmts > 0 || trunc_factor > T(0)) {
+        // Each row is truncated as the product makes it.
+        constexpr int KMAX = max_p_elmts;
+        AMREX_ALWAYS_ASSERT(max_elmts <= KMAX);
+        Vector<Long> n0(nrows, 0);
+        auto P = amrex::SpGEMM(M, B, cpart, [&] (Long i, int* col, T* val, Long n) {
+            n0[i] = n;
+            return detail::truncate_row_host<T,KMAX>(col, val, n, max_elmts, trunc_factor,
+                                                     nlocal_c);
+        });
+        if (nnz_untruncated) {
+            *nnz_untruncated = std::accumulate(n0.begin(), n0.end(), Long(0));
+        }
+        return P;
+    }
+#else
+    amrex::ignore_unused(max_elmts, trunc_factor, nnz_untruncated);
+#endif
     return amrex::SpGEMM(M, B, cpart);
 }
 
@@ -2487,8 +2593,7 @@ SpMatrix<T> AlgMG<T>::build_interp_mm_host (SpMatrix<T>& A, SpMatrix<TS>& S,
         (nrows, [&] (Long i) { return sc.row_offset[i+1] - sc.row_offset[i] + 1; },
          [&] (int t) {
         return [&, t, marker = Vector<int>(nc, -1), col = Vector<int>(1), val = Vector<T>(1),
-                tcol = Vector<int>(KMAX), tval = Vector<T>(KMAX), tmp = Vector<std::pair<int,T>>(),
-                nbr = Vector<Nbr>()]
+                tmp = Vector<std::pair<int,T>>(), nbr = Vector<Nbr>()]
             (Long i, int const*& rc, T const*& rv) mutable -> Long
         {
             rc = col.data();
@@ -2558,45 +2663,8 @@ SpMatrix<T> AlgMG<T>::build_interp_mm_host (SpMatrix<T>& A, SpMatrix<TS>& S,
             nnz0[t] += n;
             if (!trunc) { return n; }
 
-            // The row as a one-row CSR for TruncRow.
-            int ro[2] = {0, int(n)};
-            ParCsr<T const> prow;
-            prow.csr0 = CsrView<T const,int>{val.data(), col.data(), ro, n, 1};
-            detail::TruncRow<T,KMAX> const tr{prow, max_elmts, trunc_factor, nc};
-            T sum_pos, sum_neg;
-            T const thresh = tr.threshold(0, sum_pos, sum_neg);
-            int nk = 0;
-            T kept_pos = T(0), kept_neg = T(0);
-            if (max_elmts > 0) {
-                nk = tr.select(0, thresh, tcol.data(), tval.data());
-                for (int k = 0; k < nk; ++k) {
-                    if (tval[k] > T(0)) { kept_pos += tval[k]; } else { kept_neg += tval[k]; }
-                }
-            } else {
-                for (Long k = 0; k < n; ++k) {
-                    if (std::abs(val[k]) >= thresh) {
-                        if (val[k] > T(0)) { kept_pos += val[k]; } else { kept_neg += val[k]; }
-                    }
-                }
-            }
-            T const fpos = (kept_pos != T(0)) ? sum_pos/kept_pos : T(1);
-            T const fneg = (kept_neg != T(0)) ? sum_neg/kept_neg : T(1);
-            if (max_elmts > 0) {
-                for (int k = 0; k < nk; ++k) {
-                    col[k] = tcol[k];
-                    val[k] = tval[k] * ((tval[k] > T(0)) ? fpos : fneg);
-                }
-                detail::sort_row_cpu(col.data(), val.data(), Long(nk), tmp);
-            } else {
-                for (Long k = 0; k < n; ++k) {
-                    if (std::abs(val[k]) >= thresh) {
-                        col[nk] = col[k];
-                        val[nk] = val[k] * ((val[k] > T(0)) ? fpos : fneg);
-                        ++nk;
-                    }
-                }
-            }
-            return nk;
+            return detail::truncate_row_host<T,KMAX>(col.data(), val.data(), n, max_elmts,
+                                                     trunc_factor, nc);
         };
     });
 
