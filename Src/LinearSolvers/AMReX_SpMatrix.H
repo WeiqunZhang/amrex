@@ -1710,16 +1710,21 @@ void SpMatrix<T,Allocator>::define_split (AlgPartition partition,
     Long const nnz = compact.nnz;
 
     // Entries with a compact column below nlocal are local; within a row
-    // they come first.
-    Gpu::DeviceVector<Long> pfsum(nnz);
-    auto* p_pfsum = pfsum.data();
+    // they come first. No scan is needed if all columns are local.
+    Gpu::DeviceVector<Long> pfsum;
     auto const* pcol = compact.col_index.data();
     AMREX_ALWAYS_ASSERT(nlocal < Long(std::numeric_limits<int>::max()));
     int const nl = int(nlocal);
-    Long const local_nnz = Scan::PrefixSum<Long>(nnz,
-        [=] AMREX_GPU_DEVICE (Long i) -> Long { return pcol[i] < nl; },
-        [=] AMREX_GPU_DEVICE (Long i, Long const& x) { p_pfsum[i] = x; },
-        Scan::Type::exclusive, Scan::retSum);
+    Long local_nnz = nnz;
+    if (nlocal < col_partition.numGlobalRows()) {
+        pfsum.resize(nnz);
+        auto* p_pfsum = pfsum.data();
+        local_nnz = Scan::PrefixSum<Long>(nnz,
+            [=] AMREX_GPU_DEVICE (Long i) -> Long { return pcol[i] < nl; },
+            [=] AMREX_GPU_DEVICE (Long i, Long const& x) { p_pfsum[i] = x; },
+            Scan::Type::exclusive, Scan::retSum);
+    }
+    auto const* p_pfsum = pfsum.data();
     Long const remote_nnz = nnz - local_nnz;
 
 #ifndef AMREX_USE_MPI
@@ -1809,6 +1814,35 @@ void SpMatrix<T,Allocator>::split_csr (AlgPartition const& col_partition)
     // list of remote columns.
 
     Long const nlocalrows = this->numLocalRows();
+
+    if (m_col_begin == 0 && m_col_end == col_partition.numGlobalRows()) {
+        // All columns are local: no scan, and the values are moved.
+        AMREX_ALWAYS_ASSERT_WITH_MESSAGE(m_nnz < Long(std::numeric_limits<int>::max()),
+                                         "SpMatrix: too many local nonzeros for 32-bit row offsets");
+        Long const nnz = m_nnz;
+        Long const noffset = Long(m_csr.row_offset.size());
+        m_csr_local.col_index.resize(nnz);
+        m_csr_local.row_offset.resize(nlocalrows+1);
+        auto const* pcol = m_csr.col_index.data();
+        auto const* pro = m_csr.row_offset.data();
+        auto* pcol_l = m_csr_local.col_index.data();
+        auto* pro_l = m_csr_local.row_offset.data();
+        ParallelForOMP(std::max(nnz, nlocalrows+1), [=] AMREX_GPU_DEVICE (Long i)
+        {
+            if (i < nnz) { pcol_l[i] = int(pcol[i]); }
+            if (i <= nlocalrows) { pro_l[i] = (i < noffset) ? int(pro[i]) : 0; }
+        });
+        Gpu::streamSynchronize();
+        m_csr_local.mat = std::move(m_csr.mat);
+        m_csr_local.nnz = m_nnz;
+        m_csr = csr_type{};
+#ifdef AMREX_USE_MPI
+        update_remote_col_index(container_type<Long>{}, m_csr_remote.col_index, true);
+#endif
+        m_split = true;
+        return;
+    }
+
     Long local_nnz;
     Gpu::DeviceVector<Long> pfsum(m_nnz);
     auto* p_pfsum = pfsum.data();
@@ -2019,13 +2053,10 @@ void SpMatrix<T,Allocator>::update_remote_col_index (VL const& gcols, VI& lcols,
     }
 
     // Now we convert the remote indices from global to local.
-    std::map<Long,int> gtol;
-    for (Long i = 0, N = Long(m_remote_cols_v.size()); i < N; ++i) {
-        gtol[m_remote_cols_v[i]] = int(i);
-    }
     Gpu::PinnedVector<int> h_lcols(n);
     for (Long i = 0; i < n; ++i) {
-        h_lcols[i] = gtol[h_gcols[i]];
+        h_lcols[i] = int(std::lower_bound(m_remote_cols_v.begin(), m_remote_cols_v.end(),
+                                          h_gcols[i]) - m_remote_cols_v.begin());
     }
 
 #ifdef AMREX_USE_GPU

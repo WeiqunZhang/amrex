@@ -10,6 +10,7 @@
 
 #include <algorithm>
 #include <limits>
+#include <utility>
 
 namespace amrex::detail {
 
@@ -27,11 +28,44 @@ CSR<T,V,I> spgemm_empty (Long nrows)
 
 #if !defined(AMREX_USE_GPU)
 
-// Gustavson's algorithm. Pass 1 counts, pass 2 accumulates into a dense
-// per-thread accumulator. Output rows are sorted.
-template <typename T, template<typename> class V, typename I>
-CSR<T,V,I> spgemm_local_cpu (Long nrows, Long ncols,
-                             CsrView<T const,I> const& A, CsrView<T const,I> const& B)
+// Sorts the n entries of a row by column; `tmp` is scratch for long rows.
+template <typename T, typename I>
+void sort_row_cpu (I* AMREX_RESTRICT col, T* AMREX_RESTRICT val, Long n,
+                   Vector<std::pair<I,T>>& tmp)
+{
+    if (n <= 32) {
+        for (Long k = 1; k < n; ++k) {
+            I const c = col[k];
+            T const v = val[k];
+            Long m = k;
+            for (; m > 0 && col[m-1] > c; --m) {
+                col[m] = col[m-1];
+                val[m] = val[m-1];
+            }
+            col[m] = c;
+            val[m] = v;
+        }
+    } else {
+        tmp.resize(n);
+        for (Long k = 0; k < n; ++k) { tmp[k] = {col[k], val[k]}; }
+        std::sort(tmp.begin(), tmp.end(),
+                  [] (auto const& x, auto const& y) { return x.first < y.first; });
+        for (Long k = 0; k < n; ++k) { col[k] = tmp[k].first; val[k] = tmp[k].second; }
+    }
+}
+
+/**
+ * \brief Builds a CSR on the host one row at a time.
+ *
+ * `make_row(t)` returns a callable `row(i, col, val)` for block t that
+ * computes row i in its own scratch storage, points `col` and `val` to it
+ * and returns the number of entries. The rows are split into one block per
+ * thread with about the same total `work(i)`. Rows are appended to buffers
+ * and copied into the result once all counts are known, so no symbolic
+ * pass is needed.
+ */
+template <typename T, template<typename> class V, typename I, typename W, typename F>
+CSR<T,V,I> csr_from_rows_cpu (Long nrows, W const& work, F const& make_row)
 {
     CSR<T,V,I> C;
     C.row_offset.resize(nrows+1);
@@ -39,27 +73,83 @@ CSR<T,V,I> spgemm_local_cpu (Long nrows, Long ncols,
     AMREX_ASSUME(crow != nullptr); // gcc -Wnull-dereference false positive
     crow[0] = 0;
 
-#ifdef AMREX_USE_OMP
-#pragma omp parallel
-#endif
-    {
-        Vector<Long> marker(ncols, -1);
-#ifdef AMREX_USE_OMP
-#pragma omp for schedule(dynamic,64)
-#endif
+    int const nblocks = int(std::max(Long(1), std::min(Long(OpenMP::get_max_threads()), nrows)));
+    Vector<Long> rbegin(nblocks+1, nrows);
+    Long* AMREX_RESTRICT prb = rbegin.data();
+    AMREX_ASSUME(prb != nullptr); // gcc -Wnull-dereference false positive
+    prb[0] = 0;
+    if (nblocks > 1) {
+        Vector<Long> wsum(nrows+1);
+        Long* AMREX_RESTRICT pw = wsum.data();
+        AMREX_ASSUME(pw != nullptr);
+        pw[0] = 0;
+        for (Long i = 0; i < nrows; ++i) { pw[i+1] = pw[i] + work(i); }
+        for (int t = 1; t < nblocks; ++t) {
+            prb[t] = std::lower_bound(pw, pw+nrows+1, pw[nrows]/nblocks*t) - pw;
+        }
+    }
+
+    if (nblocks == 1) {
+        // Rows go straight into the result. The capacity is a guess from
+        // `work`; pages that are never written are never touched.
+        Long cap = 0;
+        for (Long i = 0; i < nrows; ++i) { cap += work(i); }
+        C.col_index.resize(cap);
+        C.mat.resize(cap);
+        auto row = make_row(0);
+        Long p = 0;
         for (Long i = 0; i < nrows; ++i) {
-            Long cnt = 0;
-            for (Long ap = A.row_offset[i]; ap < A.row_offset[i+1]; ++ap) {
-                Long const k = A.col_index[ap];
-                for (Long bp = B.row_offset[k]; bp < B.row_offset[k+1]; ++bp) {
-                    Long const j = B.col_index[bp];
-                    if (marker[j] != i) {
-                        marker[j] = i;
-                        ++cnt;
-                    }
-                }
+            I const* rc = nullptr;
+            T const* rv = nullptr;
+            Long const n = row(i, rc, rv);
+            if (p + n > Long(C.col_index.size())) {
+                Long const newcap = std::max(p + n, Long(C.col_index.size())*3/2);
+                C.col_index.resize(p); // only the filled part is copied
+                C.mat.resize(p);
+                C.col_index.resize(newcap);
+                C.mat.resize(newcap);
             }
-            crow[i+1] = I(cnt);
+            std::copy(rc, rc+n, C.col_index.data()+p);
+            std::copy(rv, rv+n, C.mat.data()+p);
+            p += n;
+            AMREX_ALWAYS_ASSERT_WITH_MESSAGE(p <= Long(std::numeric_limits<I>::max()),
+                                             "SpGEMM: too many nonzeros for the index type");
+            crow[i+1] = I(p);
+        }
+        C.col_index.resize(p);
+        C.mat.resize(p);
+        C.nnz = p;
+        return C;
+    }
+
+    struct Buffer {
+        V<I> col;
+        V<T> val;
+        Long n = 0;
+    };
+    Vector<Vector<Buffer>> buffers(nblocks);
+    constexpr Long buffer_size = Long(1) << 20;
+
+#ifdef AMREX_USE_OMP
+#pragma omp parallel for schedule(static,1)
+#endif
+    for (int t = 0; t < nblocks; ++t) {
+        auto row = make_row(t);
+        auto& bufs = buffers[t];
+        for (Long i = rbegin[t]; i < rbegin[t+1]; ++i) {
+            I const* rc = nullptr;
+            T const* rv = nullptr;
+            Long const n = row(i, rc, rv);
+            if (bufs.empty() || bufs.back().n + n > Long(bufs.back().col.size())) {
+                bufs.emplace_back();
+                bufs.back().col.resize(std::max(buffer_size, n));
+                bufs.back().val.resize(std::max(buffer_size, n));
+            }
+            auto& buf = bufs.back();
+            std::copy(rc, rc+n, buf.col.data()+buf.n);
+            std::copy(rv, rv+n, buf.val.data()+buf.n);
+            buf.n += n;
+            crow[i+1] = I(n);
         }
     }
 
@@ -76,46 +166,229 @@ CSR<T,V,I> spgemm_local_cpu (Long nrows, Long ncols,
     C.nnz = total;
     C.col_index.resize(C.nnz);
     C.mat.resize(C.nnz);
-    I*    AMREX_RESTRICT ccol = C.col_index.data();
-    T*    AMREX_RESTRICT cmat = C.mat.data();
+    I* AMREX_RESTRICT ccol = C.col_index.data();
+    T* AMREX_RESTRICT cmat = C.mat.data();
 
 #ifdef AMREX_USE_OMP
-#pragma omp parallel
+#pragma omp parallel for schedule(static,1)
 #endif
-    {
-        Vector<Long> marker(ncols, -1);
-        Vector<T> acc(ncols);
-        Vector<I> cols;
-#ifdef AMREX_USE_OMP
-#pragma omp for schedule(dynamic,64)
-#endif
-        for (Long i = 0; i < nrows; ++i) {
-            cols.clear();
-            for (Long ap = A.row_offset[i]; ap < A.row_offset[i+1]; ++ap) {
-                Long const k = A.col_index[ap];
-                T const a = A.mat[ap];
-                for (Long bp = B.row_offset[k]; bp < B.row_offset[k+1]; ++bp) {
-                    Long const j = B.col_index[bp];
-                    if (marker[j] != i) {
-                        marker[j] = i;
-                        cols.push_back(j);
-                        acc[j] = a * B.mat[bp];
-                    } else {
-                        acc[j] += a * B.mat[bp];
-                    }
-                }
-            }
-            std::sort(cols.begin(), cols.end());
-            Long p = crow[i];
-            for (I j : cols) {
-                ccol[p] = j;
-                cmat[p] = acc[j];
-                ++p;
-            }
+    for (int t = 0; t < nblocks; ++t) {
+        Long p = crow[rbegin[t]];
+        for (auto& buf : buffers[t]) {
+            std::copy(buf.col.data(), buf.col.data()+buf.n, ccol+p);
+            std::copy(buf.val.data(), buf.val.data()+buf.n, cmat+p);
+            p += buf.n;
+            buf = Buffer{};
         }
     }
 
     return C;
+}
+
+// Gustavson's algorithm with a dense marker holding the position of each
+// column in the current row. Output rows are sorted.
+template <typename T, template<typename> class V, typename I>
+CSR<T,V,I> spgemm_local_cpu (Long nrows, Long ncols,
+                             CsrView<T const,I> const& A, CsrView<T const,I> const& B)
+{
+    auto nprod = [&] (Long i) {
+        Long n = 0;
+        for (Long ap = A.row_offset[i]; ap < A.row_offset[i+1]; ++ap) {
+            Long const k = A.col_index[ap];
+            n += B.row_offset[k+1] - B.row_offset[k];
+        }
+        return n;
+    };
+    return csr_from_rows_cpu<T,V,I>(nrows, nprod, [&] (int) {
+        return [&, marker = Vector<I>(ncols, I(-1)), col = Vector<I>(), val = Vector<T>(),
+                tmp = Vector<std::pair<I,T>>()]
+            (Long i, I const*& rc, T const*& rv) mutable -> Long
+        {
+            Long const maxlen = std::min(nprod(i), ncols);
+            if (Long(col.size()) < maxlen) {
+                col.resize(maxlen);
+                val.resize(maxlen);
+            }
+            Long n = 0;
+            for (Long ap = A.row_offset[i]; ap < A.row_offset[i+1]; ++ap) {
+                Long const k = A.col_index[ap];
+                T const a = A.mat[ap];
+                for (Long bp = B.row_offset[k]; bp < B.row_offset[k+1]; ++bp) {
+                    I const j = B.col_index[bp];
+                    Long const m = marker[j]; // may be left over from an earlier row
+                    if (m >= 0 && m < n && col[m] == j) {
+                        val[m] += a * B.mat[bp];
+                    } else {
+                        marker[j] = I(n);
+                        col[n] = j;
+                        val[n] = a * B.mat[bp];
+                        ++n;
+                    }
+                }
+            }
+            sort_row_cpu(col.data(), val.data(), n, tmp);
+            rc = col.data();
+            rv = val.data();
+            return n;
+        };
+    });
+}
+
+/**
+ * \brief Galerkin product R (A P) of local CSR matrices on the host.
+ *
+ * The rows of A P are computed in chunks of fine rows when a row of R
+ * first needs them, and a chunk is reused once no later row of R does, so
+ * A P is never stored in full. The sums are done in the same order as
+ * SpGEMM(R, SpGEMM(A, P)). `R` has `nc` rows, `A` is square with `nf`
+ * rows and `P` has `nc` columns. Output rows are sorted.
+ */
+template <typename T, template<typename> class V, typename I>
+CSR<T,V,I> rap_local_cpu (Long nf, Long nc, CsrView<T const,I> const& R,
+                          CsrView<T const,I> const& A, CsrView<T const,I> const& P)
+{
+    constexpr Long chunk_rows = 1024;
+    Long const nchunks = (nf + chunk_rows - 1) / chunk_rows;
+
+    auto work = [&] (Long c) {
+        Long n = 0;
+        for (Long rp = R.row_offset[c]; rp < R.row_offset[c+1]; ++rp) {
+            Long const i = R.col_index[rp];
+            n += A.row_offset[i+1] - A.row_offset[i];
+        }
+        return n;
+    };
+
+    // Last row of R that needs a chunk: the largest column of P in it.
+    Vector<Long> chunk_last(nchunks, -1);
+    for (Long q = 0; q < nchunks; ++q) {
+        for (Long i = q*chunk_rows; i < std::min(nf, (q+1)*chunk_rows); ++i) {
+            if (P.row_offset[i+1] > P.row_offset[i]) {
+                chunk_last[q] = std::max(chunk_last[q], Long(P.col_index[P.row_offset[i+1]-1]));
+            }
+        }
+    }
+
+    struct Chunk {
+        Vector<Long> off;
+        Vector<I> col;
+        Vector<T> val;
+    };
+
+    return csr_from_rows_cpu<T,V,I>(nc, work, [&] (int) {
+        return [&, cmarker = Vector<I>(nc, I(-1)), marker = Vector<I>(nc, I(-1)),
+                slot = Vector<int>(nchunks, -1), chunks = Vector<Chunk>(),
+                live = Vector<Long>(), free_slots = Vector<int>(),
+                next_release = std::numeric_limits<Long>::max(),
+                col = Vector<I>(), val = Vector<T>(), tmp = Vector<std::pair<I,T>>()]
+            (Long c, I const*& rc, T const*& rv) mutable -> Long
+        {
+            // Rows of A P for chunk q, unsorted.
+            auto compute_chunk = [&] (Long q) {
+                int s;
+                if (free_slots.empty()) {
+                    s = int(chunks.size());
+                    chunks.emplace_back();
+                } else {
+                    s = free_slots.back();
+                    free_slots.pop_back();
+                }
+                slot[q] = s;
+                live.push_back(q);
+                next_release = std::min(next_release, chunk_last[q]);
+                auto& ch = chunks[s];
+                Long const i0 = q*chunk_rows;
+                Long const i1 = std::min(nf, i0+chunk_rows);
+                ch.off.resize(i1-i0+1);
+                ch.off[0] = 0;
+                Long p = 0;
+                for (Long i = i0; i < i1; ++i) {
+                    Long maxlen = 0;
+                    for (Long ap = A.row_offset[i]; ap < A.row_offset[i+1]; ++ap) {
+                        Long const k = A.col_index[ap];
+                        maxlen += P.row_offset[k+1] - P.row_offset[k];
+                    }
+                    if (Long(ch.col.size()) < p + maxlen) {
+                        ch.col.resize(std::max(p + maxlen, Long(ch.col.size())*2));
+                        ch.val.resize(ch.col.size());
+                    }
+                    Long const rs = p;
+                    for (Long ap = A.row_offset[i]; ap < A.row_offset[i+1]; ++ap) {
+                        Long const k = A.col_index[ap];
+                        T const a = A.mat[ap];
+                        for (Long pp = P.row_offset[k]; pp < P.row_offset[k+1]; ++pp) {
+                            I const j = P.col_index[pp];
+                            Long const m = cmarker[j]; // may be left over from elsewhere
+                            if (m >= rs && m < p && ch.col[m] == j) {
+                                ch.val[m] += a * P.mat[pp];
+                            } else {
+                                cmarker[j] = I(p);
+                                ch.col[p] = j;
+                                ch.val[p] = a * P.mat[pp];
+                                ++p;
+                            }
+                        }
+                    }
+                    ch.off[i-i0+1] = p;
+                }
+            };
+
+            // Chunks no later row needs are recycled.
+            if (c > next_release) {
+                next_release = std::numeric_limits<Long>::max();
+                for (Long l = 0; l < Long(live.size()); ) {
+                    Long const q = live[l];
+                    if (chunk_last[q] < c) {
+                        free_slots.push_back(slot[q]);
+                        slot[q] = -1;
+                        live[l] = live.back();
+                        live.pop_back();
+                    } else {
+                        next_release = std::min(next_release, chunk_last[q]);
+                        ++l;
+                    }
+                }
+            }
+
+            Long maxlen = 0;
+            for (Long rp = R.row_offset[c]; rp < R.row_offset[c+1]; ++rp) {
+                Long const i = R.col_index[rp];
+                Long const q = i / chunk_rows;
+                if (slot[q] < 0) { compute_chunk(q); }
+                auto const& ch = chunks[slot[q]];
+                maxlen += ch.off[i-q*chunk_rows+1] - ch.off[i-q*chunk_rows];
+            }
+            maxlen = std::min(maxlen, nc);
+            if (Long(col.size()) < maxlen) {
+                col.resize(maxlen);
+                val.resize(maxlen);
+            }
+
+            Long n = 0;
+            for (Long rp = R.row_offset[c]; rp < R.row_offset[c+1]; ++rp) {
+                Long const i = R.col_index[rp];
+                T const r = R.mat[rp];
+                Long const q = i / chunk_rows;
+                auto const& ch = chunks[slot[q]];
+                for (Long x = ch.off[i-q*chunk_rows]; x < ch.off[i-q*chunk_rows+1]; ++x) {
+                    I const j = ch.col[x];
+                    Long const m = marker[j];
+                    if (m >= 0 && m < n && col[m] == j) {
+                        val[m] += r * ch.val[x];
+                    } else {
+                        marker[j] = I(n);
+                        col[n] = j;
+                        val[n] = r * ch.val[x];
+                        ++n;
+                    }
+                }
+            }
+            sort_row_cpu(col.data(), val.data(), n, tmp);
+            rc = col.data();
+            rv = val.data();
+            return n;
+        };
+    });
 }
 
 #elif defined(AMREX_USE_CUDA)
@@ -573,6 +846,14 @@ SpGEMM (SpMatrix<T,Allocator> const& A, SpMatrix<T,Allocator> const& B,
     typename SpMat::RemoteRowsMM ext;
     if (! detail::spmat_comm_is_local(Am.partition(), Bm.partition())) {
         ext = Am.fetch_remote_rows_mm(Bm);
+    }
+
+    if (ext.nrows == 0 && Am.m_remote_cols_v.empty() && Bm.m_remote_cols_v.empty()) {
+        auto Ch = detail::spgemm_local<T,SpMat::template container_type,int>
+            (nrows, nlocal, Am.m_csr_local.const_view(), Bm.m_csr_local.const_view());
+        SpMat C;
+        C.define_split(Am.partition(), col_partition, std::move(Ch), nlocal, nullptr, 0);
+        return C;
     }
 
     // Compact column space: [local columns | sorted remote columns].
