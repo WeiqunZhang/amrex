@@ -873,6 +873,26 @@ public:
 
     static AMREX_EXPORT bool m_alloc_single_chunk;
 
+    //! Experimental FillBoundary variants for GPU-aware MPI, set by the
+    //! `amrex.fb.*` parameters. All are off by default.
+    struct FBVariants {
+        bool engine = false;            //!< use the variant code path even if all variants are off
+        bool host_off_node = false;     //!< pinned host buffers for off-node peers
+        Long host_threshold = 0;        //!< pinned host buffers for messages smaller than this (bytes)
+        bool local_first = false;       //!< local copy before posting sends
+        bool async_unpack = false;      //!< no host sync after unpack
+        bool persistent = false;        //!< keep comm buffers between calls
+        bool unpack_on_arrival = false; //!< unpack each message as it arrives
+        int  debug_ranks_per_node = 0;  //!< testing only: fake node size for host_off_node
+
+        [[nodiscard]] bool enabled () const noexcept {
+            return engine || host_off_node || host_threshold > 0 || local_first ||
+                async_unpack || persistent || unpack_on_arrival;
+        }
+        [[nodiscard]] bool off_node (int global_rank) const noexcept;
+    };
+    static AMREX_EXPORT FBVariants m_fbv;
+
     //! Query whether single-chunk allocation is enabled for new FabArrays.
     [[nodiscard]] static bool getAllocSingleChunk () { return m_alloc_single_chunk; }
 

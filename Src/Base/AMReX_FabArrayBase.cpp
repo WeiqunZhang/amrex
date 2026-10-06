@@ -85,11 +85,23 @@ std::map<std::string,FabArrayBase::meminfo> FabArrayBase::m_mem_usage;
 std::vector<std::string>                    FabArrayBase::m_region_tag;
 
 bool                               FabArrayBase::m_alloc_single_chunk = false;
+FabArrayBase::FBVariants           FabArrayBase::m_fbv;
 
 namespace
 {
     bool initialized = false;
     std::uint64_t comm_meta_data_id = 0;
+}
+
+bool
+FabArrayBase::FBVariants::off_node (int global_rank) const noexcept
+{
+    const int me = ParallelDescriptor::MyProc();
+    if (debug_ranks_per_node > 0) {
+        return global_rank/debug_ranks_per_node != me/debug_ranks_per_node;
+    } else {
+        return ParallelDescriptor::NodeId(global_rank) != ParallelDescriptor::NodeId(me);
+    }
 }
 
 void
@@ -129,6 +141,30 @@ FabArrayBase::Initialize ()
 
     ParmParse ppmf("amrex.mf");
     ppmf.queryAdd("alloc_single_chunk", FabArrayBase::m_alloc_single_chunk);
+
+    {
+        ParmParse ppfb("amrex.fb");
+        auto& v = FabArrayBase::m_fbv;
+        ppfb.queryAdd("engine", v.engine);
+        ppfb.queryAdd("host_off_node", v.host_off_node);
+        ppfb.queryAdd("host_threshold", v.host_threshold);
+        ppfb.queryAdd("local_first", v.local_first);
+        ppfb.queryAdd("async_unpack", v.async_unpack);
+        ppfb.queryAdd("persistent", v.persistent);
+        ppfb.queryAdd("unpack_on_arrival", v.unpack_on_arrival);
+        ppfb.queryAdd("debug_ranks_per_node", v.debug_ranks_per_node);
+        if (v.enabled()) {
+            amrex::Print() << "FillBoundary variants: engine=" << v.engine
+                           << " host_off_node=" << v.host_off_node
+                           << " host_threshold=" << v.host_threshold
+                           << " local_first=" << v.local_first
+                           << " async_unpack=" << v.async_unpack
+                           << " persistent=" << v.persistent
+                           << " unpack_on_arrival=" << v.unpack_on_arrival
+                           << " debug_ranks_per_node=" << v.debug_ranks_per_node
+                           << " gpu_aware_mpi=" << ParallelDescriptor::UseGpuAwareMpi() << "\n";
+        }
+    }
 
     amrex::ExecOnFinalize(FabArrayBase::Finalize);
 

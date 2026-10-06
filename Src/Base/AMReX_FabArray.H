@@ -117,6 +117,91 @@ struct TheFaArenaDeleter {
 };
 using TheFaArenaPointer = std::unique_ptr<char, TheFaArenaDeleter>;
 
+#if defined(AMREX_USE_MPI) && (defined(AMREX_USE_CUDA) || defined(AMREX_USE_HIP))
+#define AMREX_FB_VARIANTS 1
+
+/// \cond DOXYGEN_IGNORE
+namespace detail {
+    using fbv_event_t = AMREX_HIP_OR_CUDA(hipEvent_t, cudaEvent_t);
+
+    inline fbv_event_t fbv_event_create () {
+        fbv_event_t ev{};
+        AMREX_HIP_OR_CUDA(
+            AMREX_HIP_SAFE_CALL(hipEventCreateWithFlags(&ev, hipEventDisableTiming));,
+            AMREX_CUDA_SAFE_CALL(cudaEventCreateWithFlags(&ev, cudaEventDisableTiming)); )
+        return ev;
+    }
+
+    inline void fbv_event_record (fbv_event_t ev) {
+        AMREX_HIP_OR_CUDA(
+            AMREX_HIP_SAFE_CALL(hipEventRecord(ev, Gpu::gpuStream()));,
+            AMREX_CUDA_SAFE_CALL(cudaEventRecord(ev, Gpu::gpuStream())); )
+    }
+
+    inline void fbv_event_sync (fbv_event_t ev) {
+        AMREX_HIP_OR_CUDA(
+            AMREX_HIP_SAFE_CALL(hipEventSynchronize(ev));,
+            AMREX_CUDA_SAFE_CALL(cudaEventSynchronize(ev)); )
+    }
+
+    inline void fbv_event_destroy (fbv_event_t ev) {
+        AMREX_HIP_OR_CUDA((void)hipEventDestroy(ev);, (void)cudaEventDestroy(ev);)
+    }
+
+    //! Event recorded after the pack kernel when FB local copy runs first.
+    inline fbv_event_t fbv_pack_event () {
+        static fbv_event_t ev = fbv_event_create();
+        return ev;
+    }
+}
+/// \endcond
+
+//! Cached layout, kernel tags and (optionally) buffers of the experimental
+//! FillBoundary variants for one (FB, BUF, ncomp).
+template <class FAB>
+struct FBVEntry {
+    using value_type = typename FAB::value_type;
+
+    //! Messages are in either a device or a pinned host buffer.
+    struct Layout {
+        Vector<int>         rank; // global rank
+        Vector<std::size_t> size;
+        Vector<std::size_t> offset; // in its own buffer
+        Vector<char>        on_host;
+        std::size_t dev_bytes = 0;
+        std::size_t host_bytes = 0;
+    };
+    Layout snd, rcv;
+
+    // Host messages have poff = ~offset (i.e., negative).
+    TagVector<CommSendBufTag<value_type>> send_tv;
+    TagVector<CommRecvBufTag<value_type>> recv_tv;
+    Vector<TagVector<CommRecvBufTag<value_type>>> recv_tv_msg; // one per message
+
+    // Persistent buffers
+    char* snd_d = nullptr;
+    char* snd_h = nullptr;
+    char* rcv_d = nullptr;
+    char* rcv_h = nullptr;
+    detail::fbv_event_t unpack_done{};
+    bool unpack_pending = false;
+
+    FBVEntry () = default;
+    FBVEntry (FBVEntry const&) = delete;
+    FBVEntry (FBVEntry &&) = delete;
+    FBVEntry& operator= (FBVEntry const&) = delete;
+    FBVEntry& operator= (FBVEntry &&) = delete;
+
+    ~FBVEntry () {
+        if (snd_d) { Gpu::freeAsync(The_Comms_Arena(), snd_d); }
+        if (rcv_d) { Gpu::freeAsync(The_Comms_Arena(), rcv_d); }
+        if (snd_h) { Gpu::freeAsync(The_Pinned_Arena(), snd_h); }
+        if (rcv_h) { Gpu::freeAsync(The_Pinned_Arena(), rcv_h); }
+        if (unpack_done) { detail::fbv_event_destroy(unpack_done); }
+    }
+};
+#endif
+
 // Data used in non-blocking fill boundary.
 template <class FAB>
 struct FBData {
@@ -139,6 +224,13 @@ struct FBData {
     int                 tag;
     //
     bool                deterministic = false;
+#ifdef AMREX_FB_VARIANTS
+    FBVEntry<FAB>*      fbv_entry = nullptr;
+    char*               fbv_rcv_d = nullptr;
+    char*               fbv_rcv_h = nullptr;
+    char*               fbv_snd_d = nullptr;
+    char*               fbv_snd_h = nullptr;
+#endif
 };
 
 // Data used in non-blocking parallel copy.
@@ -1698,6 +1790,17 @@ public:
                               Vector<CopyComTagsContainer const*> const& send_cctc,
                               int ncomp, std::uint64_t id) const;
 
+#ifdef AMREX_FB_VARIANTS
+    template <typename BUF>
+    FBVEntry<FAB>* fbv_get_entry (const FB& TheFB, int ncomp);
+
+    template <typename BUF>
+    void fbv_nowait (const FB& TheFB, int scomp, int ncomp, int SeqNum);
+
+    template <typename BUF>
+    void fbv_finish ();
+#endif
+
 #endif
 
     template <typename BUF = value_type>
@@ -1856,6 +1959,9 @@ private:
     mutable std::map<RecvSendCopyHandlerKey,
                      std::unique_ptr<TagVector<CommSendBufTag<value_type>>>>
         m_send_copy_handler;
+#endif
+#ifdef AMREX_FB_VARIANTS
+    std::map<RecvSendCopyHandlerKey, std::unique_ptr<FBVEntry<FAB>>> m_fbv_cache;
 #endif
 
 public:
@@ -2169,6 +2275,9 @@ FabArray<FAB>::clear_fab_caches ()
     m_recv_copy_handler.clear();
     m_send_copy_handler.clear();
 #endif
+#ifdef AMREX_FB_VARIANTS
+    m_fbv_cache.clear();
+#endif
 }
 
 template <class FAB>
@@ -2253,6 +2362,9 @@ FabArray<FAB>::clear ()
     m_fb_local_copy_handler.clear();
     m_recv_copy_handler.clear();
     m_send_copy_handler.clear();
+#endif
+#ifdef AMREX_FB_VARIANTS
+    m_fbv_cache.clear();
 #endif
 
     FabArrayBase::clear();
@@ -2397,6 +2509,9 @@ FabArray<FAB>::FabArray (FabArray<FAB>&& rhs) noexcept
     , m_recv_copy_handler(std::move(rhs.m_recv_copy_handler))
     , m_send_copy_handler(std::move(rhs.m_send_copy_handler))
 #endif
+#ifdef AMREX_FB_VARIANTS
+    , m_fbv_cache(std::move(rhs.m_fbv_cache))
+#endif
     // no need to worry about the data used in non-blocking FillBoundary.
 {
     m_FA_stats.recordBuild();
@@ -2432,6 +2547,9 @@ FabArray<FAB>::operator= (FabArray<FAB>&& rhs) noexcept
         std::swap(m_fb_local_copy_handler, rhs.m_fb_local_copy_handler);
         std::swap(m_recv_copy_handler, rhs.m_recv_copy_handler);
         std::swap(m_send_copy_handler, rhs.m_send_copy_handler);
+#endif
+#ifdef AMREX_FB_VARIANTS
+        std::swap(m_fbv_cache, rhs.m_fbv_cache);
 #endif
 
         rhs.define_function_called = false;

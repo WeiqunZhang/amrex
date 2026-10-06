@@ -1,6 +1,7 @@
 
 #include <AMReX_FBI.H>
 #include <AMReX_PCI.H>
+#include <AMReX_FBVariants.H>
 
 /**
  * \file AMReX_FabArrayCommI.H
@@ -118,6 +119,17 @@ FabArray<FAB>::FBEP_nowait (int scomp, int ncomp, const IntVect& nghost,
         // No work to do.
         return;
     }
+
+#ifdef AMREX_FB_VARIANTS
+    if (m_fbv.enabled() && !sumboundary && ParallelDescriptor::UseGpuAwareMpi() &&
+        Gpu::inLaunchRegion() && !Gpu::inGraphRegion() &&
+        ((TheFB.m_threadsafe_loc && TheFB.m_threadsafe_rcv) ||
+         amrex::IsStoreAtomic<value_type>::value))
+    {
+        fbv_nowait<BUF>(TheFB, scomp, ncomp, SeqNum);
+        return;
+    }
+#endif
 
     fbd = std::make_unique<FBData<FAB>>();
     fbd->fb    = &TheFB;
@@ -242,6 +254,13 @@ FabArray<FAB>::FillBoundary_finish ()
     BL_PROFILE_SYNC_STOP();
 
     if (!fbd) { return; }
+
+#ifdef AMREX_FB_VARIANTS
+    if (fbd->fbv_entry) {
+        fbv_finish<BUF>();
+        return;
+    }
+#endif
 
     const FB* TheFB = fbd->fb;
     bool sumboundary = TheFB->m_sb_snghost.allGE(0);
