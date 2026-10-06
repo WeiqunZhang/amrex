@@ -57,6 +57,7 @@ namespace {
     bool the_comms_arena_defragmentation = true;
 #endif
     bool the_arena_is_managed = false;
+    bool the_comms_arena_is_managed = false; // testing only
     bool abort_on_out_of_gpu_memory = false;
 
 #if defined(AMREX_USE_CUDA) || defined(AMREX_USE_HIP)
@@ -475,6 +476,7 @@ Arena::Initialize (bool minimal)
     pp.queryAdd( "the_pinned_arena_defragmentation",  the_pinned_arena_defragmentation);
     pp.queryAdd(  "the_comms_arena_defragmentation",   the_comms_arena_defragmentation);
     pp.queryAdd("the_arena_is_managed", the_arena_is_managed);
+    pp.queryAdd("the_comms_arena_is_managed", the_comms_arena_is_managed);
     pp.queryAdd("abort_on_out_of_gpu_memory", abort_on_out_of_gpu_memory);
 
     {
@@ -545,7 +547,13 @@ Arena::Initialize (bool minimal)
 
 #ifdef AMREX_USE_GPU
     if (ParallelDescriptor::UseGpuAwareMpi()) {
-        if (!(the_arena->isDevice()) &&
+        if (the_comms_arena_is_managed) {
+            // For testing GPU-aware MPI code paths with an MPI that is not GPU-aware.
+            ArenaInfo ai{};
+            ai.SetReleaseThreshold(the_comms_arena_release_threshold);
+            the_comms_arena = new CArena(0, ai);
+            the_comms_arena->registerForProfiling("Comms Memory");
+        } else if (!(the_arena->isDevice()) &&
             the_device_arena_defragmentation == the_comms_arena_defragmentation)
         {
             the_comms_arena = the_device_arena;
