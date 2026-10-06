@@ -212,6 +212,7 @@ while ( false )
     extern AMREX_EXPORT MPI_Comm m_comm;
     extern AMREX_EXPORT int m_nprocs_per_node;
     extern AMREX_EXPORT int m_rank_in_node;
+    extern AMREX_EXPORT std::vector<int> m_node_id;
     extern AMREX_EXPORT int m_nprocs_per_processor;
     extern AMREX_EXPORT int m_rank_in_processor;
     extern AMREX_EXPORT const int ioProcessor;
@@ -231,6 +232,12 @@ while ( false )
     //! might be the same or different from MyRankInProcessor based on
     //! MPI_Get_processor_name.
     inline int MyRankInNode () noexcept { return m_rank_in_node; }
+
+    //! Return an id of the node (MPI_COMM_TYPE_SHARED) that global rank
+    //! `rank` runs on. Ranks on the same node have the same id.
+    inline int NodeId (int rank) noexcept {
+        return m_node_id.empty() ? 0 : m_node_id[rank];
+    }
 
     //! Return the number of MPI ranks per node as defined by
     //! MPI_Get_processor_name. This might be the same or different from

@@ -76,6 +76,7 @@ namespace amrex::ParallelDescriptor {
 
     int m_nprocs_per_node = 1;
     int m_rank_in_node = 0;
+    std::vector<int> m_node_id;
 
     int m_nprocs_per_processor = 1;
     int m_rank_in_processor = 0;
@@ -354,6 +355,10 @@ StartParallel (int* argc, char*** argv, MPI_Comm a_mpi_comm)
         MPI_Comm_split_type(m_comm, split_type, 0, MPI_INFO_NULL, &node_comm);
         MPI_Comm_size(node_comm, &m_nprocs_per_node);
         MPI_Comm_rank(node_comm, &m_rank_in_node);
+        int node_id = ParallelDescriptor::MyProc();
+        MPI_Bcast(&node_id, 1, MPI_INT, 0, node_comm);
+        m_node_id.resize(ParallelDescriptor::NProcs());
+        MPI_Allgather(&node_id, 1, MPI_INT, m_node_id.data(), 1, MPI_INT, m_comm);
         MPI_Comm_free(&node_comm);
 
         char procname[MPI_MAX_PROCESSOR_NAME];
