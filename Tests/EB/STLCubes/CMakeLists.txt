@@ -1,6 +1,4 @@
-# The legacy STL builder misclassifies some nodes on grid-aligned faces in
-# single precision, so this test runs in double precision only.
-if (NOT (3 IN_LIST AMReX_SPACEDIM) OR AMReX_PRECISION STREQUAL "SINGLE")
+if (NOT (3 IN_LIST AMReX_SPACEDIM))
     return()
 endif ()
 
