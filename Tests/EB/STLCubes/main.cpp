@@ -16,16 +16,26 @@ using namespace amrex;
 // after eb2.stl_scale = 1e-3.  Several box faces lie on grid planes.
 namespace {
     AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
-    Real box_surface_distance (Real x, Real y, Real z)
+    void box_bounds (int ib, int jb, Real lo[3], Real hi[3])
     {
+        lo[0] = -0.85_rt + static_cast<Real>(ib)*0.2_rt;
+        lo[1] = -0.325_rt + static_cast<Real>(jb)*0.25_rt;
+        lo[2] = -0.125_rt;
+        hi[0] = lo[0] + 0.1_rt;
+        hi[1] = lo[1] + 0.15_rt;
+        hi[2] = 0.125_rt;
+    }
+
+    // Signed distance to the boxes, positive inside (the EB level set convention)
+    AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+    Real box_signed_distance (Real x, Real y, Real z)
+    {
+        Real const p[3] = {x, y, z};
         Real dmin = std::numeric_limits<Real>::max();
         for (int jb = 0; jb < 3; ++jb) {
-            Real const ylo = -0.325_rt + static_cast<Real>(jb)*0.25_rt;
             for (int ib = 0; ib < 7; ++ib) {
-                Real const xlo = -0.85_rt + static_cast<Real>(ib)*0.2_rt;
-                Real const lo[3] = {xlo, ylo, -0.125_rt};
-                Real const hi[3] = {xlo+0.1_rt, ylo+0.15_rt, 0.125_rt};
-                Real const p[3] = {x, y, z};
+                Real lo[3], hi[3];
+                box_bounds(ib, jb, lo, hi);
                 Real dout2 = 0.0_rt;
                 Real din = std::numeric_limits<Real>::max();
                 for (int d = 0; d < 3; ++d) {
@@ -33,36 +43,31 @@ namespace {
                     if (q > 0.0_rt) { dout2 += q*q; }
                     din = amrex::min(din, -q);
                 }
-                Real const dist = (dout2 > 0.0_rt) ? std::sqrt(dout2) : amrex::max(din,0.0_rt);
-                dmin = amrex::min(dmin, dist);
+                if (dout2 == 0.0_rt) { return din; } // inside this box
+                dmin = amrex::min(dmin, std::sqrt(dout2));
             }
         }
-        return dmin;
+        return -dmin;
     }
 
-    // Exact aperture of the face normal to dir at node coordinate xn, with
-    // transverse extents [a0,a1] x [b0,b1] (dirs (dir+1)%3, (dir+2)%3).
+    // Exact fluid volume fraction of the cell [lo,hi]
     AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
-    Real exact_aperture (int dir, Real xn, Real a0, Real a1, Real b0, Real b1)
+    Real exact_volfrac (Real const clo[3], Real const chi[3])
     {
         Real covered = 0.0_rt;
-        Real const tol = 1.e-5_rt;
         for (int jb = 0; jb < 3; ++jb) {
-            Real const ylo = -0.325_rt + static_cast<Real>(jb)*0.25_rt;
             for (int ib = 0; ib < 7; ++ib) {
-                Real const xlo = -0.85_rt + static_cast<Real>(ib)*0.2_rt;
-                Real const lo[3] = {xlo, ylo, -0.125_rt};
-                Real const hi[3] = {xlo+0.1_rt, ylo+0.15_rt, 0.125_rt};
-                int const da = (dir+1)%3;
-                int const db = (dir+2)%3;
-                if (xn >= lo[dir]-tol && xn <= hi[dir]+tol) {
-                    Real const la = amrex::max(0.0_rt, amrex::min(a1,hi[da])-amrex::max(a0,lo[da]));
-                    Real const lb = amrex::max(0.0_rt, amrex::min(b1,hi[db])-amrex::max(b0,lo[db]));
-                    covered += la*lb;
+                Real lo[3], hi[3];
+                box_bounds(ib, jb, lo, hi);
+                Real v = 1.0_rt;
+                for (int d = 0; d < 3; ++d) {
+                    v *= amrex::max(0.0_rt, amrex::min(chi[d],hi[d]) - amrex::max(clo[d],lo[d]))
+                        / (chi[d]-clo[d]);
                 }
+                covered += v;
             }
         }
-        return 1.0_rt - covered/((a1-a0)*(b1-b0));
+        return 1.0_rt - covered;
     }
 }
 
@@ -92,85 +97,73 @@ int main (int argc, char* argv[])
         auto const& flags = factory->getMultiEBCellFlagFab();
         auto const& bcent = factory->getBndryCent();
         auto const& vfrac = factory->getVolFrac();
+        auto const& levset = factory->getLevelSet();
 
         auto const dx = geom.CellSizeArray();
         auto const problo = geom.ProbLoArray();
         auto const fa = flags.const_arrays();
         auto const bc_a = bcent.const_arrays();
+        auto const vf_a = vfrac.const_arrays();
+        auto const ls_a = levset.const_arrays();
 
         // Largest distance from an EB face centroid to the true surface, and
-        // number of cut cells whose EB face is more than dx away.
-        auto r = ParReduce(TypeList<ReduceOpMax,ReduceOpSum,ReduceOpSum>{},
-                           TypeList<Real,Long,Long>{}, flags, IntVect(0),
-            [=] AMREX_GPU_DEVICE (int b, int i, int j, int k) -> GpuTuple<Real,Long,Long>
+        // largest error in the volume fraction.  The EB cuts convex box edges
+        // and corners, which costs up to about half a cell.
+        auto r = ParReduce(TypeList<ReduceOpMax,ReduceOpMax,ReduceOpSum>{},
+                           TypeList<Real,Real,Long>{}, flags, IntVect(0),
+            [=] AMREX_GPU_DEVICE (int b, int i, int j, int k) -> GpuTuple<Real,Real,Long>
         {
-            if (fa[b](i,j,k).isSingleValued()) {
-                Real const x = problo[0] + (static_cast<Real>(i)+0.5_rt+bc_a[b](i,j,k,0))*dx[0];
-                Real const y = problo[1] + (static_cast<Real>(j)+0.5_rt+bc_a[b](i,j,k,1))*dx[1];
-                Real const z = problo[2] + (static_cast<Real>(k)+0.5_rt+bc_a[b](i,j,k,2))*dx[2];
-                Real const dist = box_surface_distance(x,y,z) / dx[0];
-                return {dist, Long(1), Long(dist > 1.0_rt)};
-            } else {
-                return {0.0_rt, Long(0), Long(0)};
+            Real const clo[3] = {problo[0] + static_cast<Real>(i)*dx[0],
+                                 problo[1] + static_cast<Real>(j)*dx[1],
+                                 problo[2] + static_cast<Real>(k)*dx[2]};
+            Real const chi[3] = {clo[0]+dx[0], clo[1]+dx[1], clo[2]+dx[2]};
+            Real const vf_err = std::abs(vf_a[b](i,j,k) - exact_volfrac(clo, chi));
+            if (vf_err > 0.75_rt && verbose) {
+                AMREX_DEVICE_PRINTF("bad cell (%d,%d,%d) volfrac %g error %g\n",
+                                    i, j, k, double(vf_a[b](i,j,k)), double(vf_err));
             }
+            Real dist = 0.0_rt;
+            if (fa[b](i,j,k).isSingleValued()) {
+                Real const x = clo[0] + (0.5_rt+bc_a[b](i,j,k,0))*dx[0];
+                Real const y = clo[1] + (0.5_rt+bc_a[b](i,j,k,1))*dx[1];
+                Real const z = clo[2] + (0.5_rt+bc_a[b](i,j,k,2))*dx[2];
+                dist = std::abs(box_signed_distance(x,y,z)) / dx[0];
+            }
+            return {dist, vf_err, Long(fa[b](i,j,k).isSingleValued())};
         });
         Real max_dist = amrex::get<0>(r);
-        Long ncut = amrex::get<1>(r);
-        Long nbad = amrex::get<2>(r);
-        ParallelDescriptor::ReduceRealMax(max_dist);
+        Real max_vf_err = amrex::get<1>(r);
+        Long ncut = amrex::get<2>(r);
+        ParallelDescriptor::ReduceRealMax({max_dist, max_vf_err});
         ParallelDescriptor::ReduceLongSum(ncut);
-        ParallelDescriptor::ReduceLongSum(nbad);
 
-        // Faces whose aperture is far from the exact one.  A fin (a zero-thickness
-        // wall in the fluid) has aperture 0 where the exact one is 1.
-        Real max_aperture_error = 0.0_rt;
-        Long nbad_faces = 0;
-        for (int dir = 0; dir < 3; ++dir) {
-            MultiFab const apmf = factory->getAreaFrac()[dir]->ToMultiFab(1.0_rt, 0.0_rt);
-            auto const ap = apmf.const_arrays();
-            auto rf = ParReduce(TypeList<ReduceOpMax,ReduceOpSum>{}, TypeList<Real,Long>{},
-                                apmf, IntVect(0),
-                [=] AMREX_GPU_DEVICE (int b, int i, int j, int k) -> GpuTuple<Real,Long>
-            {
-                IntVect const iv(i,j,k);
-                Real const xn = problo[dir] + static_cast<Real>(iv[dir])*dx[dir];
-                int const da = (dir+1)%3;
-                int const db = (dir+2)%3;
-                Real const a0 = problo[da] + static_cast<Real>(iv[da])*dx[da];
-                Real const b0 = problo[db] + static_cast<Real>(iv[db])*dx[db];
-                Real const err = std::abs(ap[b](i,j,k) - exact_aperture(dir, xn, a0, a0+dx[da],
-                                                                        b0, b0+dx[db]));
-                if (err > 0.75_rt && verbose) {
-                    AMREX_DEVICE_PRINTF("bad face dir %d (%d,%d,%d) aperture %g error %g\n",
-                                        dir, i, j, k, ap[b](i,j,k), err);
-                }
-                return {err, Long(err > 0.75_rt)};
-            });
-            max_aperture_error = amrex::max(max_aperture_error, amrex::get<0>(rf));
-            nbad_faces += amrex::get<1>(rf);
-        }
-        ParallelDescriptor::ReduceRealMax(max_aperture_error);
-        ParallelDescriptor::ReduceLongSum(nbad_faces);
+        // Nodes clearly off the surface must be on the correct side.
+        Long nbad_nodes = ParReduce(TypeList<ReduceOpSum>{}, TypeList<Long>{}, levset, IntVect(0),
+            [=] AMREX_GPU_DEVICE (int b, int i, int j, int k) -> GpuTuple<Long>
+        {
+            Real const sd = box_signed_distance(problo[0] + static_cast<Real>(i)*dx[0],
+                                                problo[1] + static_cast<Real>(j)*dx[1],
+                                                problo[2] + static_cast<Real>(k)*dx[2]);
+            bool const bad = std::abs(sd) > 0.1_rt*dx[0] && (sd > 0.0_rt) != (ls_a[b](i,j,k) > 0.0_rt);
+            if (bad && verbose) {
+                AMREX_DEVICE_PRINTF("bad node (%d,%d,%d) levelset %g distance %g\n",
+                                    i, j, k, double(ls_a[b](i,j,k)), double(sd));
+            }
+            return {Long(bad)};
+        });
+        ParallelDescriptor::ReduceLongSum(nbad_nodes);
 
-        Real const covered_volume = geom.ProbDomain().volume() - vfrac.sum()*dx[0]*dx[1]*dx[2];
-
-        // 21 boxes of 0.1 x 0.15 x 0.125 above z = 0
-        Real const exact_volume = 21.0_rt*0.1_rt*0.15_rt*0.125_rt;
-
-        amrex::Print() << "  number of cut cells:      " << ncut << "\n"
-                       << "  EB faces off the surface: " << nbad << "\n"
-                       << "  max distance / dx:        " << max_dist << "\n"
-                       << "  bad faces:                " << nbad_faces << "\n"
-                       << "  max aperture error:       " << max_aperture_error << "\n"
-                       << "  covered volume:           " << covered_volume
-                       << " (exact " << exact_volume << ")\n";
+        amrex::Print() << "  number of cut cells:   " << ncut << "\n"
+                       << "  max distance / dx:     " << max_dist << "\n"
+                       << "  max volfrac error:     " << max_vf_err << "\n"
+                       << "  misclassified nodes:   " << nbad_nodes << "\n";
 
         if (write_surface) {
             WriteEBSurface(ba, dm, geom, factory.get());
         }
 
-        if (nbad > 0 || nbad_faces > 0) {
-            amrex::Abort("STLCubes: EB faces found away from the STL surface");
+        if (max_dist > 1.0_rt || max_vf_err > 0.75_rt || nbad_nodes > 0) {
+            amrex::Abort("STLCubes: EB does not match the STL geometry");
         }
     }
     amrex::Finalize();
