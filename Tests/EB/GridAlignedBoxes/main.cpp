@@ -9,11 +9,13 @@
 #include <algorithm>
 #include <cmath>
 #include <limits>
+#include <string>
 
 using namespace amrex;
 
-// cubes.stl is 3 rows of 7 boxes, each [x0,x0+0.1] x [y0,y0+0.15] x [-0.125,0.125]
-// after eb2.stl_scale = 1e-3.  Several box faces lie on grid planes.
+// 3 rows of 7 boxes, each [x0,x0+0.1] x [y0,y0+0.15] x [-0.125,0.125], given
+// either by cubes.stl (with eb2.stl_scale = 1e-3) or by an implicit function.
+// Several box faces lie on grid planes.
 namespace {
     AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
     void box_bounds (int ib, int jb, Real lo[3], Real hi[3])
@@ -50,6 +52,21 @@ namespace {
         return -dmin;
     }
 
+    // The boxes as an implicit function, positive inside
+    struct BoxGridIF : GPUable
+    {
+        AMREX_GPU_HOST_DEVICE
+        Real operator() (AMREX_D_DECL(Real x, Real y, Real z)) const noexcept
+        {
+            return box_signed_distance(x, y, z);
+        }
+
+        Real operator() (RealArray const& p) const noexcept
+        {
+            return box_signed_distance(p[0], p[1], p[2]);
+        }
+    };
+
     // Exact fluid volume fraction of the cell [lo,hi]
     AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
     Real exact_volfrac (Real const clo[3], Real const chi[3])
@@ -84,6 +101,10 @@ int main (int argc, char* argv[])
         pp.query("write_surface", write_surface);
         int verbose = 0;
         pp.query("verbose", verbose);
+        std::string geometry = "stl"; // or "boxes" for the implicit function
+        pp.query("geometry", geometry);
+        Real max_vf_err_tol = 0.75_rt;
+        pp.query("max_volfrac_error", max_vf_err_tol);
 
         Box const domain(IntVect(0), IntVect(n_cell[0]-1, n_cell[1]-1, n_cell[2]-1));
         Geometry const geom(domain); // reads geometry.prob_lo/hi
@@ -91,7 +112,11 @@ int main (int argc, char* argv[])
         ba.maxSize(max_grid_size);
         DistributionMapping const dm(ba);
 
-        EB2::Build(geom, 0, 0);
+        if (geometry == "boxes") {
+            EB2::Build(EB2::makeShop(BoxGridIF{}), geom, 0, 0);
+        } else {
+            EB2::Build(geom, 0, 0); // eb2.geom_type = stl
+        }
 
         auto factory = makeEBFabFactory(geom, ba, dm, {1,1,1}, EBSupport::full);
         auto const& flags = factory->getMultiEBCellFlagFab();
@@ -107,8 +132,7 @@ int main (int argc, char* argv[])
         auto const ls_a = levset.const_arrays();
 
         // Largest distance from an EB face centroid to the true surface, and
-        // largest error in the volume fraction.  The EB cuts convex box edges
-        // and corners, which costs up to about half a cell.
+        // largest error in the volume fraction.
         auto r = ParReduce(TypeList<ReduceOpMax,ReduceOpMax,ReduceOpSum>{},
                            TypeList<Real,Real,Long>{}, flags, IntVect(0),
             [=] AMREX_GPU_DEVICE (int b, int i, int j, int k) -> GpuTuple<Real,Real,Long>
@@ -118,7 +142,7 @@ int main (int argc, char* argv[])
                                  problo[2] + static_cast<Real>(k)*dx[2]};
             Real const chi[3] = {clo[0]+dx[0], clo[1]+dx[1], clo[2]+dx[2]};
             Real const vf_err = std::abs(vf_a[b](i,j,k) - exact_volfrac(clo, chi));
-            if (vf_err > 0.75_rt && verbose) {
+            if (vf_err > max_vf_err_tol && verbose) {
                 AMREX_DEVICE_PRINTF("bad cell (%d,%d,%d) volfrac %g error %g\n",
                                     i, j, k, double(vf_a[b](i,j,k)), double(vf_err));
             }
@@ -162,8 +186,8 @@ int main (int argc, char* argv[])
             WriteEBSurface(ba, dm, geom, factory.get());
         }
 
-        if (max_dist > 1.0_rt || max_vf_err > 0.75_rt || nbad_nodes > 0) {
-            amrex::Abort("STLCubes: EB does not match the STL geometry");
+        if (max_dist > 1.0_rt || max_vf_err > max_vf_err_tol || nbad_nodes > 0) {
+            amrex::Abort("GridAlignedBoxes: EB does not match the geometry");
         }
     }
     amrex::Finalize();
