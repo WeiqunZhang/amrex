@@ -899,6 +899,15 @@ for debugging.
    If both this flag and ``amrex.signal_handling`` are true, ``SIGILL``
    will be handled by AMReX.
 
+.. py:data:: amrex.handle_crt_reports
+   :type: bool
+   :value: true
+
+   Windows debug builds only: if true, failed assertions and run-time check
+   failures of the debug C runtime are printed to ``stderr`` and the process
+   breaks instead of opening a blocking dialog box. Unlike the flags above,
+   this does not depend on ``amrex.signal_handling``.
+
 .. py:data:: amrex.throw_exception
    :type: bool
    :value: false
@@ -1157,11 +1166,11 @@ Memory
    :type: bool
    :value: false
 
-   This controls if AMReX should simply abort when the reported free device
-   memory is less than the amount an arena is asked to allocate. Note that
-   for managed memory it's possible to allocate more than the amount of free
-   device memory available. However, the code will be very slow. This
-   parameter is only relevant for GPU runs.
+   This controls if AMReX should throw :cpp:`amrex::OutOfMemoryError` when the
+   reported free device memory is less than the amount an arena is asked to
+   allocate. Note that for managed memory it's possible to allocate more
+   than the amount of free device memory available. However, the code will
+   be very slow. This parameter is only relevant for GPU runs.
 
 .. py:data:: amrex.mf.alloc_single_chunk
    :type: bool
@@ -1460,7 +1469,10 @@ Step Sizes
    :value: [none]
 
    When using a multirate method, this parameter sets the fixed step size to use
-   at the fast time scale.
+   at the fast time scale. If it is not set, the fast step size is chosen
+   adaptively with default tolerances. To control those tolerances with
+   :py:data:`integration.fast_rel_tol` and :py:data:`integration.fast_abs_tol`,
+   set :py:data:`integration.use_adaptive_fast_time_step` to true.
 
 .. py:data:: integration.use_adaptive_time_step
    :type: bool
@@ -1468,7 +1480,8 @@ Step Sizes
 
    This parameter enables adaptive time step sizes with single rate methods
    (e.g., ERK) or adaptive time step sizes at the slow time scale with multirate
-   methods (e.g., EX-MRI).
+   methods (e.g., EX-MRI). Adaptive slow time steps with multirate methods
+   require SUNDIALS 7.2 or later.
 
 .. py:data:: integration.use_adaptive_fast_time_step
    :type: bool
@@ -1641,7 +1654,9 @@ enabled.
   synchronization could be misleading. Enabling this parameter can provide
   more accurate measurements. However, the added synchronization points,
   which are unnecessary for correctness, could potentially degrade the
-  performance.
+  performance. When this parameter is enabled, the GPU-synchronized profiling
+  macros described in :ref:`sec:tiny:gpu_sync` do not switch TinyProfiler to
+  their focused report.
 
 .. py:data:: tiny_profiler.enabled
    :type: bool

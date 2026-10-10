@@ -115,6 +115,9 @@ if (AMReX_TEST_TYPE STREQUAL "Small")
 
    add_subdirectory("Amr/Advection_AmrCore")
 
+   # Checks NaN handling in the fast-math CI jobs
+   add_subdirectory("Base/NaN")
+
    if (AMReX_OMP)
       add_subdirectory("OpenMP/atomicAdd")
    endif ()
@@ -141,8 +144,8 @@ else()
    # List of subdirectories to search for CMakeLists.
    #
    set( AMREX_TESTS_SUBDIRS Amr ArrayND AsyncOut Base CallNoinline CommType CTOParFor DeviceGlobal
-                            Enum GpuParallelReduce HeatEquation MultiBlock MultiPeriod ParmParse Parser Parser2
-                            ParserUserFn Reducer ReduceToPlaneGuards ReduceToPlanePatchy Reinit RoundoffDomain Scan SIMD
+                            Enum GpuParallelReduce HeatEquation Morton MultiBlock MultiPeriod ParmParse Parser Parser2
+                            ParserUserFn Profiling Reducer ReduceToPlaneGuards ReduceToPlanePatchy Reinit RoundoffDomain Scan SIMD
                             SmallMatrix StochasticHeatEquation SumBoundary TOML)
 
    if (AMReX_PARTICLES)

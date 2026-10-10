@@ -82,13 +82,6 @@ MyTest::solve (bool use_overset_mask)
         mleb = std::make_unique<MLEBABecLap>(geom, grids, dmap, info,
                                              amrex::GetVecOfConstPtrs(factory));
     }
-    if (use_hypre || use_petsc) {
-        if (factory[0]->isAllRegular()) {
-            linop_maxorder = std::min(3,linop_maxorder);
-        } else {
-            linop_maxorder = 2;
-        }
-    }
     mleb->setMaxOrder(linop_maxorder);
 
     mleb->setDomainBC(mlmg_lobc, mlmg_hibc);
@@ -146,15 +139,6 @@ MyTest::solve (bool use_overset_mask)
         gmsolver.solve(GetVecOfPtrs(phi), GetVecOfConstPtrs(rhs), tol_rel, tol_abs);
     } else {
         mlmg.solve(amrex::GetVecOfPtrs(phi), amrex::GetVecOfConstPtrs(rhs), tol_rel, tol_abs);
-    }
-
-    // A failed solve often returns NaNs.  Check for them explicitly, because
-    // the max-norm checks used by these tests silently drop NaNs.
-    for (int ilev = 0; ilev < int(phi.size()); ++ilev) {
-        if (phi[ilev].contains_nan(0, phi[ilev].nComp(), 0)) {
-            amrex::Abort("MyTest::solve: solution contains NaN on level "
-                         + std::to_string(ilev));
-        }
     }
 
     if (verbose) {

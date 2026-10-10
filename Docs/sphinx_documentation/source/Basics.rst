@@ -353,6 +353,11 @@ by default returns the last one. The difference between :cpp:`query` and
 get the value, whereas :cpp:`query` returns an error code without generating a
 runtime error that will abort the run.
 
+The ``*arr`` functions grow the vector if it is too small, but they never
+shrink it. If ``xr`` above held defaults ``{-1.0, 0.0, 1.0}`` and the inputs
+had ``xrange = 2.0 3.0``, ``xr`` would become ``{2.0, 3.0, 1.0}``. Pass an
+empty vector to get exactly the values in the inputs.
+
 Math Expressions
 ----------------
 
@@ -907,6 +912,11 @@ elliptic integrals of the first and second kind).  In SYCL builds without the
 Intel math extension, ``jn`` and ``yn`` are host-only, so :cpp:`compile` aborts
 for expressions using them; use :cpp:`compileHost` instead.
 
+The elliptic-integral argument ``k`` is the modulus, rather than the parameter
+``m = k*k``. At ``k = -1`` and ``k = 1``, ``comp_ellint_2(k)`` returns ``1``.
+For direct C++ calls, :cpp:`amrex::Math::comp_ellint_1` returns positive infinity
+at these singular endpoints, and :cpp:`amrex::Math::comp_ellint_2` returns ``1``.
+
 **Heaviside step function:** ``heaviside(x1,x2)`` returns ``0`` when
 ``x1 < 0``, ``x2`` when ``x1 = 0``, and ``1`` when ``x1 > 0``.
 
@@ -973,7 +983,8 @@ Local automatic variables can be defined in the expression. For example,
    auto f = parser.compile<2>();  // 2 because there are two variables.
 
 An assignment to a local variable must be terminated with ``;``. The final
-expression in the string (without a trailing ``;``) is the return value.
+expression in the string is the return value, and a trailing ``;`` after it
+is optional.
 One should avoid name conflicts between local variables and the constants set
 by :cpp:`setConstant` or the variables registered by :cpp:`registerVariables`.
 
@@ -1202,7 +1213,11 @@ The class has a static function :cpp:`TheZeroVector()` returning the zero
 vector, :cpp:`TheUnitVector()` returning the unit vector, and
 :cpp:`TheDimensionVector (int dir)` returning a reference to a constant
 :cpp:`IntVect` that is zero except in the :cpp:`dir`-direction. Note the
-direction is zero-based. :cpp:`IntVect` has a number of relational operators,
+direction is zero-based. For index types, :cpp:`TheCellVector()` and
+:cpp:`TheNodeVector()` return the cell-centered and nodal types,
+:cpp:`TheFaceVector (int dir)` the type of faces normal to :cpp:`dir`, and
+:cpp:`TheEdgeVector (int dir)` the type of edges parallel to :cpp:`dir`.
+:cpp:`IntVect` has a number of relational operators,
 :cpp:`==`, :cpp:`!=`, :cpp:`<`, :cpp:`<=`, :cpp:`>`, and :cpp:`>=` that can be
 used for lexicographical comparison (e.g., key of :cpp:`std::map`), and a class
 :cpp:`IntVect::shift_hasher` that can be used as a hash function (e.g., for
@@ -2147,6 +2162,13 @@ operations on a :cpp:`MultiFab` or between :cpp:`MultiFab`\ s  built with the
       // int      nc   : number of components for this operation
       // int      ng   : number of ghost cells involved in this operation
       //                 mfdst and mfsrc may have more ghost cells
+
+The infinity norm, :cpp:`mf.norminf(comp, ncomp, nghost)`, counts a NaN as
+infinity, so a NaN in the data always shows up in the norm.  To test single
+values, use :cpp:`amrex::isnan`, :cpp:`amrex::isinf` and
+:cpp:`amrex::isfinite`.  Unlike the ``std::`` versions, they work in builds
+with fast-math optimizations (e.g., ``AMReX_FASTMATH=ON``), where the compiler
+may assume that NaNs and infinities never occur.
 
 We refer the reader to ``amrex/Src/Base/AMReX_MultiFab.H`` and
 ``amrex/Src/Base/AMReX_FabArray.H`` for more details. It should be noted again

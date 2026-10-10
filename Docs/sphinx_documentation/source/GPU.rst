@@ -69,7 +69,9 @@ detailed throughout the rest of this chapter:
   loops, since in AMReX's approach to parallelism it is assumed that separate :cpp:`Box` objects
   can be processed independently. However, AMReX also provides a :cpp:`MultiFab` version
   of :cpp:`ParallelFor` that can process an entire level worth of :cpp:`Box` objects in
-  a single kernel launch when it is safe to do so.
+  a single kernel launch when it is safe to do so. :cpp:`ParallelForStrided` and
+  :cpp:`ParallelForRedBlack` do the same for a strided subset of points, e.g., one
+  color of a multi-color or red-black Gauss-Seidel sweep.
 
 - AMReX can utilize GPU managed memory to automatically handle memory
   movement for mesh and particle data.  Simple data structures, such
@@ -148,6 +150,13 @@ a different compiler.  One can change this by setting ``NVCC_HOST_COMP``.
 For example, ``COMP=pgi`` alone will compile C/C++ codes with NVCC/GCC
 and Fortran codes with PGI, and link with PGI.  Using ``COMP=pgi`` and
 ``NVCC_HOST_COMP=pgi`` will compile C/C++ codes with PGI and NVCC/PGI.
+
+With CUDA, ``GPU_MIN_BLOCKS=B`` (``-DAMReX_GPU_MIN_BLOCKS=B`` in CMake) limits
+the registers per thread in GPU code so that ``B`` blocks of
+``GPU_MAX_THREADS`` threads fit on a streaming multiprocessor. A larger ``B``
+gives higher occupancy but can cause register spilling. Keep ``B`` times
+``GPU_MAX_THREADS`` within the GPU's limit of resident threads per
+multiprocessor.
 
 You can use ``amrex-tutorials/ExampleCodes/Basic/HelloWorld_C/``
 to test your programming environment.  For example, building with:
@@ -264,6 +273,8 @@ check the :ref:`table <tab:cmakecudavar>` below.
    |                              |  (requires AMReX_GPU_RDC)                       |             |                 |
    +------------------------------+-------------------------------------------------+-------------+-----------------+
    | AMReX_CUDA_MAXREGCOUNT       |  Limits the number of CUDA registers available  | 255         | User-defined    |
+   +------------------------------+-------------------------------------------------+-------------+-----------------+
+   | AMReX_GPU_MIN_BLOCKS         |  Min resident blocks per SM (see above)         | None        | User-defined    |
    +------------------------------+-------------------------------------------------+-------------+-----------------+
    | AMReX_CUDA_PTX_VERBOSE       |  Verbose code generation statistics in ptxas    | NO          | YES, NO         |
    +------------------------------+-------------------------------------------------+-------------+-----------------+
@@ -630,8 +641,14 @@ to :cpp:`The_Arena()` to reduce memory fragmentation.
 
 In :cpp:`amrex::Initialize`, a large amount of GPU device memory is
 allocated and is kept in :cpp:`The_Arena()`.  The default is 3/4 of the
-total device memory, and it can be changed with a :cpp:`ParmParse`
-parameter, ``amrex.the_arena_init_size``, in the unit of bytes. The default
+total device memory divided by the number of MPI processes sharing the
+device, and it can be changed with a :cpp:`ParmParse` parameter,
+``amrex.the_arena_init_size``, in the unit of bytes.  Note that only the
+processes in the communicator passed to :cpp:`amrex::Initialize` are
+counted.  In MPMD runs, or when an application splits the communicator and
+initializes AMReX on each part, processes from different communicators may
+share a device.  In that case, the default oversubscribes the device, and
+the size should be set explicitly.  The default
 can also be changed with an environment variable
 ``AMREX_THE_ARENA_INIT_SIZE=X``, where ``X`` is the number of bytes. When
 both the :cpp:`ParmParse` parameter and the environment variable are
@@ -662,6 +679,11 @@ a separate arena, the behavior of :cpp:`The_Device_Area()` or
 the parameter discussed above are bytes.  All these arenas also have a
 member function :cpp:`freeUnused()` that can be used to manually release
 unused memory back to the system.
+
+If an arena runs out of memory, it throws :cpp:`amrex::OutOfMemoryError`,
+which is derived from :cpp:`std::bad_alloc`, and its :cpp:`what()` describes
+the request and the current memory usage.  An uncaught exception terminates the
+run.
 
 If you want to print out the current memory usage
 of the Arenas, you can call :cpp:`amrex::Arena::PrintUsage()`.
@@ -2099,31 +2121,34 @@ and recommendations for improving the code.  For more information on how to
 use ``nvprof``, see NVIDIA's User's Guide as well as the help web pages of
 your favorite supercomputing facility that uses NVIDIA GPUs.
 
-AMReX's internal profilers currently cannot hook into profiling information
-on the GPU and an efficient way to time and retrieve that information is
-being explored. In the meantime, AMReX's timers can be used to report some
-generic timers that are useful in categorizing an application.
+AMReX's internal profilers do not hook into backend profiling information,
+but TinyProfiler can measure selected GPU scopes by synchronizing the current
+AMReX GPU stream at their timer boundaries.
 
-Due to the asynchronous launching of GPU kernels, any AMReX timers inside of
-asynchronous regions or inside GPU kernels will not measure useful
-information.  However, since the :cpp:`MFIter` synchronizes when being
-destroyed, any timer wrapped around an :cpp:`MFIter` loop will yield a
-consistent timing of the entire set of GPU launches contained within. For
-example:
+Due to asynchronous GPU kernel launches, an ordinary host timer might finish
+before the work launched inside it. Use :cpp:`BL_PROFILE_GPU_SYNC` (or its
+variable and region variants) when a TinyProfiler timer must include work
+launched on the current stream. With the full profiler (``PROFILE=TRUE``),
+these macros are ordinary, unsynchronized timers. For example:
 
 .. highlight:: cpp
 
 ::
 
-    BL_PROFILE_VAR("A_NAME", blp);     // Profiling start
+    BL_PROFILE_VAR_GPU_SYNC("A_NAME", blp); // Synchronize, then start timing
     for (MFIter mfi(mf); mfi.isValid(); ++mfi)
     {
         // gpu works
     }
-    BL_PROFILE_STOP(blp);              // Profiling stop
+    BL_PROFILE_VAR_STOP(blp);           // Synchronize, then stop timing
 
-For now, this is the best way to profile GPU codes using ``TinyProfiler``.
-If you require further profiling detail, use ``nvprof``.
+The synchronized macros add synchronization points that are unnecessary for
+correctness and may affect application performance. Once one executes, the
+TinyProfiler report focuses on synchronized timers, synchronized regions, and
+the outermost timer; see :ref:`sec:tiny:gpu_sync` for the complete behavior.
+The runtime parameter ``tiny_profiler.device_synchronize_around_region``
+instead synchronizes every TinyProfiler timer boundary and keeps the complete
+report. For detailed kernel information, use a backend profiling tool.
 
 
 Performance Tips
@@ -2193,8 +2218,9 @@ by "amrex" in your :cpp:`inputs` file.
 |                            | derivative implementations).                                          |             |                |
 +----------------------------+-----------------------------------------------------------------------+-------------+----------------+
 | abort_on_out_of_gpu_memory | If the size of free memory on the GPU is less than the size of a      | Bool        | 0              |
-|                            | requested allocation, AMReX will call AMReX::Abort() with an error    |             |                |
-|                            | describing how much free memory there is and what was requested.      |             |                |
+|                            | requested allocation, AMReX will throw amrex::OutOfMemoryError with   |             |                |
+|                            | an error describing how much free memory there is and what was        |             |                |
+|                            | requested.                                                            |             |                |
 +----------------------------+-----------------------------------------------------------------------+-------------+----------------+
 | the_arena_is_managed       | Whether :cpp:`The_Arena()` allocates managed memory.                  | Bool        | 0              |
 +----------------------------+-----------------------------------------------------------------------+-------------+----------------+

@@ -793,6 +793,28 @@ public:
         return retval;
     }
     /**
+    * \brief This static member function returns an IntVectND for the index
+    * type of faces normal to direction d: nodal in d and cell-centered
+    * in the other directions.  It is provided as a convenience to our
+    * users when defining face-centered Boxes and MultiFabs.
+    */
+    AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+    static constexpr IntVectND<dim> TheFaceVector (int d) noexcept {
+        return TheDimensionVector(d);
+    }
+    /**
+    * \brief This static member function returns an IntVectND for the index
+    * type of edges parallel to direction d: cell-centered in d and nodal
+    * in the other directions.  It is provided as a convenience to our
+    * users when defining edge-centered Boxes and MultiFabs.
+    */
+    AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+    static constexpr IntVectND<dim> TheEdgeVector (int d) noexcept {
+        IntVectND<dim> retval(1);
+        retval[d] = 0;
+        return retval;
+    }
+    /**
     * \brief This static member function returns a reference to a constant IntVectND
     * object, all of whose dim arguments are set to IndexType::NODE.
     * It is provided as a convenience to our users when defining Boxes.
@@ -1332,10 +1354,10 @@ IntVectResize (const IntVectND<old_dim>& iv, int fill_extra=0) noexcept {
     return iv.template resize<new_dim>(fill_extra);
 }
 
-//! Get I'th element of IntVectND<dim>
-template <std::size_t I, int dim>
+//! Get the Idx-th element of IntVectND<dim>
+template <std::size_t Idx, int dim>
 AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
-constexpr int get (IntVectND<dim> const& iv) noexcept { return iv.vect[I]; }
+constexpr int get (IntVectND<dim> const& iv) noexcept { return iv.vect[Idx]; }
 
 namespace detail {
     template <typename F, int dim, std::size_t... N>

@@ -19,6 +19,13 @@ MyTest::MyTest ()
 }
 
 void
+MyTest::setMultigridType (std::string const& name)
+{
+    multigrid_type = amrex::getEnumCaseInsensitive<MultigridType>(name);
+    amrex::Print() << "\nMultigrid type: " << name << "\n";
+}
+
+void
 MyTest::solve ()
 {
     BL_PROFILE("NodalPoisson::solve()");
@@ -56,6 +63,8 @@ MyTest::solve ()
         mlmg.setMaxFmgIter(max_fmg_iter);
         mlmg.setVerbose(verbose);
         mlmg.setBottomVerbose(bottom_verbose);
+        mlmg.setMultigridType(multigrid_type);
+        if (hybrid_stall_rate >= 0) { mlmg.setHybridStallCriterion(4, hybrid_stall_rate); }
         // solution is passed to MLMG::solve to provide an initial guess.
         // Additionally it also provides boundary conditions for Dirichlet
         // boundaries if there are any.
@@ -97,6 +106,8 @@ MyTest::solve ()
             mlmg.setMaxFmgIter(max_fmg_iter);
             mlmg.setVerbose(verbose);
             mlmg.setBottomVerbose(bottom_verbose);
+            mlmg.setMultigridType(multigrid_type);
+            if (hybrid_stall_rate >= 0) { mlmg.setHybridStallCriterion(4, hybrid_stall_rate); }
 #ifdef AMREX_USE_HYPRE
             if (use_hypre) {
                 mlmg.setBottomSolver(MLMG::BottomSolver::hypre);
@@ -136,15 +147,6 @@ MyTest::solve ()
             } else {
                 mlmg.solve({&solution[ilev]}, {&rhs[ilev]}, reltol, 0.0);
             }
-        }
-    }
-
-    // A failed solve often returns NaNs.  Check for them explicitly, because
-    // the max-norm checks used by these tests silently drop NaNs.
-    for (int ilev = 0; ilev < int(solution.size()); ++ilev) {
-        if (solution[ilev].contains_nan(0, solution[ilev].nComp(), 0)) {
-            amrex::Abort("MyTest::solve: solution contains NaN on level "
-                         + std::to_string(ilev));
         }
     }
 }
@@ -202,6 +204,8 @@ MyTest::readParameters ()
 
     pp.query("do_plots", do_plots);
     pp.query("num_trials", num_trials);
+    pp.queryarr("multigrid_types", multigrid_types);
+    pp.query("hybrid_stall_rate", hybrid_stall_rate);
     pp.query("test_sigma_update", test_sigma_update);
     if (test_sigma_update) { do_plots = false; }
 
@@ -356,7 +360,7 @@ MyTest::testSigmaUpdate ()
     amrex::Print() << "NodalPoisson sigma update check: max error = "
                    << err << ", tolerance = " << tol << "\n";
 
-    if (err > tol || std::isnan(err)) {
+    if (err > tol || amrex::isnan(err)) {
         amrex::Abort("NodalPoisson sigma update check failed");
     }
 #endif

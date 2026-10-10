@@ -941,9 +941,9 @@ public:
      * \param mem LayoutData whose local entries are incremented by the number
      *            of bytes owned by the corresponding FAB.
      */
-    template <std::integral I>
-    requires (BaseFabType<FAB> && (sizeof(I) >= sizeof(Long)))
-    void capacityOfFabs (LayoutData<I>& mem) const;
+    template <std::integral Int>
+    requires (BaseFabType<FAB> && (sizeof(Int) >= sizeof(Long)))
+    void capacityOfFabs (LayoutData<Int>& mem) const;
 
     /**
     * \brief Returns the sum of component "comp"
@@ -1717,7 +1717,7 @@ public:
 
     /**
      * \ingroup amrex_fabarray_communication
-     * \brief Return infinity norm
+     * \brief Return infinity norm.  A NaN counts as infinity.
      *
      * \param comp           starting component
      * \param ncomp          number of components
@@ -1735,7 +1735,7 @@ public:
 
     /**
      * \ingroup amrex_fabarray_communication
-     * \brief Return infinity norm in masked region
+     * \brief Return infinity norm in masked region.  A NaN counts as infinity.
      *
      * \param mask   only mask=true region is included
      * \param comp   starting component
@@ -2915,14 +2915,14 @@ FabArray<FAB>::setDomainBndry (value_type val,
 }
 
 template <class FAB>
-template <std::integral I>
-requires (BaseFabType<FAB> && (sizeof(I) >= sizeof(Long)))
+template <std::integral Int>
+requires (BaseFabType<FAB> && (sizeof(Int) >= sizeof(Long)))
 void
-FabArray<FAB>::capacityOfFabs (LayoutData<I>& mem) const
+FabArray<FAB>::capacityOfFabs (LayoutData<Int>& mem) const
 {
     AMREX_ASSERT(amrex::isMFIterSafe(*this, mem));
     for (MFIter mfi(*this, MFItInfo{}.DisableDeviceSync()); mfi.isValid(); ++mfi) {
-        mem[mfi] += static_cast<I>((*this)[mfi].nBytesOwned());
+        mem[mfi] += static_cast<Int>((*this)[mfi].nBytesOwned());
     }
 }
 
@@ -4212,6 +4212,7 @@ FabArray<FAB>::norminf (int comp, int ncomp, IntVect const& nghost, bool local,
     using RT = typename F::value_type;
 
     auto nm0 = RT(0.0);
+    Math::detail::AbsNanToInf<RT> const absinf{};
 
 #ifdef AMREX_USE_EB
     if ( this->is_cell_centered() && this->hasEBFabFactory() && ignore_covered )
@@ -4231,7 +4232,7 @@ FabArray<FAB>::norminf (int comp, int ncomp, IntVect const& nghost, bool local,
                     auto tmp = RT(0.0);
                     auto const& a = ma[box_no];
                     for (int n = 0; n < ncomp; ++n) {
-                        tmp = amrex::max(tmp, std::abs(a(i,j,k,comp+n)));
+                        tmp = amrex::max(tmp, absinf(a(i,j,k,comp+n)));
                     }
                     return tmp;
                 }
@@ -4250,7 +4251,7 @@ FabArray<FAB>::norminf (int comp, int ncomp, IntVect const& nghost, bool local,
                     AMREX_LOOP_4D(bx, ncomp, i, j, k, n,
                     {
                         if (!flag(i,j,k).isCovered()) {
-                            nm0 = std::max(nm0, std::abs(a(i,j,k,comp+n)));
+                            nm0 = std::max(nm0, absinf(a(i,j,k,comp+n)));
                         }
                     });
                 }
@@ -4266,7 +4267,7 @@ FabArray<FAB>::norminf (int comp, int ncomp, IntVect const& nghost, bool local,
             nm0 = ParReduce(TypeList<ReduceOpMax>{}, TypeList<RT>{}, *this, nghost, ncomp,
             [=] AMREX_GPU_DEVICE (int box_no, int i, int j, int k, int n) noexcept -> GpuTuple<RT>
             {
-                return std::abs(ma[box_no](i,j,k,comp+n));
+                return absinf(ma[box_no](i,j,k,comp+n));
             });
         } else
 #endif
@@ -4279,7 +4280,7 @@ FabArray<FAB>::norminf (int comp, int ncomp, IntVect const& nghost, bool local,
                 auto const& a = this->const_array(mfi);
                 AMREX_LOOP_4D(bx, ncomp, i, j, k, n,
                 {
-                    nm0 = std::max(nm0, std::abs(a(i,j,k,comp+n)));
+                    nm0 = std::max(nm0, absinf(a(i,j,k,comp+n)));
                 });
             }
         }
@@ -4304,6 +4305,7 @@ FabArray<FAB>::norminf (FabArray<IFAB> const& mask, int comp, int ncomp,
     using RT = typename F::value_type;
 
     auto nm0 = RT(0.0);
+    Math::detail::AbsNanToInf<RT> const absinf{};
 
 #ifdef AMREX_USE_GPU
     if (Gpu::inLaunchRegion()) {
@@ -4316,7 +4318,7 @@ FabArray<FAB>::norminf (FabArray<IFAB> const& mask, int comp, int ncomp,
                 auto tmp = RT(0.0);
                 auto const& a = ma[box_no];
                 for (int n = 0; n < ncomp; ++n) {
-                    tmp = amrex::max(tmp, std::abs(a(i,j,k,comp+n)));
+                    tmp = amrex::max(tmp, absinf(a(i,j,k,comp+n)));
                 }
                 return tmp;
             } else {
@@ -4336,7 +4338,7 @@ FabArray<FAB>::norminf (FabArray<IFAB> const& mask, int comp, int ncomp,
             AMREX_LOOP_4D(bx, ncomp, i, j, k, n,
             {
                 if (mskfab(i,j,k)) {
-                    nm0 = std::max(nm0, std::abs(a(i,j,k,comp+n)));
+                    nm0 = std::max(nm0, absinf(a(i,j,k,comp+n)));
                 }
             });
         }

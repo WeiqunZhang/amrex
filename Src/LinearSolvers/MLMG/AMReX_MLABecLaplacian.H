@@ -1058,7 +1058,7 @@ MLABecLaplacianT<MF>::Fsmooth (int amrlev, int mglev, MF& sol, const MF& rhs, in
         if (this->m_overset_mask[amrlev][mglev]) {
             const auto& osmma = this->m_overset_mask[amrlev][mglev]->const_arrays();
             if (this->m_use_gauss_seidel) {
-                ParallelFor(sol, IntVect(0), nc,
+                ParallelForRedBlack(sol, nc, redblack,
                 [=] AMREX_GPU_DEVICE (int box_no, int i, int j, int k, int n) noexcept
                 {
                     Box vbx(ama[box_no]);
@@ -1090,7 +1090,7 @@ MLABecLaplacianT<MF>::Fsmooth (int amrlev, int mglev, MF& sol, const MF& rhs, in
             }
         } else if (regular_coarsening) {
             if (this->m_use_gauss_seidel) {
-                ParallelFor(sol, IntVect(0), nc,
+                ParallelForRedBlack(sol, nc, redblack,
                 [=] AMREX_GPU_DEVICE (int box_no, int i, int j, int k, int n) noexcept
                 {
                     Box vbx(ama[box_no]);
@@ -1405,7 +1405,7 @@ MLABecLaplacianT<MF>::supportNSolve () const
     if (this->m_overset_mask[0][0]) {
         if (this->m_geom[0].back().Domain().coarsenable(MLLinOp::mg_coarsen_ratio,
                                                         this->mg_domain_min_width)
-            && this->m_grids[0].back().coarsenable(MLLinOp::mg_coarsen_ratio, MLLinOp::mg_box_min_width))
+            && this->m_grids[0].back().coarsenable(MLLinOp::mg_coarsen_ratio, this->mg_box_min_width))
         {
             support = true;
         }

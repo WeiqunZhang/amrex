@@ -16,6 +16,13 @@ MyTest::MyTest ()
 }
 
 void
+MyTest::setMultigridType (std::string const& name)
+{
+    multigrid_type = amrex::getEnumCaseInsensitive<MultigridType>(name);
+    amrex::Print() << "\nMultigrid type: " << name << "\n";
+}
+
+void
 MyTest::solve ()
 {
     MLNodeTensorLaplacian linop(geom, grids, dmap,
@@ -35,6 +42,7 @@ MyTest::solve ()
     mlmg.setMaxFmgIter(max_fmg_iter);
     mlmg.setVerbose(verbose);
     mlmg.setBottomVerbose(bottom_verbose);
+    mlmg.setMultigridType(multigrid_type);
 #ifdef AMREX_USE_HYPRE
     if (use_hypre) {
         mlmg.setBottomSolver(MLMG::BottomSolver::hypre);
@@ -60,15 +68,6 @@ MyTest::solve ()
     }
 
     mlmg.solve(GetVecOfPtrs(solution), GetVecOfConstPtrs(rhs), reltol, 0.0);
-
-    // A failed solve often returns NaNs.  Check for them explicitly, because
-    // the max-norm checks used by these tests silently drop NaNs.
-    for (int ilev = 0; ilev < int(solution.size()); ++ilev) {
-        if (solution[ilev].contains_nan(0, solution[ilev].nComp(), 0)) {
-            amrex::Abort("MyTest::solve: solution contains NaN on level "
-                         + std::to_string(ilev));
-        }
-    }
 }
 
 void
@@ -104,6 +103,7 @@ MyTest::readParameters ()
 #endif
 
     pp.query("verbose", verbose);
+    pp.query("do_plots", do_plots);
     pp.query("bottom_verbose", bottom_verbose);
     pp.query("max_iter", max_iter);
     pp.query("max_fmg_iter", max_fmg_iter);
@@ -112,6 +112,8 @@ MyTest::readParameters ()
 #ifdef AMREX_USE_FLOAT
     reltol = std::max(reltol, 1.e-5F);
 #endif
+
+    pp.queryarr("multigrid_types", multigrid_types);
 
     Vector<Real> vbeta;
     pp.queryarr("beta", vbeta);

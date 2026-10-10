@@ -82,13 +82,24 @@ MyTest::MyTest ()
 }
 
 void
+MyTest::setMultigridType (std::string const& name)
+{
+    multigrid_type = amrex::getEnumCaseInsensitive<MultigridType>(name);
+    amrex::Print() << "\nMultigrid type: " << name << "\n";
+}
+
+void
 MyTest::run ()
 {
-    solve(false);
-    computeNorms("scalar sigma");
+    for (auto const& mgt : multigrid_types) {
+        setMultigridType(mgt);
 
-    solve(true);
-    computeNorms("variable sigma");
+        solve(false);
+        computeNorms("scalar sigma");
+
+        solve(true);
+        computeNorms("variable sigma");
+    }
 }
 
 void
@@ -140,6 +151,7 @@ MyTest::solve (bool variable_sigma)
     mlmg.setMaxFmgIter(max_fmg_iter);
     mlmg.setVerbose(verbose);
     mlmg.setBottomVerbose(bottom_verbose);
+    mlmg.setMultigridType(multigrid_type);
 
     // Generate a right-hand side that is exactly consistent with the
     // discretized operator used by this test.
@@ -185,7 +197,7 @@ MyTest::computeNorms (std::string const& label) const
 #endif
 
     if (!error.is_finite() ||
-        !std::isfinite(max_error) || !std::isfinite(l1_error) ||
+        !amrex::isfinite(max_error) || !amrex::isfinite(l1_error) ||
         max_error > error_tolerance) {
         amrex::Abort("FDNodalPoisson " + label + " error check failed");
     }
@@ -215,6 +227,7 @@ MyTest::readParameters ()
 #endif
     pp.query("max_coarsening_level", max_coarsening_level);
     pp.query("max_semicoarsening_level", max_semicoarsening_level);
+    pp.queryarr("multigrid_types", multigrid_types);
 }
 
 void
