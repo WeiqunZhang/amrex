@@ -17,6 +17,7 @@ export MPICH_OFI_NIC_POLICY=GPU
     echo "CRAY_MPICH_VERSION: ${CRAY_MPICH_VERSION}"
     module list 2>&1
     nvidia-smi topo -m
+    ldd "${EXE}" | grep -E "cudart|gtl|libmpi"
 } > "${OUTDIR}/env_info.txt" 2>&1
 
 # Problem sizes: name and arguments.

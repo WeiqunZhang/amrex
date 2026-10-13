@@ -12,5 +12,11 @@
 #SBATCH -o fb_4gpu.o%j
 
 # Submit from this directory: sbatch run_4gpu.sh
+# Must match the modules used to build the executable.
+# Comment these out to use the current defaults (CPE 26.03, CUDA 13.2).
+module load cpe/25.09
+module load cudatoolkit/12.9
+module load craype-accel-nvidia80
+
 NNODES=1
 source "${SLURM_SUBMIT_DIR}/fb_variants.sh"
