@@ -31,6 +31,10 @@ The results go to `results_<N>gpu_<jobid>/`:
 | preinit_identity | none | `cudaSetDevice(localid)` before `MPI_Init`, swap off |
 | host_swap | none | amrex_swap with `amrex.use_gpu_aware_mpi=0` |
 | host_cvd_reverse | none | cvd_reverse with `amrex.use_gpu_aware_mpi=0` |
+| gpus_per_task | `--gpus-per-task=1` (implicit `per_task:1`) | Slurm (NERSC example) |
+| map_gpu_identity | `map_gpu:0,1,2,3` | Slurm (NERSC example) |
+| map_gpu_reverse | `map_gpu:3,2,1,0` | Slurm, NUMA-matched order |
+| slurm_single_noipc | `single:1` | Slurm, with `MPICH_GPU_IPC_ENABLED=0` (HPE advice under cgroups) |
 
 GTL warnings (`gtl_warn` column) are expected for `amrex_swap` and `amrex_noswap`, which
 switch device after `MPI_Init`. `host_swap` switches too, but may not warn, because MPI

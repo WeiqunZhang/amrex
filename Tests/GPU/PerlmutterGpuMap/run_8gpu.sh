@@ -2,7 +2,7 @@
 #SBATCH -A m4546_g
 #SBATCH -q regular
 #SBATCH -C gpu
-#SBATCH -t 00:45:00
+#SBATCH -t 01:15:00
 #SBATCH -N 2
 #SBATCH --exclusive
 #SBATCH --ntasks-per-node=4
