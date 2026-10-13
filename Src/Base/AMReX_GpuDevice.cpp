@@ -304,10 +304,16 @@ Device::Initialize (bool minimal, int a_device_id)
 
     if (gpu_device_count > 1 && ! minimal && a_device_id < 0) {
         if (Machine::name() == "nersc.perlmutter") {
-            // The CPU/GPU mapping on perlmutter has the reverse order.
-            device_id = gpu_device_count - device_id - 1;
-            if (amrex::Verbose()) {
-                amrex::Print() << "Multiple GPUs are visible to each MPI rank. Fixing GPU assignment for Perlmutter according to heuristics.\n";
+            bool perlmutter_swap = true;
+            pp.queryAdd("perlmutter_swap", perlmutter_swap);
+            if (perlmutter_swap) {
+                // The CPU/GPU mapping on perlmutter has the reverse order.
+                device_id = gpu_device_count - device_id - 1;
+                if (amrex::Verbose()) {
+                    amrex::Print() << "Multiple GPUs are visible to each MPI rank. Fixing GPU assignment for Perlmutter according to heuristics.\n";
+                }
+            } else if (amrex::Verbose()) {
+                amrex::Print() << "Multiple GPUs are visible to each MPI rank. Perlmutter GPU swap disabled by device.perlmutter_swap=0.\n";
             }
         } else if (Machine::name() == "olcf.frontier") {
             // The CPU/GPU mapping on fronter is documented at
