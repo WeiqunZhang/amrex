@@ -17,6 +17,8 @@
 module load cpe/25.09
 module load cudatoolkit/12.9
 module load craype-accel-nvidia80
+# Non-default CPE: otherwise the loader picks the default MPI from /opt/cray/pe/lib64.
+export LD_LIBRARY_PATH=${CRAY_LD_LIBRARY_PATH}:${LD_LIBRARY_PATH}
 
 NNODES=2
 source "${SLURM_SUBMIT_DIR}/fb_variants.sh"
