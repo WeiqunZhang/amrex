@@ -26,6 +26,8 @@ SIZES=(
     "large:n_cell=512 max_grid_size=128 ncomp=8 nghost=2 nrounds=20"
 )
 
+# slurm_single (--gpu-bind=single:1) was dropped: GTL cuIpcOpenMemHandle fails under
+# Slurm GPU cgroups and the run hangs. -t 5 caps each step in case another one hangs.
 # Variants: label | srun GPU options | per-task shell prefix | AMReX arguments.
 # The prefix runs inside each task, so $SLURM_LOCALID is the task's own.
 BIND_NONE="--gpus-per-node=4 --gpu-bind=none"
@@ -36,7 +38,6 @@ VARIANTS=(
     'cvd_identity|'"${BIND_NONE}"'|export CUDA_VISIBLE_DEVICES=$SLURM_LOCALID;|amrex.use_gpu_aware_mpi=1'
     "preinit_reverse|${BIND_NONE}|export FB_PREINIT_DEVICE=reverse;|amrex.use_gpu_aware_mpi=1"
     "preinit_identity|${BIND_NONE}|export FB_PREINIT_DEVICE=identity;|amrex.use_gpu_aware_mpi=1 device.perlmutter_swap=0"
-    "slurm_single|--gpus-per-node=4 --gpu-bind=single:1||amrex.use_gpu_aware_mpi=1"
     "host_swap|${BIND_NONE}||amrex.use_gpu_aware_mpi=0"
     'host_cvd_reverse|'"${BIND_NONE}"'|export CUDA_VISIBLE_DEVICES=$((3-SLURM_LOCALID));|amrex.use_gpu_aware_mpi=0'
 )
@@ -52,7 +53,7 @@ for rep in $(seq 1 "${REPS}"); do
             IFS='|' read -r label gpuopts prefix args <<< "${v}"
             log="${OUTDIR}/${label}_${sname}_r${rep}.log"
             echo "running ${label} ${sname} rep ${rep}"
-            srun -N "${NNODES}" -n "${NRANKS}" --ntasks-per-node=4 -c 32 --cpu-bind=cores ${gpuopts} \
+            srun -t 5 -N "${NNODES}" -n "${NRANKS}" --ntasks-per-node=4 -c 32 --cpu-bind=cores ${gpuopts} \
                 bash -c "${prefix} exec ${EXE} label=${label} ${sargs} ${args}" \
                 > "${log}" 2>&1
             ngtl=$(grep -c "not using the same device" "${log}")

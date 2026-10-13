@@ -29,7 +29,6 @@ The results go to `results_<N>gpu_<jobid>/`:
 | cvd_identity | none | `CUDA_VISIBLE_DEVICES=localid` |
 | preinit_reverse | none | `cudaSetDevice(3-localid)` before `MPI_Init`, then swap |
 | preinit_identity | none | `cudaSetDevice(localid)` before `MPI_Init`, swap off |
-| slurm_single | `single:1` | Slurm binds one GPU per task |
 | host_swap | none | amrex_swap with `amrex.use_gpu_aware_mpi=0` |
 | host_cvd_reverse | none | cvd_reverse with `amrex.use_gpu_aware_mpi=0` |
 
