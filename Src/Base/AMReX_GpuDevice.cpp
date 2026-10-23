@@ -433,10 +433,17 @@ Device::Initialize (bool minimal, int a_device_id)
     }
 
     if (gpu_device_count > 1 && ! minimal && a_device_id < 0 && ! use_preinit) {
-        device_id = machine_device_id(device_id, gpu_device_count);
+        // device.perlmutter_swap=0 keeps device = rank in node on Perlmutter (for testing).
+        bool perlmutter_swap = true;
+        pp.queryAdd("perlmutter_swap", perlmutter_swap);
+        if (perlmutter_swap || Machine::name() != "nersc.perlmutter") {
+            device_id = machine_device_id(device_id, gpu_device_count);
+        }
         if (Machine::name() == "nersc.perlmutter") {
             if (amrex::Verbose()) {
-                amrex::Print() << "Multiple GPUs are visible to each MPI rank. Fixing GPU assignment for Perlmutter according to heuristics.\n";
+                amrex::Print() << "Multiple GPUs are visible to each MPI rank. "
+                               << (perlmutter_swap ? "Fixing GPU assignment for Perlmutter according to heuristics.\n"
+                                                   : "Perlmutter GPU swap disabled by device.perlmutter_swap=0.\n");
             }
         } else if (Machine::name() == "olcf.frontier") {
             if (gpu_device_count == 8 && amrex::Verbose()) {
