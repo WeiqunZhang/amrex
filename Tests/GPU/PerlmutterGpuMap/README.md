@@ -4,7 +4,8 @@ This benchmark times `FillBoundary` under different ways of assigning GPUs to ra
 was written to look into the Cray MPICH GTL warning "not using the same device it did
 during gtl_init".
 
-Build on Perlmutter with the default modules:
+Build on Perlmutter with the default modules (the GNUmakefile ignores `AMREX_HOME` from
+the environment and uses the enclosing checkout):
 
     make -j16
 
@@ -71,5 +72,3 @@ To check `amrex::Gpu::SelectDeviceBeforeMPIInit`, run the `fix` set (`amrex_init
 
     VARIANT_SET=fix sbatch run_8gpu.sh
 
-`HAVE_SELECT=FALSE` on the `make` line drops the `app_init_select` code path, for building
-against an AMReX without that function.

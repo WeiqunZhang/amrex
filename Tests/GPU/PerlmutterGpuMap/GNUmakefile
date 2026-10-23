@@ -1,4 +1,5 @@
-AMREX_HOME ?= ../../..
+# Always the enclosing checkout: the test needs the FillBoundary variants of this branch.
+AMREX_HOME := $(abspath ../../..)
 
 DEBUG     = FALSE
 DIM       = 3
