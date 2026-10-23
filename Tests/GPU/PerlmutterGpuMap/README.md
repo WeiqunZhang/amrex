@@ -4,7 +4,7 @@ This benchmark times `FillBoundary` under different ways of assigning GPUs to ra
 was written to look into the Cray MPICH GTL warning "not using the same device it did
 during gtl_init".
 
-Build on Perlmutter (`PrgEnv-gnu`, `cudatoolkit`, `craype-accel-nvidia80`):
+Build on Perlmutter with the default modules:
 
     make -j16
 
@@ -40,6 +40,31 @@ GTL warnings (`gtl_warn` column) are expected for `amrex_swap` and `amrex_noswap
 switch device after `MPI_Init`. `host_swap` switches too, but may not warn, because MPI
 never sees GPU buffers in that variant. The `preinit_*` variants keep all GPUs visible
 but set the device before `MPI_Init`. They emulate a possible AMReX fix.
+
+Every run also checks its result: the same FillBoundary is done with the default code
+path and all `amrex.fb.*` variants off, and the RESULT line reports `check=ok` or
+`check=FAIL` with the largest difference over valid and ghost cells (`check=0` skips it).
+The table has a `check` column; `FAIL(n)` means n runs differed.
+
+`VARIANT_SET=fb sbatch run_8gpu.sh` times the experimental `amrex.fb.*` FillBoundary
+variants instead of the GPU mappings:
+
+| variant | `amrex.fb.*` setting |
+|---|---|
+| fb_default | none (default path, GPU-aware MPI) |
+| fb_host_mpi | none, `amrex.use_gpu_aware_mpi=0` |
+| fb_engine | `engine=1`: the variant code path with nothing switched on |
+| fb_host_off_node | `host_off_node=1`: pinned host buffers for off-node peers |
+| fb_host_small | `host_threshold=65536`: pinned host buffers for messages under 64 KiB |
+| fb_local_first | `local_first=1` |
+| fb_async_unpack | `async_unpack=1` |
+| fb_persistent | `persistent=1` |
+| fb_unpack_arrival | `unpack_on_arrival=1` |
+| fb_all_device | local_first + async_unpack + persistent + unpack_on_arrival |
+| fb_all_host_off | fb_all_device + host_off_node |
+
+On one node (`run_4gpu.sh`) all peers are on-node, so the host_off_node variants run with
+`amrex.fb.debug_ranks_per_node=2`, which treats ranks 0-1 and 2-3 as separate nodes.
 
 To check `amrex::Gpu::SelectDeviceBeforeMPIInit`, run the `fix` set (`amrex_init`,
 `app_init_select`, `app_init_plain`, `cvd_reverse`):

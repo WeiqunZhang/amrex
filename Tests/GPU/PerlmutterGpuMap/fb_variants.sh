@@ -59,6 +59,29 @@ if [ "${VARIANT_SET}" = "fix" ]; then
     )
 fi
 
+# VARIANT_SET=fb: the amrex.fb.* FillBoundary variants, all with GPU-aware MPI and the
+# default GPU mapping. fb_default is the default code path; fb_host_mpi stages through the
+# host without GPU-aware MPI. On one node every peer is on-node, so the host_off_node
+# variants fake two-rank nodes.
+if [ "${VARIANT_SET}" = "fb" ]; then
+    FAKE_NODE=""
+    [ "${NNODES}" -eq 1 ] && FAKE_NODE="amrex.fb.debug_ranks_per_node=2"
+    GA="amrex.use_gpu_aware_mpi=1"
+    VARIANTS=(
+        "fb_default|${BIND_NONE}||${GA}"
+        "fb_host_mpi|${BIND_NONE}||amrex.use_gpu_aware_mpi=0"
+        "fb_engine|${BIND_NONE}||${GA} amrex.fb.engine=1"
+        "fb_host_off_node|${BIND_NONE}||${GA} amrex.fb.host_off_node=1 ${FAKE_NODE}"
+        "fb_host_small|${BIND_NONE}||${GA} amrex.fb.host_threshold=65536"
+        "fb_local_first|${BIND_NONE}||${GA} amrex.fb.local_first=1"
+        "fb_async_unpack|${BIND_NONE}||${GA} amrex.fb.async_unpack=1"
+        "fb_persistent|${BIND_NONE}||${GA} amrex.fb.persistent=1"
+        "fb_unpack_arrival|${BIND_NONE}||${GA} amrex.fb.unpack_on_arrival=1"
+        "fb_all_device|${BIND_NONE}||${GA} amrex.fb.local_first=1 amrex.fb.async_unpack=1 amrex.fb.persistent=1 amrex.fb.unpack_on_arrival=1"
+        "fb_all_host_off|${BIND_NONE}||${GA} amrex.fb.local_first=1 amrex.fb.async_unpack=1 amrex.fb.persistent=1 amrex.fb.unpack_on_arrival=1 amrex.fb.host_off_node=1 ${FAKE_NODE}"
+    )
+fi
+
 SUMMARY="${OUTDIR}/summary.txt"
 : > "${SUMMARY}"
 
@@ -76,6 +99,7 @@ for rep in $(seq 1 "${REPS}"); do
             ngtl=$(grep -c "not using the same device" "${log}")
             if grep -q '^RESULT' "${log}"; then
                 grep '^RESULT' "${log}" | sed "s/\$/ size=${sname} rep=${rep} gtl_warnings=${ngtl}/" >> "${SUMMARY}"
+                grep -q '^CHECK FAILED' "${log}" && echo "check failed: see ${log}"
             else
                 reason=error
                 grep -q "DUE TO TIME LIMIT" "${log}" && reason=timeout

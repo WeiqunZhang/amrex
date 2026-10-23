@@ -7,6 +7,7 @@ from collections import defaultdict
 
 times = defaultdict(list)
 gtl = defaultdict(int)
+checkfail = defaultdict(int)
 failed = []
 labels, sizes = [], []
 
@@ -25,14 +26,17 @@ with open(sys.argv[1]) as f:
             sizes.append(size)
         times[lab, size].append(float(fields["ms_med"]))
         gtl[lab] = max(gtl[lab], int(fields["gtl_warnings"]))
+        if fields.get("check", "ok") == "FAIL":
+            checkfail[lab] += 1
 
 print("Median of per-run medians, ms per FillBoundary (lower is better)")
-print(f"{'variant':18s}" + "".join(f"{s:>12s}" for s in sizes) + f"{'gtl_warn':>10s}")
+print(f"{'variant':18s}" + "".join(f"{s:>12s}" for s in sizes) + f"{'gtl_warn':>10s}{'check':>8s}")
 for lab in labels:
     row = f"{lab:18s}"
     for s in sizes:
         v = times.get((lab, s))
         row += f"{statistics.median(v):12.4f}" if v else f"{'-':>12s}"
-    print(row + f"{gtl[lab]:10d}")
+    chk = f"FAIL({checkfail[lab]})" if checkfail[lab] else "ok"
+    print(row + f"{gtl[lab]:10d}{chk:>8s}")
 for line in failed:
     print(line)
