@@ -14,11 +14,6 @@ TINY_PROFILE = FALSE
 
 include $(AMREX_HOME)/Tools/GNUMake/Make.defs
 
-HAVE_SELECT ?= TRUE
-ifeq ($(HAVE_SELECT),TRUE)
-  DEFINES += -DFB_HAVE_SELECT
-endif
-
 include ./Make.package
 include $(AMREX_HOME)/Src/Base/Make.package
 

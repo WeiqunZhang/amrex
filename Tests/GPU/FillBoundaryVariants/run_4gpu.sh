@@ -8,8 +8,8 @@
 #SBATCH --ntasks-per-node=4
 #SBATCH --cpus-per-task=32
 #SBATCH --gpus-per-node=4
-#SBATCH -J fb_4gpu
-#SBATCH -o fb_4gpu.o%j
+#SBATCH -J fbv_4gpu
+#SBATCH -o fbv_4gpu.o%j
 
 # Submit from this directory: sbatch run_4gpu.sh
 # Uses the default Perlmutter modules; build with the same.
