@@ -287,9 +287,8 @@ struct TagVector {
 
     void undefine () {
         if (defined) {
-            Gpu::streamSynchronize();
-            The_Pinned_Arena()->free(h_buffer);
-            The_Arena()->free(d_buffer);
+            Gpu::freeAsync(The_Pinned_Arena(), h_buffer);
+            Gpu::freeAsync(The_Arena(), d_buffer);
             h_buffer = nullptr;
             d_buffer = nullptr;
             d_tags = nullptr;

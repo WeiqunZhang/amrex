@@ -256,6 +256,7 @@ FluxRegister::CrseInit (const MultiFab& mflx,
             {
                 tag.dfab(i,j,k,n+destcomp) += tag.sfab(i,j,k,n);
             });
+            Gpu::streamSynchronize(); // fs is a temporary
 #endif
         }
     }
@@ -726,7 +727,6 @@ FluxRegister::ClearInternalBorders (const Geometry& geom)
     }
 
 #ifdef AMREX_USE_GPU
-    // There is Gpu::streamSynchronize in Parallelfor below internally.
     ParallelFor(tags, nc,
     [=] AMREX_GPU_DEVICE (int i, int j, int k, int n, Array4BoxTag<Real> const& tag)
     {

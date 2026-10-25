@@ -335,7 +335,7 @@ unpack_recv_buffer_gpu (FabArray<FAB>& mf, int scomp, int ncomp,
         tag.dfab(i,j,k,scomp+n) = proj(tag.sfab, si ,n);
     });
 
-    // There is Gpu::streamSynchronize in ParallelFor above
+    Gpu::streamSynchronize(); // recv buffer is freed by the caller
 
     if (pbuffer != recv_data[0]) {
         The_Arena()->free(pbuffer);

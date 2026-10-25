@@ -2858,6 +2858,9 @@ FabArray<FAB>::setBndry (value_type val,
                 {
                     tag.dfab(i,j,k,strt_comp+n) = val;
                 });
+                if (!Gpu::inNoSyncRegion()) {
+                    Gpu::streamSynchronize();
+                }
             }
         } else
 #endif
@@ -4139,6 +4142,9 @@ FabArray<FAB>::setVal (value_type val, const CommMetaData& thecmd, int scomp, in
     {
         CMD_local_setVal_gpu(val, thecmd, scomp, ncomp);
         CMD_remote_setVal_gpu(val, thecmd, scomp, ncomp);
+        if (!Gpu::inNoSyncRegion()) {
+            Gpu::streamSynchronize();
+        }
     }
     else
 #endif

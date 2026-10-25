@@ -1985,6 +1985,7 @@ void HypreMLABecLap::commBCoefs (int flev, Array<MultiFab const*,AMREX_SPACEDIM>
         {
             tag.dfab(i,j,k) = tag.sfab(i,j,k);
         });
+        Gpu::streamSynchronize();
 #endif
 
         FA::PostSnds(comm_data.data, comm_data.size, comm_data.rank, comm_data.request,
@@ -2063,6 +2064,7 @@ void HypreMLABecLap::commBCoefs (int flev, Array<MultiFab const*,AMREX_SPACEDIM>
 
 #ifdef AMREX_USE_GPU
         unpack_bc(bc_recv_tags, rr);
+        Gpu::streamSynchronize(); // recv buffer is freed on return
 #endif
     }
 
