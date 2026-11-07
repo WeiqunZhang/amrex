@@ -2192,6 +2192,11 @@ MLMGT<MF>::spIter (int iter)
         }
 
         linop.averageDownAndSync(sol);
+        // Nodal: the fine coarse/fine nodes are not seen by the residual, so
+        // take them from the double precision coarse solution.
+        for (int falev = 1; falev <= finest_amr_lev; ++falev) {
+            linop.interpCoarseFineSolution(falev, sol[falev], sol[falev-1]);
+        }
     } else {
         amrex::ignore_unused(iter);
         amrex::Abort("MLMG::spIter: MultiFab only");
