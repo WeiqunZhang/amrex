@@ -54,7 +54,7 @@ MLNodeLaplacianT<MF>::define (const Vector<Geometry>& a_geom,
         ba.enclosedCells();
     }
 
-    MLNodeLinOpT<MF>::define(a_geom, cc_grids, a_dmap, a_info, a_factory);
+    MLNodeLinOpT<MF>::define(a_geom, cc_grids, a_dmap, this->dpInfo(a_info), a_factory);
 
     m_const_sigma = a_const_sigma;
     m_sigma.resize(this->m_num_amr_levels);
@@ -101,6 +101,12 @@ MLNodeLaplacianT<MF>::define (const Vector<Geometry>& a_geom,
 #if (AMREX_SPACEDIM == 2)
     m_is_rz = this->m_geom[0][0].IsRZ();
 #endif
+
+    this->makeSPLinOp(a_info, [&] (auto const& sp_info) {
+        return std::make_unique<MLNodeLaplacianT<fMultiFab>>
+            (this->spGeom(a_geom), a_grids, a_dmap, sp_info, Vector<FabFactory<BaseFab<float>> const*>{},
+             static_cast<float>(a_const_sigma));
+    });
 
     m_needs_update = true;
 }
@@ -417,6 +423,12 @@ MLNodeLaplacianT<MF>::setSigma (int amrlev, const MF& a_sigma)
     }
 
     m_needs_update = true;
+
+    this->template spForward<MLNodeLaplacianT>([&] (auto* sp) {
+        fMultiFab fsigma(a_sigma.boxArray(), a_sigma.DistributionMap(), a_sigma.nComp(), 0);
+        fsigma.LocalCopy(a_sigma, 0, 0, a_sigma.nComp(), IntVect(0));
+        sp->setSigma(amrlev, fsigma);
+    });
 }
 
 template <typename MF>

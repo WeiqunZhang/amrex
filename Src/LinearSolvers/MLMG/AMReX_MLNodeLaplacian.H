@@ -107,12 +107,22 @@ public :
 
     std::string name () const override { return std::string("MLNodeLaplacian"); }
 
+    [[nodiscard]] bool supportsMixedPrecision () const override {
+        return typeid(*this) == typeid(MLNodeLaplacianT<MF>);
+    }
+
     /**
      * \brief Enable cylindrical (RZ) metric terms.
      *
      * \param rz True activates RZ corrections.
      */
-    void setRZCorrection (bool rz) noexcept { m_is_rz = rz; }
+    void setRZCorrection (bool rz) noexcept {
+        m_is_rz = rz;
+        if (this->m_sp_linop) { // the RZ stencil carries one power of r
+            this->m_sp_scale = static_cast<RT>(std::pow(this->m_sp_length_scale, rz ? -1 : -2));
+        }
+        this->template spForward<MLNodeLaplacianT>([&] (auto* sp) { sp->setRZCorrection(rz); });
+    }
 
     /**
      * \brief Threshold for normalization (prevents dividing by tiny averages).
@@ -124,6 +134,8 @@ public :
             m_normalization_threshold = t;
             m_needs_update = true;
         }
+        this->template spForward<MLNodeLaplacianT>([&] (auto* sp) {
+            sp->setNormalizationThreshold(static_cast<float>(t)); });
     }
 
     /**
@@ -160,7 +172,10 @@ public :
      *
      * \param flag True selects Gauss-Seidel.
      */
-    void setGaussSeidel (bool flag) noexcept { m_use_gauss_seidel = flag; }
+    void setGaussSeidel (bool flag) noexcept {
+        m_use_gauss_seidel = flag;
+        this->template spForward<MLNodeLaplacianT>([&] (auto* sp) { sp->setGaussSeidel(flag); });
+    }
     /**
      * \brief Toggle harmonic averaging when coarsening sigma.
      *
@@ -171,6 +186,7 @@ public :
             m_use_harmonic_average = flag;
             m_needs_update = true;
         }
+        this->template spForward<MLNodeLaplacianT>([&] (auto* sp) { sp->setHarmonicAverage(flag); });
     }
 
     /**
@@ -183,6 +199,7 @@ public :
             m_use_mapped = flag;
             m_needs_update = true;
         }
+        this->template spForward<MLNodeLaplacianT>([&] (auto* sp) { sp->setMapped(flag); });
     }
 
     /**
@@ -197,6 +214,7 @@ public :
             this->m_precond_weight_mask.clear();
             m_needs_update = true;
         }
+        this->template spForward<MLNodeLaplacianT>([&] (auto* sp) { sp->setCoarseningStrategy(cs); });
     }
 
     BottomSolver getDefaultBottomSolver () const final {

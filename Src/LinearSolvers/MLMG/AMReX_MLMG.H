@@ -996,9 +996,8 @@ MLMGT<MF>::solve (const Vector<AMF*>& a_sol, const Vector<AMF const*>& a_rhs,
                                      "MLMG: this operator does not support mixed precision");
     if (mixed) {
         AMREX_ALWAYS_ASSERT_WITH_MESSAGE(multigrid_type == MultigridType::geometric
-                                         && cf_strategy != CFStrategy::ghostnodes
-                                         && linop.isCellCentered(),
-            "MLMG: mixed precision needs geometric multigrid on a cell-centered operator");
+                                         && cf_strategy != CFStrategy::ghostnodes,
+            "MLMG: mixed precision needs geometric multigrid without ghost nodes");
         AMREX_ALWAYS_ASSERT_WITH_MESSAGE(bottom_solver != BottomSolver::hypre
                                          && bottom_solver != BottomSolver::petsc
                                          && bottom_solver != BottomSolver::algmg
