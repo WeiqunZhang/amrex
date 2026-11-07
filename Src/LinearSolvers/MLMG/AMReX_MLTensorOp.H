@@ -308,6 +308,9 @@ MLTensorOpT<MF>::setMappingFactors (int amrlev, const Array<AMF const*,AMREX_SPA
 }
 
 extern template class MLTensorOpT<MultiFab>;
+#if !defined(AMREX_USE_FLOAT) && !(defined(AMREX_USE_CUDA) && defined(_WIN32) && defined(AMREX_USE_EB))
+extern template class MLTensorOpT<fMultiFab>;
+#endif
 
 //! Double precision tensor operator.
 using MLTensorOp = MLTensorOpT<MultiFab>;

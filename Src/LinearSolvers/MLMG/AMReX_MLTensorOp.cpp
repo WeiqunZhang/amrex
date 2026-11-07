@@ -708,5 +708,8 @@ MLTensorOpT<MF>::compVelGrad (int amrlev, const Array<MF*,AMREX_SPACEDIM>& fluxe
 }
 
 template class MLTensorOpT<MultiFab>;
+#if !defined(AMREX_USE_FLOAT) && !(defined(AMREX_USE_CUDA) && defined(_WIN32) && defined(AMREX_USE_EB))
+template class MLTensorOpT<fMultiFab>; // single precision copy for mixed precision
+#endif
 
 }
