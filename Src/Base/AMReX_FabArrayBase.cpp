@@ -2780,6 +2780,20 @@ FabArrayBase::isFusingCandidate () const noexcept // NOLINT(readability-convert-
 
 #ifdef AMREX_USE_GPU
 
+namespace {
+    // The fused launches index the points of a box with 32-bit integers.
+    void check_par_for_ncells (Long ncellsmax)
+    {
+#ifndef AMREX_ARRAY4_64BIT_INDEX
+        AMREX_ALWAYS_ASSERT_WITH_MESSAGE(ncellsmax <= Long(std::numeric_limits<int>::max()) + 1,
+            "ParallelFor: box has too many points for 32-bit indexing; build with "
+            "USE_ARRAY4_64BIT_INDEX=TRUE (GNU Make) or AMReX_ARRAY4_64BIT_INDEX=ON (CMake)");
+#else
+        amrex::ignore_unused(ncellsmax);
+#endif
+    }
+}
+
 FabArrayBase::ParForInfo::ParForInfo (const FabArrayBase& fa, const IntVect& nghost)
     : m_bat(fa.boxArray().transformer()),
       m_ng(nghost)
@@ -2796,6 +2810,7 @@ FabArrayBase::ParForInfo::ParForInfo (const FabArrayBase& fa, const IntVect& ngh
         boxes.push_back(b);
         m_ncellsmax = std::max(m_ncellsmax, N);
     }
+    check_par_for_ncells(m_ncellsmax);
     detail::build_par_for_boxes(m_hp, m_boxes, boxes);
 }
 
@@ -2814,6 +2829,7 @@ FabArrayBase::ParForInfo::ParForInfo (const FabArrayBase& fa, const IntVect& str
         boxes.push_back(b.ok() ? detail::strided_box(b, stride, offset) : Box());
         m_ncellsmax = std::max(m_ncellsmax, boxes.back().numPts());
     }
+    check_par_for_ncells(m_ncellsmax);
     detail::build_par_for_boxes(m_hp, m_boxes, boxes);
 }
 
@@ -2836,6 +2852,7 @@ FabArrayBase::ParForInfo::ParForInfo (const FabArrayBase& fa, RedBlack)
         boxes.push_back(b.ok() ? b : Box());
         m_ncellsmax = std::max(m_ncellsmax, half.numPts());
     }
+    check_par_for_ncells(m_ncellsmax);
     detail::build_par_for_boxes(m_hp, m_boxes, boxes);
 }
 

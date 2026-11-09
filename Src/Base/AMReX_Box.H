@@ -2547,6 +2547,21 @@ struct BoxIndexerND
         return retval;
     }
 
+    //! As intVect, without the 64-bit fallback; requires numPts() < 2^32-1.
+    [[nodiscard]] AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+    IntVectND<dim> intVect32 (std::uint32_t icell) const
+    {
+        IntVectND<dim> retval = lo;
+        for (int i=dim-1; i>0; --i) {
+            std::uint32_t quotient, remainder;
+            fdm32[i-1](quotient, remainder, icell);
+            retval[i] += int(quotient);
+            icell = remainder;
+        }
+        retval[0] += int(icell);
+        return retval;
+    }
+
     /**
      * \brief Functor returning the coordinate padded to Dim3.
      *
@@ -2597,6 +2612,12 @@ struct BoxIndexerND<1>
      */
     [[nodiscard]] AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
     IntVectND<1> intVect (std::uint64_t icell) const
+    {
+        return IntVectND<1>{int(icell)+lo[0]};
+    }
+
+    [[nodiscard]] AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+    IntVectND<1> intVect32 (std::uint32_t icell) const
     {
         return IntVectND<1>{int(icell)+lo[0]};
     }

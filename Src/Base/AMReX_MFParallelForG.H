@@ -43,6 +43,25 @@ void destroy_par_for_boxes (char* hp, char* dp)
     }
 }
 
+// Without AMREX_ARRAY4_64BIT_INDEX, a box of a fused launch has at most 2^31
+// points (BaseFab and ParForInfo check it), so its points are indexed with
+// 32-bit integers.
+#ifdef AMREX_ARRAY4_64BIT_INDEX
+using ParForIndex = std::uint64_t;
+#else
+using ParForIndex = std::uint32_t;
+#endif
+
+AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+IntVect par_for_intvect (BoxIndexer const& indexer, ParForIndex icell)
+{
+#ifdef AMREX_ARRAY4_64BIT_INDEX
+    return indexer.intVect(icell);
+#else
+    return indexer.intVect32(icell);
+#endif
+}
+
 namespace parfor_mf_detail {
     template <typename F>
     AMREX_GPU_DEVICE
@@ -95,7 +114,7 @@ ParallelFor_doit (MF const& mf, IntVect const& nghost, int ncomp, IntVect const&
              {
                  std::uint32_t ibox, iblock;
                  fdm_box(ibox, iblock, blockIdx.x);
-                 auto icell = std::uint64_t(iblock)*MT + threadIdx.x;
+                 auto icell = ParForIndex(iblock)*MT + threadIdx.x;
 
 #elif defined(AMREX_USE_SYCL)
 
@@ -106,11 +125,11 @@ ParallelFor_doit (MF const& mf, IntVect const& nghost, int ncomp, IntVect const&
                  int threadIdxx = item.get_local_linear_id();
                  std::uint32_t ibox, iblock;
                  fdm_box(ibox, iblock, blockIdxx);
-                 auto icell = std::uint64_t(iblock)*MT + threadIdxx;
+                 auto icell = ParForIndex(iblock)*MT + threadIdxx;
 #endif
                  BoxIndexer const& indexer = dp_boxes[ibox];
-                 if (icell < indexer.numPts()) {
-                     auto [i, j, k] = indexer(icell);
+                 if (icell < ParForIndex(indexer.numPts())) {
+                     auto [i, j, k] = par_for_intvect(indexer, icell).dim3();
                      parfor_mf_detail::call_f(f, ibox, i, j, k, ncomp);
                  }
              });
@@ -167,7 +186,7 @@ ParallelForStrided_doit (MF const& mf, IntVect const& stride, IntVect const& off
          {
              std::uint32_t ibox, iblock;
              fdm_box(ibox, iblock, blockIdx.x);
-             auto icell = std::uint64_t(iblock)*MT + threadIdx.x;
+             auto icell = ParForIndex(iblock)*MT + threadIdx.x;
 
 #elif defined(AMREX_USE_SYCL)
 
@@ -178,11 +197,11 @@ ParallelForStrided_doit (MF const& mf, IntVect const& stride, IntVect const& off
              int threadIdxx = item.get_local_linear_id();
              std::uint32_t ibox, iblock;
              fdm_box(ibox, iblock, blockIdxx);
-             auto icell = std::uint64_t(iblock)*MT + threadIdxx;
+             auto icell = ParForIndex(iblock)*MT + threadIdxx;
 #endif
              BoxIndexer const& indexer = dp_boxes[ibox];
-             if (icell < indexer.numPts()) {
-                 IntVect iv = indexer.intVect(icell);
+             if (icell < ParForIndex(indexer.numPts())) {
+                 IntVect iv = par_for_intvect(indexer, icell);
                  for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
                      iv[idim] = indexer.lo[idim] + (iv[idim]-indexer.lo[idim])*stride[idim];
                  }
@@ -199,8 +218,10 @@ int box_indexer_len_x (BoxIndexer const& indexer)
 {
 #if (AMREX_SPACEDIM == 1)
     return int(indexer.npts);
-#else
+#elif defined(AMREX_ARRAY4_64BIT_INDEX)
     return int(indexer.fdm[0].divisor);
+#else
+    return int(indexer.fdm32[0].divisor);
 #endif
 }
 
@@ -229,7 +250,7 @@ ParallelForRedBlack_doit (MF const& mf, int redblack, F const& f)
          {
              std::uint32_t ibox, iblock;
              fdm_box(ibox, iblock, blockIdx.x);
-             auto icell = std::uint64_t(iblock)*MT + threadIdx.x;
+             auto icell = ParForIndex(iblock)*MT + threadIdx.x;
 
 #elif defined(AMREX_USE_SYCL)
 
@@ -240,12 +261,12 @@ ParallelForRedBlack_doit (MF const& mf, int redblack, F const& f)
              int threadIdxx = item.get_local_linear_id();
              std::uint32_t ibox, iblock;
              fdm_box(ibox, iblock, blockIdxx);
-             auto icell = std::uint64_t(iblock)*MT + threadIdxx;
+             auto icell = ParForIndex(iblock)*MT + threadIdxx;
 #endif
              // indexers[0]: the box coarsened by 2 in x; indexers[1]: the box.
              BoxIndexer const* indexers = dp_boxes + 2*ibox;
-             if (icell < indexers[0].numPts()) {
-                 auto [ic, j, k] = indexers[0](icell);
+             if (icell < ParForIndex(indexers[0].numPts())) {
+                 auto [ic, j, k] = par_for_intvect(indexers[0], icell).dim3();
                  const int i = 2*ic + ((j+k+redblack) & 1);
                  const int xlo = indexers[1].lo[0];
                  if (i >= xlo && i < xlo + box_indexer_len_x(indexers[1])) {
