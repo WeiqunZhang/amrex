@@ -95,7 +95,7 @@ add_amrex_define( AMREX_USE_FLATTEN_FOR NO_LEGACY IF AMReX_FLATTEN_FOR )
 # Bound checking
 add_amrex_define( AMREX_BOUND_CHECK NO_LEGACY IF AMReX_BOUND_CHECK )
 
-# 64-bit Array4 indexing in GPU code
+# 64-bit Array4 indexing
 add_amrex_define( AMREX_ARRAY4_64BIT_INDEX NO_LEGACY IF AMReX_ARRAY4_64BIT_INDEX )
 
 # Backtraces on macOS

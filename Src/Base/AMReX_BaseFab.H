@@ -118,13 +118,14 @@ struct NumComps {
 };
 
 namespace detail {
-//! Device code computes Array4 offsets within a component with 32-bit
+//! In GPU builds, Array4 computes offsets within a component with 32-bit
 //! integers (see ArrayND::offset4), so a box can have at most 2^31 points.
+//! The limit applies to all builds, so that behavior does not depend on the build.
 inline void check_array4_index_range (Box const& bx)
 {
-#if defined(AMREX_USE_GPU) && !defined(AMREX_ARRAY4_64BIT_INDEX)
+#ifndef AMREX_ARRAY4_64BIT_INDEX
     AMREX_ALWAYS_ASSERT_WITH_MESSAGE(bx.numPts() <= Long(std::numeric_limits<int>::max()) + 1,
-        "BaseFab: box has too many points for 32-bit Array4 indexing on GPU; "
+        "BaseFab: box has too many points for 32-bit Array4 indexing; "
         "build with USE_ARRAY4_64BIT_INDEX=TRUE (GNU Make) or AMReX_ARRAY4_64BIT_INDEX=ON (CMake)");
 #else
     amrex::ignore_unused(bx);
@@ -1615,7 +1616,7 @@ BaseFab<T>::define ()
     AMREX_ASSERT(this->nvar >= 0);
     if (this->nvar == 0) { return; }
     AMREX_ASSERT(std::numeric_limits<Long>::max()/this->nvar > this->domain.numPts());
-    if (arena()->isDeviceAccessible()) { detail::check_array4_index_range(this->domain); }
+    detail::check_array4_index_range(this->domain);
 
     // set the members after alloc, which may throw
     const Long n = this->nvar*this->domain.numPts();
@@ -1800,7 +1801,7 @@ BaseFab<T>::resize (const Box& b, int n, Arena* ar)
         ar = m_arena;
     }
 
-    if (DataAllocator(ar).arena()->isDeviceAccessible()) { detail::check_array4_index_range(b); }
+    detail::check_array4_index_range(b);
 
     if (arena() != DataAllocator(ar).arena()) {
         clear();

@@ -429,7 +429,7 @@ print_option( AMReX_FLATTEN_FOR )
 option(AMReX_BOUND_CHECK  "Enable bound checking in Array4 class" OFF)
 print_option( AMReX_BOUND_CHECK )
 
-option(AMReX_ARRAY4_64BIT_INDEX "Use 64-bit integers for Array4 indexing in GPU code" OFF)
+option(AMReX_ARRAY4_64BIT_INDEX "Use 64-bit integers for Array4 indexing" OFF)
 print_option( AMReX_ARRAY4_64BIT_INDEX )
 
 if("${CMAKE_SYSTEM_NAME}" MATCHES "Darwin")
