@@ -204,8 +204,8 @@ int box_indexer_len_x (BoxIndexer const& indexer)
 #endif
 }
 
-// One launch over the red or black points of all boxes. Consecutive threads
-// take consecutive points of one row, as in the single-box path.
+// One launch over the red or black points of all boxes, as in the single-box
+// path: thread ic of a row takes i = 2*ic or 2*ic+1, whichever has the color.
 template <int MT, FabArrayType MF, typename F>
 void
 ParallelForRedBlack_doit (MF const& mf, int redblack, F const& f)
@@ -242,18 +242,14 @@ ParallelForRedBlack_doit (MF const& mf, int redblack, F const& f)
              fdm_box(ibox, iblock, blockIdxx);
              auto icell = std::uint64_t(iblock)*MT + threadIdxx;
 #endif
-             // indexers[0]: even i, indexers[1]: odd i. Enumerate the larger
-             // lattice, then pick the one with the parity this row needs.
+             // indexers[0]: the box coarsened by 2 in x; indexers[1]: the box.
              BoxIndexer const* indexers = dp_boxes + 2*ibox;
-             const int big = (indexers[1].numPts() > indexers[0].numPts()) ? 1 : 0;
-             if (icell < indexers[big].numPts()) {
-                 const IntVect iv = indexers[big].intVect(icell);
-                 const int ic = iv[0] - indexers[big].lo[0];
-                 auto const d3 = iv.dim3();
-                 const int parity = (d3.y + d3.z + redblack) & 1;
-                 BoxIndexer const& indexer = indexers[parity];
-                 if (ic < box_indexer_len_x(indexer)) {
-                     f(ibox, indexer.lo[0] + 2*ic, d3.y, d3.z);
+             if (icell < indexers[0].numPts()) {
+                 auto [ic, j, k] = indexers[0](icell);
+                 const int i = 2*ic + ((j+k+redblack) & 1);
+                 const int xlo = indexers[1].lo[0];
+                 if (i >= xlo && i < xlo + box_indexer_len_x(indexers[1])) {
+                     f(ibox, i, j, k);
                  }
              }
          });
