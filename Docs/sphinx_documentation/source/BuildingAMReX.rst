@@ -84,6 +84,10 @@ list of important variables.
 
    \end{center}
 
+In GPU builds, a box of a :cpp:`FArrayBox` or other :cpp:`BaseFab` can have at
+most :math:`2^{31}` points. Set ``USE_ARRAY4_64BIT_INDEX = TRUE`` for larger
+boxes, at some cost in GPU performance.
+
 At the beginning of ``amrex-tutorials/Base/HelloWorld/GNUmakefile``,
 ``AMREX_HOME`` is set to the path to the top directory of AMReX.  Note that in
 the example :cpp:`?=` is a conditional variable assignment operator that only
@@ -563,6 +567,9 @@ The list of available options is reported in the :ref:`table <tab:cmakevar>` bel
    | AMReX_ASSERTIONS             |  Build with assertions turned on                | NO                      | YES, NO               |
    +------------------------------+-------------------------------------------------+-------------------------+-----------------------+
    | AMReX_BOUND_CHECK            |  Enable bound checking in Array4 class          | NO                      | YES, NO               |
+   +------------------------------+-------------------------------------------------+-------------------------+-----------------------+
+   | AMReX_ARRAY4_64BIT_INDEX     |  64-bit Array4 indexing in GPU code; needed for | NO                      | YES, NO               |
+   |                              |  a box of more than 2^31 points                 |                         |                       |
    +------------------------------+-------------------------------------------------+-------------------------+-----------------------+
    | AMReX_EXPORT_DYNAMIC         |  Enable backtrace on macOS                      | NO (unless Darwin)      | YES, NO               |
    +------------------------------+-------------------------------------------------+-------------------------+-----------------------+
