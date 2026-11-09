@@ -906,6 +906,38 @@ namespace amrex {
         //
 
         /**
+         * \brief Offset of element (i,j,k,n) from p.
+         *
+         * In device code, unless AMREX_ARRAY4_64BIT_INDEX is defined, the
+         * offset within a component is computed with 32-bit integers, which
+         * is much cheaper on GPUs. BaseFab checks that its boxes fit.
+         */
+        [[nodiscard]] AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+        Long offset4 (int i, int j, int k, int n) const noexcept
+            requires (IsArray4_v)
+        {
+#if defined(AMREX_USE_GPU) && !defined(AMREX_ARRAY4_64BIT_INDEX)
+            AMREX_IF_ON_DEVICE((
+                return Long((i-begin.vect[0]) +
+                            (j-begin.vect[1]) * int(stride.a[0]) +
+                            (k-begin.vect[2]) * int(stride.a[1])) +
+                    n * stride.a[2];
+            ))
+            AMREX_IF_ON_HOST((
+                return (i-begin.vect[0]) +
+                       (j-begin.vect[1]) * stride.a[0] +
+                       (k-begin.vect[2]) * stride.a[1] +
+                                       n * stride.a[2];
+            ))
+#else
+            return (i-begin.vect[0]) +
+                   (j-begin.vect[1]) * stride.a[0] +
+                   (k-begin.vect[2]) * stride.a[1] +
+                                   n * stride.a[2];
+#endif
+        }
+
+        /**
          * \brief Access Array4 element using three integer spatial indices.
          *
          * The component index is implicitly assumed to be zero. When
@@ -931,9 +963,7 @@ namespace amrex {
             AMREX_ARRAY4_INDEX_ASSERT(i,j,k,0);
 #endif
 #if defined(AMREX_USE_GPU) || defined(AMREX_DEBUG)
-            return p[(i-begin.vect[0]) +
-                     (j-begin.vect[1]) * stride.a[0] +
-                     (k-begin.vect[2]) * stride.a[1]];
+            return p[offset4(i,j,k,0)];
 #else
             Long idx1 = i + j*stride.a[0] + k*stride.a[1];
             Long idx0 = begin.vect[0]
@@ -967,10 +997,7 @@ namespace amrex {
             AMREX_ARRAY4_INDEX_ASSERT(i,j,k,n);
 #endif
 #if defined(AMREX_USE_GPU) || defined(AMREX_DEBUG)
-            return p[(i-begin.vect[0]) +
-                     (j-begin.vect[1]) * stride.a[0] +
-                     (k-begin.vect[2]) * stride.a[1] +
-                                     n * stride.a[2]];
+            return p[offset4(i,j,k,n)];
 #else
             Long idx1 = i + j*stride.a[0] + k*stride.a[1] + n*stride.a[2];
             Long idx0 = begin.vect[0]
@@ -1082,9 +1109,7 @@ namespace amrex {
             AMREX_ARRAY4_INDEX_ASSERT(i,j,k,0);
 #endif
 #if defined(AMREX_USE_GPU) || defined(AMREX_DEBUG)
-            return p + ((i-begin.vect[0]) +
-                        (j-begin.vect[1]) * stride.a[0] +
-                        (k-begin.vect[2]) * stride.a[1]);
+            return p + offset4(i,j,k,0);
 #else
             Long idx1 = i + j*stride.a[0] + k*stride.a[1];
             Long idx0 = begin.vect[0]
@@ -1112,10 +1137,7 @@ namespace amrex {
             AMREX_ARRAY4_INDEX_ASSERT(i,j,k,n);
 #endif
 #if defined(AMREX_USE_GPU) || defined(AMREX_DEBUG)
-            return p + ((i-begin.vect[0]) +
-                        (j-begin.vect[1]) * stride.a[0] +
-                        (k-begin.vect[2]) * stride.a[1] +
-                                        n * stride.a[2]);
+            return p + offset4(i,j,k,n);
 #else
             Long idx1 = i + j*stride.a[0] + k*stride.a[1] + n*stride.a[2];
             Long idx0 = begin.vect[0]

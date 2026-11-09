@@ -117,6 +117,21 @@ struct NumComps {
     int n;
 };
 
+namespace detail {
+//! Device code computes Array4 offsets within a component with 32-bit
+//! integers (see ArrayND::offset4), so a box can have at most 2^31 points.
+inline void check_array4_index_range (Box const& bx)
+{
+#if defined(AMREX_USE_GPU) && !defined(AMREX_ARRAY4_64BIT_INDEX)
+    AMREX_ALWAYS_ASSERT_WITH_MESSAGE(bx.numPts() <= Long(std::numeric_limits<int>::max()) + 1,
+        "BaseFab: box has too many points for 32-bit Array4 indexing on GPU; "
+        "build with USE_ARRAY4_64BIT_INDEX=TRUE (GNU Make) or AMReX_ARRAY4_64BIT_INDEX=ON (CMake)");
+#else
+    amrex::ignore_unused(bx);
+#endif
+}
+}
+
 template <typename T>
 AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
 Array4<T>
@@ -1600,6 +1615,7 @@ BaseFab<T>::define ()
     AMREX_ASSERT(this->nvar >= 0);
     if (this->nvar == 0) { return; }
     AMREX_ASSERT(std::numeric_limits<Long>::max()/this->nvar > this->domain.numPts());
+    if (arena()->isDeviceAccessible()) { detail::check_array4_index_range(this->domain); }
 
     // set the members after alloc, which may throw
     const Long n = this->nvar*this->domain.numPts();
@@ -1679,12 +1695,14 @@ template<class T>
 BaseFab<T>::BaseFab (const Box& bx, int ncomp, T* p)
     : dptr(p), domain(bx), nvar(ncomp), truesize(bx.numPts()*ncomp)
 {
+    detail::check_array4_index_range(bx);
 }
 
 template<class T>
 BaseFab<T>::BaseFab (const Box& bx, int ncomp, T const* p)
     : dptr(const_cast<T*>(p)), domain(bx), nvar(ncomp), truesize(bx.numPts()*ncomp)
 {
+    detail::check_array4_index_range(bx);
 }
 
 template<class T>
@@ -1781,6 +1799,8 @@ BaseFab<T>::resize (const Box& b, int n, Arena* ar)
     if (ar == nullptr) {
         ar = m_arena;
     }
+
+    if (DataAllocator(ar).arena()->isDeviceAccessible()) { detail::check_array4_index_range(b); }
 
     if (arena() != DataAllocator(ar).arena()) {
         clear();
