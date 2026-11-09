@@ -2822,17 +2822,19 @@ FabArrayBase::ParForInfo::ParForInfo (const FabArrayBase& fa, RedBlack)
       m_kind(Kind::redblack),
       m_ng(0)
 {
-    const IntVect stride(AMREX_D_DECL(2,1,1));
     Vector<Box> boxes;
     m_ncellsmax = 0;
     for (int K : fa.indexArray) {
         Box const& b = fa.box(K);
-        for (int parity = 0; parity < 2; ++parity) {
-            const IntVect offset(AMREX_D_DECL(parity,0,0));
-            boxes.push_back(b.ok() ? detail::strided_box(b, stride, offset) : Box());
-            // A launch enumerates the larger of the two lattices.
-            m_ncellsmax = std::max(m_ncellsmax, boxes.back().numPts());
+        Box half;
+        if (b.ok()) {
+            half = b;
+            half.setSmall(0, amrex::coarsen(b.smallEnd(0),2));
+            half.setBig  (0, amrex::coarsen(b.bigEnd(0),2));
         }
+        boxes.push_back(half);
+        boxes.push_back(b.ok() ? b : Box());
+        m_ncellsmax = std::max(m_ncellsmax, half.numPts());
     }
     detail::build_par_for_boxes(m_hp, m_boxes, boxes);
 }
