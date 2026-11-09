@@ -84,6 +84,8 @@ ParallelFor_doit (MF const& mf, IntVect const& nghost, int ncomp, IntVect const&
         AMREX_ASSERT(Long(nblocks_per_box)*Long(nboxes) < Long(std::numeric_limits<int>::max()));
         const int nblocks = nblocks_per_box * nboxes;
         const BoxIndexer* dp_boxes = parforinfo.getBoxes();
+        // Box and block within the box from the block index, without a division.
+        const Math::FastDivmodU32 fdm_box(nblocks_per_box);
 
 #if defined(AMREX_USE_CUDA) || defined(AMREX_USE_HIP)
 
@@ -91,18 +93,20 @@ ParallelFor_doit (MF const& mf, IntVect const& nghost, int ncomp, IntVect const&
             <<<nblocks, MT, 0, Gpu::gpuStream()>>>
             ([=] AMREX_GPU_DEVICE () noexcept
              {
-                 int ibox = int(blockIdx.x) / nblocks_per_box;
-                 auto icell = std::uint64_t(blockIdx.x-ibox*nblocks_per_box)*MT + threadIdx.x;
+                 std::uint32_t ibox, iblock;
+                 fdm_box(ibox, iblock, blockIdx.x);
+                 auto icell = std::uint64_t(iblock)*MT + threadIdx.x;
 
 #elif defined(AMREX_USE_SYCL)
 
         amrex::launch<MT>(nblocks, Gpu::gpuStream(),
              [=] AMREX_GPU_DEVICE (sycl::nd_item<1> const& item) noexcept
              {
-                 int blockIdxx = item.get_group_linear_id();
+                 auto blockIdxx = std::uint32_t(item.get_group_linear_id());
                  int threadIdxx = item.get_local_linear_id();
-                 int ibox = int(blockIdxx) / nblocks_per_box;
-                 auto icell = std::uint64_t(blockIdxx-ibox*nblocks_per_box)*MT + threadIdxx;
+                 std::uint32_t ibox, iblock;
+                 fdm_box(ibox, iblock, blockIdxx);
+                 auto icell = std::uint64_t(iblock)*MT + threadIdxx;
 #endif
                  BoxIndexer const& indexer = dp_boxes[ibox];
                  if (icell < indexer.numPts()) {
@@ -153,6 +157,7 @@ ParallelForStrided_doit (MF const& mf, IntVect const& stride, IntVect const& off
     AMREX_ASSERT(Long(nblocks_per_box)*Long(nboxes) < Long(std::numeric_limits<int>::max()));
     const int nblocks = nblocks_per_box * nboxes;
     const BoxIndexer* dp_boxes = parforinfo.getBoxes();
+    const Math::FastDivmodU32 fdm_box(nblocks_per_box);
 
 #if defined(AMREX_USE_CUDA) || defined(AMREX_USE_HIP)
 
@@ -160,18 +165,20 @@ ParallelForStrided_doit (MF const& mf, IntVect const& stride, IntVect const& off
         <<<nblocks, MT, 0, Gpu::gpuStream()>>>
         ([=] AMREX_GPU_DEVICE () noexcept
          {
-             int ibox = int(blockIdx.x) / nblocks_per_box;
-             auto icell = std::uint64_t(blockIdx.x-ibox*nblocks_per_box)*MT + threadIdx.x;
+             std::uint32_t ibox, iblock;
+             fdm_box(ibox, iblock, blockIdx.x);
+             auto icell = std::uint64_t(iblock)*MT + threadIdx.x;
 
 #elif defined(AMREX_USE_SYCL)
 
     amrex::launch<MT>(nblocks, Gpu::gpuStream(),
          [=] AMREX_GPU_DEVICE (sycl::nd_item<1> const& item) noexcept
          {
-             int blockIdxx = item.get_group_linear_id();
+             auto blockIdxx = std::uint32_t(item.get_group_linear_id());
              int threadIdxx = item.get_local_linear_id();
-             int ibox = int(blockIdxx) / nblocks_per_box;
-             auto icell = std::uint64_t(blockIdxx-ibox*nblocks_per_box)*MT + threadIdxx;
+             std::uint32_t ibox, iblock;
+             fdm_box(ibox, iblock, blockIdxx);
+             auto icell = std::uint64_t(iblock)*MT + threadIdxx;
 #endif
              BoxIndexer const& indexer = dp_boxes[ibox];
              if (icell < indexer.numPts()) {
@@ -212,6 +219,7 @@ ParallelForRedBlack_doit (MF const& mf, int redblack, F const& f)
     AMREX_ASSERT(Long(nblocks_per_box)*Long(nboxes) < Long(std::numeric_limits<int>::max()));
     const int nblocks = nblocks_per_box * nboxes;
     const BoxIndexer* dp_boxes = parforinfo.getBoxes();
+    const Math::FastDivmodU32 fdm_box(nblocks_per_box);
 
 #if defined(AMREX_USE_CUDA) || defined(AMREX_USE_HIP)
 
@@ -219,18 +227,20 @@ ParallelForRedBlack_doit (MF const& mf, int redblack, F const& f)
         <<<nblocks, MT, 0, Gpu::gpuStream()>>>
         ([=] AMREX_GPU_DEVICE () noexcept
          {
-             int ibox = int(blockIdx.x) / nblocks_per_box;
-             auto icell = std::uint64_t(blockIdx.x-ibox*nblocks_per_box)*MT + threadIdx.x;
+             std::uint32_t ibox, iblock;
+             fdm_box(ibox, iblock, blockIdx.x);
+             auto icell = std::uint64_t(iblock)*MT + threadIdx.x;
 
 #elif defined(AMREX_USE_SYCL)
 
     amrex::launch<MT>(nblocks, Gpu::gpuStream(),
          [=] AMREX_GPU_DEVICE (sycl::nd_item<1> const& item) noexcept
          {
-             int blockIdxx = item.get_group_linear_id();
+             auto blockIdxx = std::uint32_t(item.get_group_linear_id());
              int threadIdxx = item.get_local_linear_id();
-             int ibox = int(blockIdxx) / nblocks_per_box;
-             auto icell = std::uint64_t(blockIdxx-ibox*nblocks_per_box)*MT + threadIdxx;
+             std::uint32_t ibox, iblock;
+             fdm_box(ibox, iblock, blockIdxx);
+             auto icell = std::uint64_t(iblock)*MT + threadIdxx;
 #endif
              // indexers[0]: even i, indexers[1]: odd i. Enumerate the larger
              // lattice, then pick the one with the parity this row needs.
