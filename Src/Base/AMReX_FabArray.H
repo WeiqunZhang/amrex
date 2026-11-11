@@ -403,8 +403,9 @@ public:
      * \brief Construct an empty FabArray<FAB> that has a default Arena.
      *
      * If `define` is called later with a nullptr as MFInfo's arena, the
-     * default Arena `a` will be used.  If the arena in MFInfo is not a
-     * nullptr, the MFInfo's arena will be used.
+     * arena of the previous `define` will be used, or the default Arena
+     * `a` for the first `define` and after `clear`.  If the arena in MFInfo
+     * is not a nullptr, the MFInfo's arena will be used.
      */
     explicit FabArray (Arena* a) noexcept;
 
