@@ -1802,6 +1802,8 @@ protected:
 
     std::unique_ptr<FabFactory<FAB> > m_factory;
     DataAllocator m_dallocator;
+    //! Arena from FabArray(Arena*), used by define when MFInfo has none.
+    Arena* m_default_arena = nullptr;
     std::unique_ptr<detail::SingleChunkArena> m_single_chunk_arena;
     Long m_single_chunk_size = 0;
 
@@ -2295,7 +2297,7 @@ FabArray<FAB>::clear ()
     m_fabs_v.clear();
     clear_arrays();
     m_factory.reset();
-    m_dallocator.m_arena = nullptr;
+    m_dallocator.m_arena = m_default_arena;
     // no need to clear the non-blocking fillboundary stuff
 
     if (nbytes > 0) {
@@ -2389,6 +2391,7 @@ FabArray<FAB>::FabArray () noexcept
 template <class FAB>
 FabArray<FAB>::FabArray (Arena* a) noexcept
     : m_dallocator(a),
+      m_default_arena(a),
       shmem()
 {
     m_FA_stats.recordBuild();
@@ -2445,6 +2448,7 @@ FabArray<FAB>::FabArray (FabArray<FAB>&& rhs) noexcept
     : FabArrayBase (static_cast<FabArrayBase&&>(rhs))
     , m_factory    (std::move(rhs.m_factory))
     , m_dallocator (rhs.m_dallocator)
+    , m_default_arena(rhs.m_default_arena)
     , m_single_chunk_arena(std::move(rhs.m_single_chunk_arena))
     , m_single_chunk_size(std::exchange(rhs.m_single_chunk_size,0))
     , define_function_called(rhs.define_function_called)
@@ -2484,6 +2488,7 @@ FabArray<FAB>::operator= (FabArray<FAB>&& rhs) noexcept
         FabArrayBase::operator=(static_cast<FabArrayBase&&>(rhs));
         m_factory = std::move(rhs.m_factory);
         m_dallocator = rhs.m_dallocator;
+        m_default_arena = rhs.m_default_arena;
         m_single_chunk_arena = std::move(rhs.m_single_chunk_arena);
         std::swap(m_single_chunk_size, rhs.m_single_chunk_size);
         define_function_called = rhs.define_function_called;
